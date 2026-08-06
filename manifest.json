@@ -1,0 +1,9 @@
+{
+  "name": "Plump Jogos",
+  "short_name": "Plump",
+  "start_url": "./",
+  "display": "standalone",
+  "lang": "pt-BR",
+  "background_color": "#050611",
+  "theme_color": "#050611"
+}
