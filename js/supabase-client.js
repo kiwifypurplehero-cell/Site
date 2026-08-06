@@ -5,4 +5,4 @@ export const configured = Boolean(window.supabase && !placeholder(cfg.SUPABASE_U
 export const db = configured ? window.supabase.createClient(cfg.SUPABASE_URL, publicKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 }) : null;
-export const REDIRECT_URL = 'https://kiwifypurplehero-cell.github.io/Site-dos-jogos/';
+export const REDIRECT_URL = 'https://kiwifypurplehero-cell.github.io/Site/';
