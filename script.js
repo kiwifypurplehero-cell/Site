@@ -1,132 +1,39 @@
 (() => {
-  const STORAGE_KEY = 'plumpJogosPreferences';
-  const UPDATE_CACHE_KEY = 'plumpJogosUpdateCache';
-  const CACHE_TTL = 15 * 60 * 1000;
-  const REPOSITORIES = {
-    site: 'https://api.github.com/repos/kiwifypurplehero-cell/Site/commits/main',
-    cs16: 'https://api.github.com/repos/kiwifypurplehero-cell/CS1-6HTML/commits/main',
-  };
-  const themes = {
-    original: { name: 'Plump Original', primary: '#8b5cf6', secondary: '#4776ff', accent: '#38d9f5', background: '#050611', surface: '#0d1021', text: '#f5f6ff', button: '#7055ed', glow: '#38d9f5', cardOpacity: 0.92, glowStrength: 0.42, animationStrength: 1 },
-    blue: { name: 'Azul Neon', primary: '#2563eb', secondary: '#06b6d4', accent: '#67e8f9', background: '#04111f', surface: '#0b2036', text: '#eefaff', button: '#0ea5e9', glow: '#22d3ee', cardOpacity: 0.9, glowStrength: 0.5, animationStrength: 1 },
-    purple: { name: 'Roxo Gamer', primary: '#a855f7', secondary: '#7c3aed', accent: '#f0abfc', background: '#10051c', surface: '#1d0b31', text: '#fff7ff', button: '#9333ea', glow: '#d946ef', cardOpacity: 0.9, glowStrength: 0.5, animationStrength: 1 },
-    red: { name: 'Vermelho Arena', primary: '#ef4444', secondary: '#f97316', accent: '#facc15', background: '#160606', surface: '#2a1010', text: '#fff7ed', button: '#dc2626', glow: '#fb7185', cardOpacity: 0.9, glowStrength: 0.46, animationStrength: 1 },
-    green: { name: 'Verde Terminal', primary: '#22c55e', secondary: '#16a34a', accent: '#86efac', background: '#020b06', surface: '#07180d', text: '#ecfdf5', button: '#15803d', glow: '#4ade80', cardOpacity: 0.88, glowStrength: 0.45, animationStrength: 0.8 },
-    light: { name: 'Claro', primary: '#4f46e5', secondary: '#0284c7', accent: '#0891b2', background: '#f6f7fb', surface: '#ffffff', text: '#101422', button: '#4f46e5', glow: '#60a5fa', cardOpacity: 0.96, glowStrength: 0.22, animationStrength: 0.7 },
-    dark: { name: 'Escuro', primary: '#7c3aed', secondary: '#2563eb', accent: '#22d3ee', background: '#030712', surface: '#111827', text: '#f9fafb', button: '#6d28d9', glow: '#38bdf8', cardOpacity: 0.94, glowStrength: 0.35, animationStrength: 0.8 },
-  };
-  const defaultThemeKey = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'original';
-  let preferences = loadPreferences();
-  let lastFocusedElement = null;
-
-  function loadPreferences() {
-    const fallback = { themeKey: defaultThemeKey, customTheme: themes[defaultThemeKey], gameViewMode: 'detailed', reduceAnimations: window.matchMedia('(prefers-reduced-motion: reduce)').matches };
-    try { return { ...fallback, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; } catch { return fallback; }
-  }
-  function savePreferences() { localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences)); }
-  function applyTheme(theme) {
-    const root = document.documentElement;
-    root.style.setProperty('--color-primary', theme.primary);
-    root.style.setProperty('--color-secondary', theme.secondary);
-    root.style.setProperty('--color-accent', theme.accent);
-    root.style.setProperty('--color-background', theme.background);
-    root.style.setProperty('--color-surface', theme.surface);
-    root.style.setProperty('--color-text', theme.text);
-    root.style.setProperty('--color-button', theme.button);
-    root.style.setProperty('--color-glow', theme.glow);
-    root.style.setProperty('--card-opacity', theme.cardOpacity);
-    root.style.setProperty('--glow-strength', theme.glowStrength);
-    root.style.setProperty('--animation-strength', preferences.reduceAnimations ? 0 : theme.animationStrength);
-    document.body.classList.toggle('reduce-animations', preferences.reduceAnimations);
-    updateContrastWarning(theme.background, theme.text);
-  }
-  function resetTheme() { preferences = { themeKey: 'original', customTheme: themes.original, gameViewMode: preferences.gameViewMode, reduceAnimations: false }; savePreferences(); syncSettingsControls(); applyTheme(themes.original); showToast('Configurações restauradas.'); }
-  function getActiveTheme() { return preferences.themeKey === 'custom' ? preferences.customTheme : themes[preferences.themeKey] || themes.original; }
-  function luminance(hex) { const rgb = hex.replace('#','').match(/.{2}/g).map((x)=>parseInt(x,16)/255).map((v)=>v<=0.03928?v/12.92:((v+0.055)/1.055)**2.4); return 0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2]; }
-  function updateContrastWarning(bg, text) { const warning = document.querySelector('#contrast-warning'); if (!warning) return; const ratio = (Math.max(luminance(bg), luminance(text)) + .05) / (Math.min(luminance(bg), luminance(text)) + .05); warning.hidden = ratio >= 4.5; }
-
-  function setGameViewMode(mode) {
-    preferences.gameViewMode = mode; savePreferences();
-    document.querySelector('#games-list')?.setAttribute('data-view', mode);
-    document.querySelectorAll('[data-view-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.viewMode === mode)));
-  }
-
-  async function fetchRepositoryUpdate(key, url) {
-    const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/vnd.github+json' } });
-      if (!response.ok) throw new Error(`GitHub respondeu ${response.status}`);
-      const data = await response.json();
-      const date = data?.commit?.committer?.date || data?.commit?.author?.date;
-      if (!date) throw new Error('Data ausente');
-      return { key, date, checkedAt: Date.now(), verified: true };
-    } finally { clearTimeout(timeout); }
-  }
-  function formatUpdateDate(dateValue) { return new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }).format(new Date(dateValue)).replace(',', ' às'); }
-  function formatRelativeTime(dateValue) {
-    const diff = Date.now() - new Date(dateValue).getTime(); const mins = Math.max(1, Math.floor(diff / 60000));
-    if (mins < 60) return `Atualizado há ${mins} minuto${mins > 1 ? 's' : ''}`;
-    const hours = Math.floor(mins / 60); if (hours < 24) return `Atualizado há ${hours} hora${hours > 1 ? 's' : ''}`;
-    const days = Math.floor(hours / 24); return `Atualizado há ${days} dia${days > 1 ? 's' : ''}`;
-  }
-  function renderUpdate(key, item, fallback = false) {
-    const box = document.querySelector(`[data-update-project="${key}"]`); if (!box || !item) return;
-    box.dataset.updateDate = item.date;
-    box.querySelector('[data-update-date]').textContent = `${fallback ? 'Última atualização conhecida' : 'Última atualização'}: ${formatUpdateDate(item.date)}`;
-    box.querySelector('[data-update-relative]').textContent = formatRelativeTime(item.date);
-    box.querySelector('[data-update-status]').textContent = item.verified && !fallback ? 'Atualização verificada' : 'Não foi possível verificar agora';
-  }
-  async function refreshUpdateInformation(force = false) {
-    const button = document.querySelector('[data-refresh-updates]'); if (button) button.textContent = 'Verificando atualização…';
-    let cache = {}; try { cache = JSON.parse(localStorage.getItem(UPDATE_CACHE_KEY) || '{}'); } catch { cache = {}; }
-    const fresh = cache.checkedAt && Date.now() - cache.checkedAt < CACHE_TTL;
-    if (!force && fresh) { Object.entries(cache.items || {}).forEach(([key, item]) => renderUpdate(key, item)); if (button) button.textContent = 'Atualizar informações'; return; }
-    try {
-      const results = await Promise.all(Object.entries(REPOSITORIES).map(([key, url]) => fetchRepositoryUpdate(key, url)));
-      const items = Object.fromEntries(results.map((item) => [item.key, item])); localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ checkedAt: Date.now(), items }));
-      Object.entries(items).forEach(([key, item]) => renderUpdate(key, item));
-    } catch (error) { Object.entries(cache.items || {}).forEach(([key, item]) => renderUpdate(key, item, true)); document.querySelectorAll('[data-update-status]').forEach((el) => { if (!el.textContent.includes('conhecida')) el.textContent = 'Não foi possível verificar agora'; }); }
-    if (button) button.textContent = 'Atualizar informações';
-  }
-
-  function showToast(message) { const toast = document.querySelector('.toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
-  function openSettingsPanel(trigger) { lastFocusedElement = trigger; document.querySelector('#settings-panel').hidden = false; trigger.setAttribute('aria-expanded', 'true'); document.body.classList.add('modal-open'); syncSettingsControls(); document.querySelector('#settings-close').focus(); }
-  function closeSettingsPanel() { const panel = document.querySelector('#settings-panel'); if (panel.hidden) return; panel.hidden = true; document.querySelectorAll('[data-open-settings]').forEach((button) => button.setAttribute('aria-expanded', 'false')); document.body.classList.remove('modal-open'); lastFocusedElement?.focus(); }
-  function syncSettingsControls() {
-    const theme = getActiveTheme(); document.querySelector('#theme-select').value = preferences.themeKey;
-    ['primary','secondary','accent','background','surface','text','button','glow'].forEach((name) => { document.querySelector(`#color-${name}`).value = theme[name]; });
-    document.querySelector('#card-opacity').value = theme.cardOpacity; document.querySelector('#glow-strength').value = theme.glowStrength; document.querySelector('#animation-strength').value = theme.animationStrength; document.querySelector('#reduce-animations').checked = preferences.reduceAnimations; updatePreview(theme);
-  }
-  function readCustomTheme() { return { name: 'Personalizado', primary: colorPrimary.value, secondary: colorSecondary.value, accent: colorAccent.value, background: colorBackground.value, surface: colorSurface.value, text: colorText.value, button: colorButton.value, glow: colorGlow.value, cardOpacity: Number(cardOpacity.value), glowStrength: Number(glowStrength.value), animationStrength: Number(animationStrength.value) }; }
-  function updatePreview(theme) { const preview = document.querySelector('.theme-preview'); if (!preview) return; preview.style.setProperty('--preview-bg', theme.background); preview.style.setProperty('--preview-surface', theme.surface); preview.style.setProperty('--preview-text', theme.text); preview.style.setProperty('--preview-primary', theme.primary); preview.style.setProperty('--preview-accent', theme.accent); updateContrastWarning(theme.background, theme.text); }
-
-  const menuToggle = document.querySelector('.menu-toggle'); const menu = document.querySelector('.nav-links'); const navLinks = document.querySelectorAll('.nav-link'); const header = document.querySelector('.site-header');
-  function closeMenu() { menu.classList.remove('open'); menuToggle.setAttribute('aria-expanded','false'); menuToggle.setAttribute('aria-label','Abrir menu'); }
-  menuToggle.addEventListener('click', () => { const isOpen = menu.classList.toggle('open'); menuToggle.setAttribute('aria-expanded', String(isOpen)); menuToggle.setAttribute('aria-label', isOpen ? 'Fechar menu' : 'Abrir menu'); });
-  navLinks.forEach((link) => link.addEventListener('click', closeMenu)); document.addEventListener('click', (event) => { if (!menu.contains(event.target) && !menuToggle.contains(event.target)) closeMenu(); });
-  const sections = document.querySelectorAll('main section[id], header[id]'); function updateNavigation() { header.classList.toggle('scrolled', window.scrollY > 20); let current='inicio'; sections.forEach((section)=>{ if (window.scrollY >= section.offsetTop - 180) current = section.id; }); navLinks.forEach((link)=>link.classList.toggle('active', link.getAttribute('href') === `#${current}`)); } window.addEventListener('scroll', updateNavigation, { passive: true }); updateNavigation();
-
-  document.querySelectorAll('[data-open-settings]').forEach((button) => button.addEventListener('click', (event) => openSettingsPanel(event.currentTarget)));
-  document.querySelector('#settings-panel').addEventListener('click', (event) => { if (event.target.matches('[data-close-settings]')) closeSettingsPanel(); });
-  document.querySelectorAll('[data-view-mode]').forEach((button) => button.addEventListener('click', () => setGameViewMode(button.dataset.viewMode)));
-  document.querySelector('#theme-select').addEventListener('change', (event) => { if (event.target.value !== 'custom') { preferences.themeKey = event.target.value; preferences.customTheme = themes[event.target.value]; syncSettingsControls(); applyTheme(getActiveTheme()); savePreferences(); } });
-  const colorPrimary = document.querySelector('#color-primary'), colorSecondary = document.querySelector('#color-secondary'), colorAccent = document.querySelector('#color-accent'), colorBackground = document.querySelector('#color-background'), colorSurface = document.querySelector('#color-surface'), colorText = document.querySelector('#color-text'), colorButton = document.querySelector('#color-button'), colorGlow = document.querySelector('#color-glow'), cardOpacity = document.querySelector('#card-opacity'), glowStrength = document.querySelector('#glow-strength'), animationStrength = document.querySelector('#animation-strength');
-  document.querySelectorAll('.settings-panel input[type="color"], .settings-panel input[type="range"]').forEach((input) => input.addEventListener('input', () => { preferences.themeKey = 'custom'; preferences.customTheme = readCustomTheme(); document.querySelector('#theme-select').value = 'custom'; updatePreview(preferences.customTheme); }));
-  document.querySelector('#apply-theme').addEventListener('click', () => { preferences.customTheme = readCustomTheme(); preferences.themeKey = document.querySelector('#theme-select').value === 'custom' ? 'custom' : preferences.themeKey; preferences.reduceAnimations = document.querySelector('#reduce-animations').checked; applyTheme(getActiveTheme()); savePreferences(); showToast('Aparência aplicada.'); });
-  document.querySelector('#save-theme').addEventListener('click', () => { preferences.themeKey = 'custom'; preferences.customTheme = readCustomTheme(); preferences.reduceAnimations = document.querySelector('#reduce-animations').checked; applyTheme(preferences.customTheme); savePreferences(); showToast('Tema salvo neste navegador.'); });
-  document.querySelector('#reset-theme').addEventListener('click', resetTheme);
-  document.querySelector('#reduce-animations').addEventListener('change', (event) => { preferences.reduceAnimations = event.target.checked; applyTheme(getActiveTheme()); savePreferences(); });
-  document.querySelector('[data-refresh-updates]').addEventListener('click', () => refreshUpdateInformation(true));
-  setInterval(() => Object.keys(REPOSITORIES).forEach((key) => { const date = document.querySelector(`[data-update-project="${key}"]`)?.dataset.updateDate; if (date) renderUpdate(key, { date, verified: true }); }), 60000);
-
-  const modal = document.querySelector('#site-modal'), modalTitle = document.querySelector('#modal-title'), modalContent = document.querySelector('#modal-content'), modalActions = document.querySelector('#modal-actions');
-  const modalData = { install: { title:'Como instalar o CS 1.6 PLH', content:'<ol><li>Clique em Baixar.</li><li>Extraia o arquivo ZIP.</li><li>Abra a pasta extraída.</li><li>Localize o arquivo HTML principal.</li><li>Abra em um navegador atualizado.</li></ol>' }, credits: { title:'Créditos', content:'<p>Plump Jogos foi criada por Matheus (Plump), com ajuda do Codex no desenvolvimento do site.</p>' }, privacy: { title:'Política de privacidade', content:'<p>Este site não coleta dados pessoais, não utiliza rastreadores, anúncios ou cookies de análise. Links externos seguem as políticas dos respectivos serviços.</p>' } };
-  function openModal(trigger, data, isDownload=false) { lastFocusedElement = trigger; modalTitle.textContent = data.title; modalContent.innerHTML = data.content; modalActions.innerHTML = isDownload ? '<button class="button button--ghost" type="button" data-close-modal>Cancelar</button><a class="button button--primary" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML/archive/refs/heads/main.zip" target="_blank" rel="noopener noreferrer">Continuar download</a>' : '<button class="button button--primary" type="button" data-close-modal>Entendido</button>'; modal.hidden = false; document.body.classList.add('modal-open'); modal.querySelector('[data-close-modal]').focus(); }
-  function closeModal() { if (modal.hidden) return; modal.hidden = true; document.body.classList.remove('modal-open'); lastFocusedElement?.focus(); }
-  document.querySelectorAll('[data-open-download]').forEach((button) => button.addEventListener('click', (event) => openModal(event.currentTarget, { title:'Confirmar download', content:'<p>Você está prestes a baixar a versão mais recente do CS 1.6 PLH diretamente pelo GitHub.</p>' }, true)));
-  document.querySelector('[data-open-install]').addEventListener('click', (event) => openModal(event.currentTarget, modalData.install)); document.querySelector('[data-open-credits]').addEventListener('click', (event) => openModal(event.currentTarget, modalData.credits)); document.querySelector('[data-open-privacy]').addEventListener('click', (event) => openModal(event.currentTarget, modalData.privacy)); modal.addEventListener('click', (event) => { if (event.target.closest('[data-close-modal]')) closeModal(); });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeModal(); closeSettingsPanel(); } const trap = !modal.hidden ? modal : (!document.querySelector('#settings-panel').hidden ? document.querySelector('#settings-panel') : null); if (event.key === 'Tab' && trap) { const focusable = [...trap.querySelectorAll('button, a[href], input, select')]; const first = focusable[0], last = focusable.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } } });
-
-  const reducedMotion = preferences.reduceAnimations || window.matchMedia('(prefers-reduced-motion: reduce)').matches; const revealItems = document.querySelectorAll('.reveal'); if (reducedMotion || !('IntersectionObserver' in window)) revealItems.forEach((item)=>item.classList.add('visible')); else { const observer = new IntersectionObserver((entries,o)=>entries.forEach((entry)=>{ if(entry.isIntersecting){ entry.target.classList.add('visible'); o.unobserve(entry.target); } }), { threshold:.12 }); revealItems.forEach((item)=>observer.observe(item)); }
-  applyTheme(getActiveTheme()); setGameViewMode(preferences.gameViewMode); refreshUpdateInformation();
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const PREF='plumpgames.preferences.v1', PROFILES='plumpgames.localProfiles.v1', ACTIVE='plumpgames.activeProfile.v1';
+const usernamePattern=/^[a-z0-9._-]{3,24}$/;
+const themes={original:['#8b5cf6','#4776ff','#38d9f5','#050611','#0d1021','#f5f6ff','#7055ed','#38d9f5'],blue:['#2563eb','#06b6d4','#67e8f9','#04111f','#0b2036','#eefaff','#0ea5e9','#22d3ee'],purple:['#a855f7','#7c3aed','#f0abfc','#10051c','#1d0b31','#fff7ff','#9333ea','#d946ef'],red:['#ef4444','#f97316','#facc15','#160606','#2a1010','#fff7ed','#dc2626','#fb7185'],green:['#22c55e','#16a34a','#86efac','#020b06','#07180d','#ecfdf5','#15803d','#4ade80'],light:['#4f46e5','#0284c7','#0891b2','#f6f7fb','#ffffff','#101422','#4f46e5','#60a5fa'],dark:['#7c3aed','#2563eb','#22d3ee','#030712','#111827','#f9fafb','#6d28d9','#38bdf8']};
+const keys=['primary','secondary','accent','background','surface','text','button','glow'];
+const defaults={theme:'original',colors:themes.original,glowStrength:.42,cardOpacity:.92,animationStrength:1,view:'detailed',wallpaper:'cosmic',reduceMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
+let prefs=read(PREF,defaults), editing=null, lastFocus=null;
+function read(k,f){try{return {...f,...JSON.parse(localStorage.getItem(k)||'{}')}}catch{return {...f}}}
+function profiles(){try{const value=JSON.parse(localStorage.getItem(PROFILES)||'[]');return Array.isArray(value)?value.map(p=>({displayName:p.displayName,username:String(p.username||'').trim().toLowerCase(),avatar:p.avatar,bio:p.bio,createdAt:p.createdAt})).filter(p=>usernamePattern.test(p.username)):[]}catch{return []}}
+function toast(m){const t=$('.toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+function normalizeInputs(){[...$$('#local-username,#admin-username')].forEach(i=>i.addEventListener('input',()=>{i.value=i.value.trim().toLowerCase().replace(/\s/g,'')}))}
+function apply(){keys.forEach((k,i)=>document.documentElement.style.setProperty(`--color-${k}`,prefs.colors[i]));document.documentElement.style.setProperty('--glow-strength',prefs.glowStrength);document.documentElement.style.setProperty('--card-opacity',prefs.cardOpacity);document.documentElement.style.setProperty('--animation-strength',prefs.reduceMotion?0:prefs.animationStrength);document.body.classList.toggle('reduce-animations',prefs.reduceMotion);$('#games-list').dataset.view=prefs.view;$$('[data-view-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.viewMode===prefs.view)));renderWallpaper()}
+function sync(){ $('#theme-select').value=prefs.theme;keys.forEach((k,i)=>$(`#color-${k}`).value=prefs.colors[i]);$('#glow-strength').value=prefs.glowStrength;$('#card-opacity').value=prefs.cardOpacity;$('#animation-strength').value=prefs.animationStrength;$('#reduce-animations').checked=prefs.reduceMotion }
+function collect(){prefs.theme=$('#theme-select').value;prefs.colors=keys.map(k=>$(`#color-${k}`).value);prefs.glowStrength=+$('#glow-strength').value;prefs.cardOpacity=+$('#card-opacity').value;prefs.animationStrength=+$('#animation-strength').value;prefs.reduceMotion=$('#reduce-animations').checked}
+function save(){localStorage.setItem(PREF,JSON.stringify(prefs))}
+const wallpapers={cosmic:['Gradiente Cósmico','Gradiente suave em movimento','Baixo'],particles:['Partículas Neon','Pontos luminosos flutuantes','Médio'],waves:['Ondas Digitais','Ondas neon contínuas','Médio'],none:['Sem animação','Fundo estático e econômico','Nenhum']};
+function renderWallpaper(){const el=$('#live-wallpaper');el.className=`live-wallpaper wallpaper--${prefs.wallpaper}`;el.classList.toggle('is-paused',document.hidden||prefs.reduceMotion||prefs.wallpaper==='none')}
+function buildWallpapers(){const box=$('#wallpaper-selector');box.innerHTML=Object.entries(wallpapers).map(([id,x])=>`<article class="wallpaper-card"><div class="wallpaper-thumb wallpaper--${id}" aria-hidden="true"></div><div><strong>${x[0]}</strong><small>${x[1]}</small><small>Impacto: ${x[2]}</small></div><button class="button button--small ${prefs.wallpaper===id?'button--primary':'button--ghost'}" data-wallpaper="${id}">Selecionar</button></article>`).join('');$$('[data-wallpaper]',box).forEach(b=>b.onclick=()=>{prefs.wallpaper=b.dataset.wallpaper;save();apply();buildWallpapers();toast('Live wallpaper selecionado.')})}
+function openPanel(){lastFocus=document.activeElement;$('#gx-side-panel').hidden=false;$('#gx-panel-backdrop').hidden=false;$('#gx-menu-button').setAttribute('aria-expanded','true');document.body.classList.add('modal-open');$('#gx-panel-close').focus()}
+function closePanel(){if($('#gx-side-panel').hidden)return;$('#gx-side-panel').hidden=true;$('#gx-panel-backdrop').hidden=true;$('#gx-menu-button').setAttribute('aria-expanded','false');document.body.classList.remove('modal-open');(lastFocus||$('#gx-menu-button')).focus()}
+function account(){const list=profiles(), active=list.find(p=>p.username===localStorage.getItem(ACTIVE));const a=$('#account-area');if(active)a.innerHTML=`<div class="profile-summary"><span>${active.avatar}</span><div><h3>${active.displayName}</h3><small>@${active.username}</small></div></div><p>Este perfil existe apenas neste navegador e não é uma conta online segura.</p><button class="button button--ghost" data-edit-profile>Editar perfil local</button><button class="button button--ghost" data-delete-profile>Excluir perfil local</button>`;else a.innerHTML=`<h3>Bem-vindo à PlumpGames</h3><p>Entre, crie um usuário local ou continue como visitante.</p><button class="button button--ghost" data-existing>Entrar</button><button class="button button--primary" data-create-profile>Criar usuário</button><button class="button button--ghost" data-visitor>Continuar como visitante</button><small>Este perfil fica salvo somente neste navegador.</small>`;
+$('[data-create-profile]',a)?.addEventListener('click',()=>openProfile());$('[data-edit-profile]',a)?.addEventListener('click',()=>openProfile(active));$('[data-delete-profile]',a)?.addEventListener('click',()=>{localStorage.setItem(PROFILES,JSON.stringify(list.filter(p=>p.username!==active.username)));localStorage.removeItem(ACTIVE);account();toast('Perfil local excluído.')});$('[data-visitor]',a)?.addEventListener('click',closePanel);$('[data-existing]',a)?.addEventListener('click',()=>{if(!list.length)return toast('Nenhum perfil existe neste navegador.');a.innerHTML='<h3>Entrar como usuário existente deste navegador</h3>'+list.map(p=>`<button class="local-profile-choice" data-choose="${p.username}">${p.avatar} ${p.displayName} <small>@${p.username}</small></button>`).join('');$$('[data-choose]',a).forEach(b=>b.onclick=()=>{let username=b.dataset.choose.trim().toLowerCase();localStorage.setItem(ACTIVE,username);account();toast('Perfil local restaurado.')})})}
+function openProfile(p=null){editing=p?.username||null;$('#profile-title').textContent=p?'Editar perfil local':'Criar usuário local';$('#display-name').value=p?.displayName||'';$('#local-username').value=p?.username||'';$('#profile-avatar').value=p?.avatar||'🎮';$('#profile-bio').value=p?.bio||'';$('#profile-modal').hidden=false;$('#display-name').focus()}
+function closeProfile(){$('#profile-modal').hidden=true;$('#profile-error').textContent=''}
+async function adminSession(){try{const r=await fetch('/api/admin/session',{credentials:'same-origin'}),d=await r.json();const ok=d.authenticated===true&&d.role==='admin';$('#admin-area').hidden=ok;$('#editor-area').hidden=!ok;return ok}catch{$('#admin-area').hidden=false;$('#editor-area').hidden=true;return false}}
+function modal(title,content,download=false){$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-actions').innerHTML=download?'<button class="button button--ghost" data-close-modal>Cancelar</button><a class="button button--primary" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML/archive/refs/heads/main.zip">Continuar download</a>':'<button class="button button--primary" data-close-modal>Entendido</button>';$('#site-modal').hidden=false}
+function init(){normalizeInputs();apply();sync();buildWallpapers();account();adminSession();
+$('#gx-menu-button').onclick=()=>$('#gx-side-panel').hidden?openPanel():closePanel;$('#gx-panel-close').onclick=closePanel;$('#gx-panel-backdrop').onclick=closePanel;
+$$('.gx-accordion__button').forEach(b=>b.onclick=()=>{const opening=b.getAttribute('aria-expanded')!=='true';if(innerWidth<700)$$('.gx-accordion__button').forEach(x=>{x.setAttribute('aria-expanded','false');$('#'+x.getAttribute('aria-controls')).hidden=true});b.setAttribute('aria-expanded',String(opening));$('#'+b.getAttribute('aria-controls')).hidden=!opening});
+$('#theme-select').onchange=e=>{if(e.target.value!=='custom'){prefs.theme=e.target.value;prefs.colors=themes[prefs.theme];sync();apply()}};$$('#appearance-content input[type=color]').forEach(i=>i.oninput=()=>{$('#theme-select').value='custom';prefs.theme='custom'});$('#apply-theme').onclick=()=>{collect();apply();toast('Aparência aplicada.')};$('#save-theme').onclick=()=>{collect();apply();save();toast('Preferências salvas neste navegador.')};$('#reset-theme').onclick=()=>{prefs={...defaults,colors:[...themes.original]};save();sync();apply();buildWallpapers();toast('Configurações restauradas.')};$$('[data-view-mode]').forEach(b=>b.onclick=()=>{prefs.view=b.dataset.viewMode;save();apply()});$('#reduce-animations').onchange=e=>{prefs.reduceMotion=e.target.checked;save();apply()};document.addEventListener('visibilitychange',renderWallpaper);
+$('#profile-form').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);let username=String(fd.get('username')).trim().toLowerCase();if(!usernamePattern.test(username))return $('#profile-error').textContent='Use 3 a 24 letras minúsculas, números, ponto, hífen ou underline, sem espaços.';const list=profiles();if(list.some(p=>p.username===username&&p.username!==editing))return $('#profile-error').textContent='Este nome de usuário já existe neste navegador.';const profile={displayName:String(fd.get('displayName')).trim(),username,avatar:String(fd.get('avatar')),bio:String(fd.get('bio')).trim(),createdAt:list.find(p=>p.username===editing)?.createdAt||new Date().toISOString()};localStorage.setItem(PROFILES,JSON.stringify([...list.filter(p=>p.username!==editing),profile]));localStorage.setItem(ACTIVE,username);closeProfile();account();toast('Perfil local salvo neste navegador.')};$$('[data-close-profile]').forEach(b=>b.onclick=closeProfile);
+$('#admin-login-form').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);let username=String(fd.get('username')).trim().toLowerCase();const message=$('#admin-message');message.textContent='Verificando…';try{const r=await fetch('/api/admin/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:String(fd.get('password'))})});const d=await r.json();message.textContent=r.ok?'':(d.error||'Usuário ou senha inválidos.');if(r.ok){e.target.reset();await adminSession();toast('Modo editor ativado.')}}catch{message.textContent='Não foi possível entrar agora.'}};$('#admin-logout').onclick=async()=>{await fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'});await adminSession();toast('Sessão administrativa encerrada.')};
+const future=['Contas sincronizadas','Biblioteca de jogos','Favoritos','Conquistas','Comentários','Perfis públicos','Sincronização entre dispositivos','Editor administrativo permanente'];$('#future-content').innerHTML=future.map(x=>`<button class="future-card" type="button"><b>${x}</b><span>Em desenvolvimento</span></button>`).join('');$$('.future-card').forEach(b=>b.onclick=()=>toast('Este recurso está planejado para uma versão futura.'));const tools=['Editar nome e descrição dos jogos','Editar status do projeto','Editar notícias','Editar links','Editar data ou texto de destaque','Adicionar conteúdo futuro','Pré-visualizar alterações'];$('.editor-tools').innerHTML=tools.map(x=>`<button class="button button--ghost" type="button">${x}</button>`).join('');$$('.editor-tools button').forEach(b=>b.onclick=()=>toast('Ferramenta demonstrativa: não há persistência permanente.'));
+$$('[data-open-download]').forEach(b=>b.onclick=()=>modal('Confirmar download','<p>Você baixará a versão mais recente diretamente do GitHub.</p>',true));$('[data-open-install]').onclick=()=>modal('Como instalar o CS 1.6 PLH','<ol><li>Baixe e extraia o ZIP.</li><li>Abra o arquivo HTML principal em um navegador atualizado.</li></ol>');$('[data-open-credits]').onclick=()=>modal('Créditos','<p>PlumpGames foi criada por Matheus (Plump), com ajuda do Codex.</p>');$('[data-open-privacy]').onclick=()=>modal('Política de Privacidade','<p>Perfis e preferências locais ficam somente neste navegador. A sessão administrativa usa cookie seguro HttpOnly.</p>');$('[data-open-terms]').onclick=()=>modal('Termos de Uso','<p>Use a PlumpGames de forma lícita e respeitosa.</p>');$('#site-modal').onclick=e=>{if(e.target.closest('[data-close-modal]'))$('#site-modal').hidden=true};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#profile-modal').hidden)closeProfile();else if(!$('#site-modal').hidden)$('#site-modal').hidden=true;else closePanel()}const trap=!$('#profile-modal').hidden?$('#profile-modal'):(!$('#site-modal').hidden?$('#site-modal'):(!$('#gx-side-panel').hidden?$('#gx-side-panel'):null));if(e.key==='Tab'&&trap){const f=$$('button:not([disabled]),a[href],input,select,textarea',trap).filter(x=>!x.closest('[hidden]'));if(!f.length)return;const first=f[0],last=f.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});$$('.reveal,.hero-entrance').forEach(x=>x.classList.add('visible'))}
+init();
 })();

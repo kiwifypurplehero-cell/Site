@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plump Jogos — Jogos grátis para navegador e download</title>
-    <meta name="description" content="Site oficial da Plump Jogos. Conheça e baixe jogos gratuitos criados por Matheus Plump, incluindo CS 1.6 PLH.">
-    <meta name="keywords" content="Plump Jogos, Plump Games, jogos grátis, jogos HTML, jogos para navegador, CS 1.6 PLH, Matheus Plump">
+    <title>PlumpGames — Jogos gratuitos e projetos independentes</title>
+    <meta name="description" content="Site oficial da PlumpGames: jogos gratuitos e projetos independentes de Matheus Plump, incluindo CS 1.6 PLH.">
+    <meta name="keywords" content="PlumpGames, jogos grátis, jogos HTML, jogos para navegador, CS 1.6 PLH, Matheus Plump">
     <meta name="robots" content="index, follow">
     <meta name="author" content="Matheus Plump">
     <meta name="theme-color" content="#050611">
@@ -14,22 +14,19 @@
 
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
-    <meta property="og:site_name" content="Plump Jogos">
-    <meta property="og:title" content="Plump Jogos — Jogos grátis para navegador e download">
+    <meta property="og:site_name" content="PlumpGames">
+    <meta property="og:title" content="PlumpGames — Jogos gratuitos e projetos independentes">
     <meta property="og:description" content="Conheça e baixe jogos gratuitos criados por Matheus Plump, incluindo CS 1.6 PLH.">
     <meta property="og:url" content="https://site.kiwifypurplehero.workers.dev/">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Plump Jogos — Jogos grátis para navegador e download">
+    <meta name="twitter:title" content="PlumpGames — Jogos gratuitos e projetos independentes">
     <meta name="twitter:description" content="Jogos gratuitos de Matheus Plump para jogar no navegador e baixar.">
 
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"WebSite","name":"Plump Jogos","alternateName":"Plump Games","url":"https://site.kiwifypurplehero.workers.dev/","description":"Site oficial de jogos gratuitos criados por Matheus Plump.","inLanguage":"pt-BR","author":{"@type":"Person","name":"Matheus Plump"}}
+      {"@context":"https://schema.org","@type":"WebSite","name":"PlumpGames","url":"https://site.kiwifypurplehero.workers.dev/","description":"Jogos gratuitos e projetos independentes de Matheus Plump.","inLanguage":"pt-BR","author":{"@type":"Person","name":"Matheus Plump"}}
     </script>
     <link rel="stylesheet" href="style.css">
-    <script src="config.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js" defer></script>
-    <script type="module" src="js/app.js"></script>
   </head>
   <body>
     <div id="live-wallpaper" class="live-wallpaper" aria-hidden="true"></div>
@@ -38,7 +35,7 @@
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
-        <a class="brand" href="#inicio" aria-label="Plump Jogos — início"><span class="brand__mark" aria-hidden="true">P</span><span>Plump <strong>Jogos</strong></span></a>
+        <a class="brand" href="#inicio" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
         <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Abrir menu"><span></span><span></span><span></span></button>
         <ul class="nav-links" id="main-menu">
           <li><a class="nav-link active" href="#inicio">Início</a></li>
@@ -46,17 +43,15 @@
           <li><a class="nav-link" href="#novidades">Novidades</a></li>
           <li><a class="nav-link" href="#sobre">Sobre</a></li>
         </ul>
-        <div class="auth-actions" data-guest-ui><button id="auth-button" class="button button--small button--primary" type="button" aria-haspopup="dialog" aria-controls="auth-modal">Entrar / Criar conta</button></div>
-        <div class="account-area" data-user-ui hidden><button class="account-trigger" type="button" aria-expanded="false" aria-label="Abrir menu da conta" data-account-trigger><span class="avatar" data-avatar>P</span><span data-display-name>Jogador</span><span aria-hidden="true">⌄</span></button><div class="account-menu" hidden data-account-menu><button data-panel-section="profile">Meu perfil</button><button data-open-settings hidden aria-hidden="true">Personalizar página</button><button data-open-wallpapers hidden aria-hidden="true">Live wallpapers</button><button data-panel-section="feedbacks">Meus feedbacks</button><button data-panel-section="reports">Meus relatórios</button><button data-signout>Sair</button></div></div>
-        <button hidden aria-hidden="true" class="button button--small settings-button" type="button" aria-label="Personalizar página" aria-expanded="false" aria-controls="settings-panel" data-open-settings>Personalizar página</button>
+        <button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button>
       </nav>
     </header>
 
     <main>
       <section class="hero container" aria-labelledby="hero-title">
         <div class="hero__content">
-          <p class="eyebrow hero-entrance">Plump Games apresenta</p>
-          <h1 class="hero-entrance" id="hero-title">Plump Jogos: <span>diversão sem barreiras</span></h1>
+          <p class="eyebrow hero-entrance">PlumpGames apresenta</p>
+          <h1 class="hero-entrance" id="hero-title">PlumpGames: <span>diversão sem barreiras</span></h1>
           <p class="hero__text hero-entrance">Jogos gratuitos criados por Matheus (Plump) para curtir no navegador ou fazer o download de jogos com segurança.</p>
           <div class="hero__actions hero-entrance"><a class="button button--primary" href="#jogos">Conhecer o jogo <span aria-hidden="true">→</span></a><a class="button button--ghost" href="#sobre">Sobre o estúdio</a></div>
           <dl class="hero__stats hero-entrance" aria-label="Destaques"><div><dt>100%</dt><dd>Gratuito</dd></div><div><dt>HTML</dt><dd>Formato</dd></div><div><dt>1</dt><dd>Projeto ativo</dd></div></dl>
@@ -93,45 +88,40 @@
 
       <section class="section container updates-panel reveal" aria-labelledby="updates-title"><div class="section-heading"><div><p class="eyebrow">Status do site</p><h2 id="updates-title">Última atualização do site</h2></div><div class="project-update project-update--site" data-update-project="site"><p data-update-date>Verificando atualização…</p><small data-update-relative></small><small data-update-status>Verificando atualização…</small></div></div></section>
 
-      <section class="section section--news" id="novidades" aria-labelledby="news-title"><div class="container"><div class="section-heading reveal"><div><p class="eyebrow">Demonstração de atualizações</p><h2 id="news-title">Novidades</h2></div><p>Acompanhe notícias e próximos passos do universo Plump Games.</p></div><div class="news-grid">
-        <article class="news-card reveal"><span class="demo-label">Notícia de demonstração</span><span class="news-card__number">01</span><h3>Site oficial publicado</h3><p>A nova casa da Plump Jogos reúne informações sobre os projetos de Matheus Plump.</p></article>
+      <section class="section section--news" id="novidades" aria-labelledby="news-title"><div class="container"><div class="section-heading reveal"><div><p class="eyebrow">Demonstração de atualizações</p><h2 id="news-title">Novidades</h2></div><p>Acompanhe notícias e próximos passos do universo PlumpGames.</p></div><div class="news-grid">
+        <article class="news-card reveal"><span class="demo-label">Notícia de demonstração</span><span class="news-card__number">01</span><h3>Site oficial publicado</h3><p>A nova casa da PlumpGames reúne informações sobre os projetos de Matheus Plump.</p></article>
         <article class="news-card reveal"><span class="demo-label">Notícia de demonstração</span><span class="news-card__number">02</span><h3>Download pelo GitHub disponível</h3><p>O pacote mais recente do CS 1.6 PLH pode ser obtido diretamente do repositório oficial.</p></article>
         <article class="news-card reveal"><span class="demo-label">Notícia de demonstração</span><span class="news-card__number">03</span><h3>Novas melhorias estão em desenvolvimento</h3><p>A experiência segue recebendo ajustes e novas ideias para evoluir.</p></article>
       </div></div></section>
 
-      <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PJ</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>Plump Jogos</span></h2><p>A Plump Jogos, também apresentada como Plump Games, é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
+      <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
     </main>
 
-    <footer class="site-footer"><div class="container footer__content"><p>Plump Jogos — Criado por Matheus (Plump) com ajuda do Codex.</p><nav aria-label="Links do rodapé"><a class="footer-link" href="#inicio">Site</a><a class="footer-link" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML" target="_blank" rel="noopener noreferrer">GitHub do jogo</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos de Uso</button></nav></div></footer>
+    <footer class="site-footer"><div class="container footer__content"><p>PlumpGames — Criado por Matheus (Plump) com ajuda do Codex.</p><nav aria-label="Links do rodapé"><a class="footer-link" href="#inicio">Site</a><a class="footer-link" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML" target="_blank" rel="noopener noreferrer">GitHub do jogo</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos de Uso</button></nav></div></footer>
 
 
-    <div class="settings-panel" id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
-      <div class="settings-panel__backdrop" data-close-settings></div>
-      <aside class="settings-panel__content" role="document">
-        <button class="modal__close" id="settings-close" type="button" aria-label="Fechar" data-close-settings>×</button>
-        <p class="eyebrow">Configurações</p><h2 id="settings-title">Personalizar aparência</h2>
-        <section><h3>Tema</h3><label for="theme-select">Tema pronto</label><select id="theme-select"><option value="original">Plump Original</option><option value="blue">Azul Neon</option><option value="purple">Roxo Gamer</option><option value="red">Vermelho Arena</option><option value="green">Verde Terminal</option><option value="light">Claro</option><option value="dark">Escuro</option><option value="custom">Personalizado</option></select></section>
-        <section><h3>Cores</h3><div class="settings-grid">
-          <label>Cor principal <input id="color-primary" type="color"></label><label>Cor secundária <input id="color-secondary" type="color"></label><label>Cor de destaque <input id="color-accent" type="color"></label><label>Cor do fundo <input id="color-background" type="color"></label><label>Cor dos cartões <input id="color-surface" type="color"></label><label>Cor dos textos <input id="color-text" type="color"></label><label>Cor dos botões <input id="color-button" type="color"></label><label>Cor do brilho neon <input id="color-glow" type="color"></label>
-        </div><p class="contrast-warning" id="contrast-warning" hidden>Esta combinação pode dificultar a leitura.</p><div class="theme-preview" aria-label="Pré-visualização das cores"><span>Prévia</span><b>Cartão gamer</b><button type="button">Botão</button></div></section>
-        <section><h3>Visualização dos jogos</h3><div class="segmented-control"><button type="button" data-view-mode="detailed" aria-pressed="true">Detalhada</button><button type="button" data-view-mode="compact" aria-pressed="false">Compacta</button></div></section>
-        <section><h3>Animações</h3><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step="0.01"></label><label>Transparência dos cartões <input id="card-opacity" type="range" min="0.55" max="1" step="0.01"></label><label>Força das animações <input id="animation-strength" type="range" min="0" max="1" step="0.01"></label></section>
-        <section id="live-wallpaper-settings"><h3>Live wallpapers</h3><p class="settings-help">Visualize, aplique e salve um fundo animado na sua conta.</p><div id="wallpaper-selector" class="wallpaper-selector"></div><label class="checkbox-label"><input id="pause-wallpaper" type="checkbox"> Pausar animação</label></section>
-        <section><h3>Acessibilidade</h3><label class="checkbox-label"><input id="reduce-animations" type="checkbox"> Reduzir animações</label></section>
-        <section><h3>Restaurar configurações</h3><div class="settings-actions"><button class="button button--primary" id="apply-theme" type="button">Aplicar</button><button class="button button--ghost" id="save-theme" type="button">Salvar na conta</button><button class="button button--ghost" id="reset-theme" type="button">Restaurar padrão</button><button class="button button--ghost" type="button" data-close-settings>Fechar</button></div></section>
-      </aside>
-    </div>
+    <div id="gx-panel-backdrop" class="gx-backdrop" hidden></div>
+    <aside id="gx-side-panel" class="gx-panel" role="dialog" aria-modal="true" aria-labelledby="gx-panel-title" hidden>
+      <header class="gx-panel__header"><div><p class="eyebrow">Central GX</p><h2 id="gx-panel-title">Menu da PlumpGames</h2></div><button id="gx-panel-close" class="modal__close" type="button" aria-label="Fechar menu">×</button></header>
+      <section id="account-area" class="gx-account" aria-live="polite"></section>
+      <div class="gx-accordions">
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="appearance-content">Aparência <span>+</span></button><div id="appearance-content" class="gx-accordion__content" hidden>
+          <label for="theme-select">Tema</label><select id="theme-select"><option value="original">Plump Original</option><option value="blue">Azul Neon</option><option value="purple">Roxo Gamer</option><option value="red">Vermelho Arena</option><option value="green">Verde Terminal</option><option value="light">Claro</option><option value="dark">Escuro</option><option value="custom">Personalizado</option></select>
+          <div class="settings-grid"><label>Cor principal<input id="color-primary" type="color"></label><label>Cor secundária<input id="color-secondary" type="color"></label><label>Cor de destaque<input id="color-accent" type="color"></label><label>Fundo<input id="color-background" type="color"></label><label>Cartões<input id="color-surface" type="color"></label><label>Textos<input id="color-text" type="color"></label><label>Botões<input id="color-button" type="color"></label><label>Brilho<input id="color-glow" type="color"></label></div><p id="contrast-warning" class="contrast-warning" hidden>Esta combinação pode dificultar a leitura.</p>
+          <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar</button><button id="save-theme" class="button button--ghost" type="button">Salvar neste navegador</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
+        </div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><div id="wallpaper-selector" class="wallpaper-selector"></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed">Detalhada</button><button type="button" data-view-mode="compact">Compacta</button></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden><label class="checkbox-label"><input id="reduce-animations" type="checkbox"> Reduzir movimento</label></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="future-content">Futuramente <span>+</span></button><div id="future-content" class="gx-accordion__content future-grid" hidden></div></section>
+      </div>
+      <section id="admin-area" class="admin-area"><h3>Entrar como administrador</h3><form id="admin-login-form"><label for="admin-username">Nome de usuário</label><input id="admin-username" name="username" required minlength="3" maxlength="24" pattern="[a-z0-9._-]+" autocapitalize="none" autocomplete="username" spellcheck="false"><label for="admin-password">Senha</label><input id="admin-password" name="password" type="password" required autocomplete="current-password"><button class="button button--primary" type="submit">Entrar como administrador</button><p id="admin-message" role="alert" aria-live="polite"></p></form></section>
+      <section id="editor-area" class="admin-area" hidden><h3>Modo editor <span class="admin-badge">ADMIN</span></h3><p>Alterações de demonstração não serão mantidas após novo deploy.</p><div class="editor-tools"></div><button id="admin-logout" class="button button--ghost" type="button">Sair do modo editor</button></section>
+    </aside>
 
-    <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-content" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel" role="document"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><span class="modal__icon" aria-hidden="true">PJ</span><p class="eyebrow">Plump Jogos</p><h2 id="modal-title"></h2><div id="modal-content"></div><div class="modal__actions" id="modal-actions"><button class="button button--ghost" type="button" data-close-modal>Fechar</button></div></div></div>
-    <div class="platform-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" aria-describedby="auth-description" aria-hidden="true" hidden><div class="modal__backdrop" data-close-platform></div><div class="platform-panel auth-panel"><button class="modal__close" type="button" data-close-platform aria-label="Fechar">×</button><p class="eyebrow">Sua conta gamer</p><h2 id="auth-title">Entre na Plump Jogos</h2><p id="auth-description">Use uma de suas contas para entrar ou criar seu perfil.</p><div class="social-auth" aria-label="Provedores de autenticação">
-      <button class="social-button" type="button" data-oauth-provider="google"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h5v4h-5"/></svg><span>Continuar com Google</span></button>
-      <button class="social-button" type="button" data-oauth-provider="azure"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg><span>Continuar com Microsoft</span></button>
-      <button class="social-button" type="button" data-oauth-provider="apple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.7 12.9c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.7-3.1.7-.7 0-1.7-.7-2.8-.7-1.4 0-2.8.9-3.5 2.2-1.5 2.6-.4 6.5 1.1 8.6.7 1 1.6 2.2 2.7 2.1 1.1 0 1.5-.7 2.8-.7s1.7.7 2.8.7c1.2 0 1.9-1 2.6-2.1.8-1.2 1.2-2.4 1.2-2.5-.1 0-2.5-1-2.5-3.6zM14.6 6.9c.6-.8 1-1.9.9-2.9-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.8-1 2.8 1 .1 2-.5 2.7-1.2z"/></svg><span>Continuar com Apple</span></button>
-      <button class="visitor-auth-button" type="button" data-visitor>Continuar como visitante</button></div><p class="form-error" data-auth-error role="alert" aria-live="polite"></p></div></div>
-    <div class="platform-modal" id="profile-onboarding" data-required-modal="true" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" aria-describedby="onboarding-description" hidden><div class="modal__backdrop"></div><div class="platform-panel platform-panel--wide"><h2 id="onboarding-title">Personalize seu perfil</h2><p id="onboarding-description">Antes de continuar, escolha como você deseja aparecer na Plump Jogos.</p><form id="onboarding-form" class="platform-form" novalidate><label for="profile-display-name">Nome de exibição</label><input id="profile-display-name" name="display_name" minlength="2" maxlength="40" required autocomplete="name"><label for="profile-username">Nome de usuário</label><input id="profile-username" name="username" minlength="3" maxlength="24" pattern="[a-z0-9._-]+" required autocomplete="username"><p id="username-status" class="field-status" aria-live="polite"></p><fieldset><legend>Avatar</legend><div id="avatar-options" class="avatar-options"></div><label for="avatar-url">Usar URL de imagem</label><input id="avatar-url" name="avatar_url" type="url" maxlength="1000" placeholder="https://..."></fieldset><label for="profile-bio">Biografia curta <span id="bio-counter">0/160</span></label><textarea id="profile-bio" name="bio" maxlength="160"></textarea><fieldset><legend>Visibilidade</legend><label class="checkbox-label"><input type="radio" name="visibility" value="public" checked> Perfil público</label><label class="checkbox-label"><input type="radio" name="visibility" value="private"> Perfil privado</label></fieldset><p class="form-error" data-profile-error role="alert" aria-live="polite"></p><button class="button button--primary" type="submit">Salvar e continuar</button><button class="button button--ghost" type="button" data-signout>Sair da conta</button></form></div></div>
-    <div class="platform-modal" id="exclusive-modal" role="dialog" aria-modal="true" aria-labelledby="exclusive-title" hidden><div class="modal__backdrop" data-close-platform></div><div class="platform-panel"><button class="modal__close" data-close-platform aria-label="Fechar">×</button><h2 id="exclusive-title">Recurso exclusivo</h2><p>Entre ou crie uma conta para utilizar esta função.</p><div class="modal__actions"><button class="button button--primary" data-open-auth>Acessar conta</button><button class="button button--ghost" data-close-platform>Agora não</button></div></div></div>
-    <div class="platform-modal" id="data-modal" role="dialog" aria-modal="true" aria-labelledby="data-title" hidden><div class="modal__backdrop" data-close-platform></div><div class="platform-panel platform-panel--wide"><button class="modal__close" data-close-platform aria-label="Fechar">×</button><h2 id="data-title"></h2><div id="data-modal-content"></div></div></div>
-    <div class="platform-modal" id="user-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden><div class="modal__backdrop" data-close-platform></div><div class="platform-panel platform-panel--wide"><button class="modal__close" data-close-platform aria-label="Fechar">×</button><h2 id="panel-title">Painel do usuário</h2><nav class="panel-tabs"><button data-panel-tab="profile">Perfil</button><button data-panel-tab="appearance">Aparência</button><button data-panel-tab="feedbacks">Meus feedbacks</button><button data-panel-tab="reports">Meus relatórios</button><button data-panel-tab="security">Segurança</button><button data-signout>Sair</button></nav><div id="panel-content" class="panel-content"></div></div></div>
+    <div id="profile-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="profile-title" hidden><div class="modal__backdrop" data-close-profile></div><div class="modal__panel"><button class="modal__close" data-close-profile aria-label="Fechar">×</button><h2 id="profile-title">Criar usuário local</h2><p>Este perfil existe apenas neste navegador e não é uma conta online segura.</p><form id="profile-form"><label for="display-name">Nome de exibição</label><input id="display-name" name="displayName" required maxlength="40" autocomplete="name"><label for="local-username">Nome de usuário</label><input id="local-username" name="username" required minlength="3" maxlength="24" pattern="[a-z0-9._-]+" autocapitalize="none" autocomplete="username" spellcheck="false"><label for="profile-avatar">Avatar predefinido</label><select id="profile-avatar" name="avatar"><option>🎮</option><option>🚀</option><option>👾</option><option>⚡</option></select><label for="profile-bio">Biografia curta (opcional)</label><textarea id="profile-bio" name="bio" maxlength="160"></textarea><p id="profile-error" role="alert"></p><button class="button button--primary" type="submit">Salvar perfil local</button></form></div></div>
+    <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>

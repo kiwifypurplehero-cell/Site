@@ -2,5 +2,3 @@ User-agent: *
 Allow: /
 
 Sitemap: https://site.kiwifypurplehero.workers.dev/sitemap.xml
-
-# Cloudflare automatic deployment test
