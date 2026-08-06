@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "plumpgames-auth",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "e80405a4-2ff2-4a0b-afba-7825856ba9f8",
       "migrations_dir": "migrations"
     }
   ]
