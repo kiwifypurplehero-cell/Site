@@ -1,26 +1,31 @@
 # PlumpGames
 
-Site estático oficial da PlumpGames servido por um Cloudflare Worker, que também valida sessões administrativas. A URL canônica é <https://site.kiwifypurplehero.workers.dev/>.
+Site oficial: <https://site.kiwifypurplehero.workers.dev/>. O Cloudflare Worker serve os assets e implementa autenticação real com Cloudflare D1, PBKDF2 e sessões HttpOnly.
 
-## Secrets administrativos
-
-Cadastre **Secrets**, nunca variáveis de texto comuns, em: **Cloudflare Dashboard → Workers & Pages → site → Settings → Variables and Secrets → Add → Type: Secret**.
-
-- `ADMIN_USERNAME`: username administrativo em minúsculas, no formato `^[a-z0-9._-]{3,24}$`.
-- `ADMIN_PASSWORD_HASH`: hash PBKDF2-SHA-256 no formato `pbkdf2-sha256$210000$SALT_BASE64$HASH_BASE64`.
-- `SESSION_SECRET`: segredo aleatório longo usado exclusivamente para assinar cookies de sessão.
-
-Gere localmente um hash e um segredo sem colocá-los no Git:
+## Criar e configurar o D1
 
 ```bash
-node -e "const c=require('crypto'),p=process.argv[1],s=c.randomBytes(16),n=210000; console.log('pbkdf2-sha256$'+n+'$'+s.toString('base64')+'$'+c.pbkdf2Sync(p,s,n,32,'sha256').toString('base64'))" 'SENHA_DE_TESTE'
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+npx wrangler d1 create plumpgames-auth
 ```
 
-Crie um arquivo `.dev.vars` local (ele é ignorado pelo Git), preencha os três valores e execute `npx wrangler dev`. Nunca faça commit desse arquivo. A senha permanece sensível a maiúsculas e minúsculas.
+Copie o `database_id` retornado para `wrangler.jsonc`, mantendo o binding com o nome **DB**. Aplique a migration localmente e no banco de produção:
 
-## Arquitetura e limites
+```bash
+npx wrangler d1 migrations apply plumpgames-auth --local
+npx wrangler d1 migrations apply plumpgames-auth --remote
+```
 
-`worker.js` trata login, logout e consulta de sessão antes de encaminhar arquivos para o binding `ASSETS`. O cookie administrativo é HttpOnly, Secure, SameSite=Strict, assinado e expira em duas horas. Perfis comuns são apenas locais, sem senha, sincronização ou papel administrativo.
+No Dashboard, confirme em **Workers & Pages → site → Settings → Bindings** que o binding D1 `DB` aponta para `plumpgames-auth`. O deploy automático precisa usar o diretório raiz, `worker.js` como entrypoint e a configuração `wrangler.jsonc`. Não é necessário cadastrar username, senha ou segredo administrativo no Worker.
 
-O modo editor atual oferece somente pré-visualizações demonstrativas. Edição de jogos, status, notícias, links, destaques e conteúdo futuro não é persistida após um novo deploy. Endpoints administrativos futuros devem sempre chamar `requireAdminSession(request, env)` antes de executar qualquer alteração permanente.
+## Autenticação e segurança
+
+- `POST /api/auth/register` cria somente contas `user` e persiste perfil e preferências no D1.
+- `POST /api/auth/login` identifica `user` ou `admin` pelo banco.
+- `GET /api/auth/session` restaura exclusivamente dados públicos.
+- `POST /api/auth/logout` revoga a sessão no D1 e remove o cookie.
+- Rotas `/api/admin/*` usam `requireAdminSession`: sem sessão retornam 401 e contas comuns recebem 403.
+- Senhas recebem PBKDF2-SHA-256 com salt aleatório e 210.000 iterações. Tokens aleatórios são enviados apenas em cookie HttpOnly; somente seu SHA-256 fica no D1.
+
+Sem **Salvar meu login**, o cookie não tem `Max-Age` (cookie de navegador), embora a sessão do servidor tenha limite de 12 horas. Com a opção marcada, o cookie e a sessão expiram em cerca de 30 dias. Ambos usam `Secure`, `HttpOnly`, `SameSite=Strict` e `Path=/`.
+
+Consulte [ADMIN_SETUP.md](ADMIN_SETUP.md) para promover a primeira conta com um comando administrativo seguro.
