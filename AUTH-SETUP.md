@@ -5,7 +5,7 @@ O site usa somente a URL e a chave pública (`publishable` ou `anon`) no navegad
 ## 1. Supabase
 
 1. Crie um projeto e execute `supabase-schema.sql` no SQL Editor.
-2. Em **Authentication > URL Configuration**, defina `https://kiwifypurplehero-cell.github.io/Site-dos-jogos/` como Site URL e adicione a mesma URL à lista de Redirect URLs.
+2. Em **Authentication > URL Configuration**, defina `https://site.kiwifypurplehero.workers.dev/` como Site URL e adicione a mesma URL à lista de Redirect URLs.
 3. Copie a Project URL e a chave pública em `config.js`, nos campos `SUPABASE_URL` e `SUPABASE_PUBLIC_KEY`.
 4. Em **Authentication > Providers**, habilite Google, Azure e Apple com os identificadores e segredos criados nos consoles de cada provedor. Esses segredos ficam apenas no painel do Supabase.
 5. Use a callback exibida pelo Supabase para os três provedores: `https://<project-ref>.supabase.co/auth/v1/callback`.

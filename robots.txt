@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kiwifypurplehero-cell.github.io/Site/sitemap.xml
+Sitemap: https://site.kiwifypurplehero.workers.dev/sitemap.xml
 
 # Cloudflare automatic deployment test

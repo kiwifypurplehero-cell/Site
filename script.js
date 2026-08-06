@@ -3,7 +3,7 @@
   const UPDATE_CACHE_KEY = 'plumpJogosUpdateCache';
   const CACHE_TTL = 15 * 60 * 1000;
   const REPOSITORIES = {
-    site: 'https://api.github.com/repos/kiwifypurplehero-cell/Site-dos-jogos/commits/main',
+    site: 'https://api.github.com/repos/kiwifypurplehero-cell/Site/commits/main',
     cs16: 'https://api.github.com/repos/kiwifypurplehero-cell/CS1-6HTML/commits/main',
   };
   const themes = {

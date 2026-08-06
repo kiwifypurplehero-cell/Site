@@ -46,9 +46,12 @@ export const signInWithMicrosoft = (button) => signInWithProvider('azure', butto
 export const signInWithApple = (button) => signInWithProvider('apple', button);
 
 export function openLoginModal() {
-  $('[data-auth-error]').textContent = '';
-  openModal($('#auth-modal'));
+  const modal = $('#auth-modal');
+  if (!modal) { console.error('Modal #auth-modal não encontrado.'); return false; }
+  $('[data-auth-error]', modal).textContent = '';
+  return openModal(modal);
 }
+export function closeLoginModal() { return closeModal($('#auth-modal')); }
 export const openRegisterModal = openLoginModal;
 
 async function loadProfile(user) {
@@ -119,8 +122,14 @@ export function requireAuthentication() {
 export const requireUser = requireAuthentication;
 export const currentUser = () => authState.user;
 
-export async function initAuth() {
-  $('#auth-button')?.addEventListener('click', openLoginModal);
+let authenticationUIInitialized = false;
+export function initializeAuthenticationUI() {
+  if (authenticationUIInitialized) return true;
+  const authButton = $('#auth-button');
+  const authModal = $('#auth-modal');
+  if (!authButton) { console.error('Botão #auth-button não encontrado.'); return false; }
+  if (!authModal) { console.error('Modal #auth-modal não encontrado.'); return false; }
+  authButton.addEventListener('click', openLoginModal);
   $$('[data-open-auth]').forEach((el) => el.addEventListener('click', openLoginModal));
   $$('[data-oauth-provider]').forEach((button) => button.addEventListener('click', () => signInWithProvider(button.dataset.oauthProvider, button)));
   $$('[data-visitor]').forEach((button) => button.addEventListener('click', () => { closeModal(button.closest('.platform-modal')); toast('Você está navegando como visitante.'); }));
@@ -131,6 +140,12 @@ export async function initAuth() {
     if (trigger) { menu.hidden = !menu.hidden; trigger.setAttribute('aria-expanded', String(!menu.hidden)); }
     else if (menu && !event.target.closest('[data-account-menu]')) { menu.hidden = true; $('[data-account-trigger]')?.setAttribute('aria-expanded', 'false'); }
   });
+  authenticationUIInitialized = true;
+  return true;
+}
+
+export async function initAuth() {
+  initializeAuthenticationUI();
   if (!configured) { updateAuthUI(); return; }
   const { data, error } = await db.auth.getSession();
   if (error) toast('Não foi possível restaurar a sessão.', 'error');
@@ -140,4 +155,4 @@ export async function initAuth() {
 }
 
 window.addEventListener('beforeunload', () => authSubscription?.unsubscribe());
-Object.assign(window, { authState, profileState, canAccessPersonalization, openLoginModal, logoutUser, signInWithGoogle, signInWithMicrosoft, signInWithApple });
+Object.assign(window, { authState, profileState, canAccessPersonalization, openLoginModal, closeLoginModal, initializeAuthenticationUI, logoutUser, signInWithGoogle, signInWithMicrosoft, signInWithApple });
