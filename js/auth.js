@@ -21,9 +21,9 @@ function oauthOptions(provider) {
 
 export async function signInWithProvider(provider, button) {
   const errorBox = $('[data-auth-error]');
-  errorBox.textContent = '';
+  if (errorBox) errorBox.textContent = '';
   if (!configured) {
-    errorBox.textContent = 'Login temporariamente indisponível. A autenticação ainda não foi configurada.';
+    if (errorBox) errorBox.textContent = 'Login temporariamente indisponível. A autenticação ainda não foi configurada.';
     return;
   }
   const label = providerLabel(provider);
@@ -48,7 +48,8 @@ export const signInWithApple = (button) => signInWithProvider('apple', button);
 export function openLoginModal() {
   const modal = $('#auth-modal');
   if (!modal) { console.error('Modal #auth-modal não encontrado.'); return false; }
-  $('[data-auth-error]', modal).textContent = '';
+  const errorBox = $('[data-auth-error]', modal);
+  if (errorBox) errorBox.textContent = '';
   return openModal(modal);
 }
 export function closeLoginModal() { return closeModal($('#auth-modal')); }
@@ -145,7 +146,8 @@ export function initializeAuthenticationUI() {
 }
 
 export async function initAuth() {
-  initializeAuthenticationUI();
+  // The controls must work even when Supabase is unavailable or misconfigured.
+  if (!initializeAuthenticationUI()) return;
   if (!configured) { updateAuthUI(); return; }
   const { data, error } = await db.auth.getSession();
   if (error) toast('Não foi possível restaurar a sessão.', 'error');
