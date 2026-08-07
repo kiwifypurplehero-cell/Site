@@ -50,7 +50,7 @@
           <h1 class="hero-entrance" id="hero-title">PlumpGames: <span>diversão sem barreiras</span></h1>
           <p class="hero__text hero-entrance">Jogos gratuitos criados por Matheus (Plump) para curtir no navegador ou fazer o download de jogos com segurança.</p>
           <div class="hero__actions hero-entrance"><a class="button button--primary" href="#jogos">Conhecer o jogo <span aria-hidden="true">→</span></a><a class="button button--ghost" href="#sobre">Sobre o estúdio</a></div>
-          <dl class="hero__stats hero-entrance" aria-label="Destaques"><div><dt>100%</dt><dd>Gratuito</dd></div><div><dt>HTML</dt><dd>Formato</dd></div><div><dt>1</dt><dd>Projeto ativo</dd></div></dl>
+          <dl class="hero__stats hero-entrance" aria-label="Destaques"><div><dt>100%</dt><dd>Gratuito</dd></div><div><dt>GitHub</dt><dd>Fonte pública</dd></div><div><dt>Auto</dt><dd>Catálogo atualizado</dd></div></dl>
         </div>
         <div class="hero__visual hero-entrance" aria-hidden="true"><div class="orbit orbit--outer"></div><div class="orbit orbit--inner"></div><div class="game-core"><span>PJ</span><small>PLAY</small></div><span class="floating-chip chip--one">GRÁTIS</span><span class="floating-chip chip--two">HTML</span><span class="floating-chip chip--three">LEVEL UP</span></div>
         <a class="scroll-hint" href="#jogos"><span>Explore</span><i aria-hidden="true"></i></a>
@@ -64,22 +64,10 @@
             <button type="button" data-view-mode="detailed" aria-pressed="true">Detalhada</button>
             <button type="button" data-view-mode="compact" aria-pressed="false">Compacta</button>
           </div>
-          <button class="button button--small button--ghost" type="button" data-refresh-updates>Atualizar informações</button>
+          <button class="button button--small button--ghost" type="button" id="refresh-games">Atualizar jogos</button>
         </div>
-        <div class="games-list" id="games-list" data-view="detailed">
-        <article class="game-card game-card--featured reveal">
-          <div class="game-card__image game-card__image--cs" role="img" aria-label="Arte abstrata em tons de azul do jogo CS 1.6 PLH"><span class="status">Em desenvolvimento</span><b>CS</b><small>1.6 PLH</small></div>
-          <div class="game-card__body">
-            <p class="card-kicker">AÇÃO • CLÁSSICO • HTML</p><h3>CS 1.6 PLH</h3><p>Jogo inspirado no clássico Counter-Strike 1.6, desenvolvido em HTML para funcionar no navegador.</p>
-            <dl class="game-details"><div><dt>Plataforma</dt><dd>Navegador</dd></div><div><dt>Formato</dt><dd>HTML</dd></div><div><dt>Preço</dt><dd>Gratuito</dd></div><div><dt>Desenvolvedor</dt><dd>Matheus Plump</dd></div><div><dt>Status</dt><dd>Em desenvolvimento</dd></div><div class="project-update" data-update-project="cs16"><dt>Última atualização</dt><dd><span data-update-date>Verificando atualização…</span><small data-update-relative></small><small data-update-status>Verificando atualização…</small></dd></div></dl>
-            <div class="card-actions">
-              <a class="button button--small button--ghost" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML" target="_blank" rel="noopener noreferrer"><svg class="button__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Ver projeto no GitHub</a>
-              <button class="button button--small button--primary" type="button" data-open-download><svg class="button__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l5-5m-5 5l-5-5M5 21h14"/></svg>Baixar jogo</button>
-              <button class="button button--small button--ghost" type="button" data-open-install>Mais detalhes</button>
-            </div>
-          </div>
-        </article>
-        </div>
+        <p id="games-message" class="games-message" role="status" aria-live="polite">Carregando jogos da PlumpGames…</p>
+        <div class="games-list" id="games-list" data-view="detailed" aria-live="polite"></div>
       </section>
 
       <section class="section container updates-panel reveal" aria-labelledby="updates-title"><div class="section-heading"><div><p class="eyebrow">Status do site</p><h2 id="updates-title">Última atualização do site</h2></div><div class="project-update project-update--site" data-update-project="site"><p data-update-date>Verificando atualização…</p><small data-update-relative></small><small data-update-status>Verificando atualização…</small></div></div></section>
@@ -93,7 +81,7 @@
       <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
     </main>
 
-    <footer class="site-footer"><div class="container footer__content"><p>PlumpGames — Criado por Matheus (Plump) com ajuda do Codex.</p><nav aria-label="Links do rodapé"><a class="footer-link" href="#inicio">Site</a><a class="footer-link" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML" target="_blank" rel="noopener noreferrer">GitHub do jogo</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos de Uso</button></nav></div></footer>
+    <footer class="site-footer"><div class="container footer__content"><p>PlumpGames — Criado por Matheus (Plump) com ajuda do Codex.</p><nav aria-label="Links do rodapé"><a class="footer-link" href="#inicio">Site</a><a class="footer-link" href="https://github.com/kiwifypurplehero-cell" target="_blank" rel="noopener noreferrer">GitHub da PlumpGames</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos de Uso</button></nav></div></footer>
 
 
     <div id="gx-panel-backdrop" class="gx-backdrop" hidden></div>

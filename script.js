@@ -123,14 +123,19 @@ $('#wallpaper-pause').addEventListener('click', () => { $('#live-wallpaper-video
 $('#wallpaper-resume').addEventListener('click', () => { if(!preferences.reduceMotion&&!preferences.economy) $('#live-wallpaper-video').play().catch(()=>setStatus('O navegador bloqueou a reprodução.',true)); });
 document.addEventListener('visibilitychange', () => { const video=$('#live-wallpaper-video'); if(document.hidden) video.pause(); else if(!preferences.reduceMotion&&!preferences.economy&&currentWallpaper().url) video.play().catch(()=>{}); });
 
-const future = ['Contas','Perfis','Favoritos','Biblioteca','Conquistas','Comentários','Mais wallpapers'];
+const future = ['Favoritos','Biblioteca','Conquistas','Comentários','Mais wallpapers'];
 $('#future-content').innerHTML = future.map(item => `<div class="future-card"><strong>${item}</strong><span>Em desenvolvimento</span></div>`).join('');
-function showModal(title, html, actions='') { $('#modal-title').textContent=title; $('#modal-content').innerHTML=html; $('#modal-actions').innerHTML=actions; $('#site-modal').hidden=false; }
-$$('[data-close-modal]').forEach(button=>button.addEventListener('click',()=>$('#site-modal').hidden=true));
-$('[data-open-download]').addEventListener('click',()=>showModal('Baixar CS 1.6 PLH','<p>O download é hospedado no repositório oficial do jogo.</p>','<a class="button button--primary" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML/archive/refs/heads/main.zip">Baixar pelo GitHub</a>'));
-$('[data-open-install]').addEventListener('click',()=>showModal('Sobre o jogo','<p>Projeto gratuito em HTML, atualmente em desenvolvimento. Extraia o arquivo baixado e abra o arquivo principal no navegador.</p>'));
+
+function showModal(title, html, actions='') {
+  $('#modal-title').textContent=title;
+  $('#modal-content').innerHTML=html;
+  $('#modal-actions').innerHTML=actions;
+  $('#site-modal').hidden=false;
+}
+function closeModal() { $('#site-modal').hidden=true; document.body.classList.remove('modal-open'); lastFocus?.focus(); }
+$$('[data-close-modal]').forEach(button=>button.addEventListener('click',closeModal));
 $('[data-open-credits]').addEventListener('click',()=>showModal('Créditos','<p>PlumpGames é criado por Matheus (Plump), com ajuda do Codex.</p>'));
-$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>As preferências ficam somente no localStorage deste navegador. O site não possui contas nem envia dados pessoais a um banco.</p>'));
+$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>As preferências e o cache de jogos ficam somente no localStorage deste navegador. O site não possui contas nem envia dados pessoais a um banco.</p>'));
 $('[data-open-terms]').addEventListener('click',()=>showModal('Termos de Uso','<p>Os projetos são oferecidos como estão. Consulte o repositório de cada jogo para detalhes.</p>'));
 
 if (!location.href.startsWith(OFFICIAL_URL) && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') console.info(`Site oficial: ${OFFICIAL_URL}`);
@@ -139,12 +144,220 @@ renderWallpapers(); syncControls(); selectWallpaper(preferences.wallpaper, true)
 const revealObserver = new IntersectionObserver(entries => entries.forEach(entry => { if(entry.isIntersecting){ entry.target.classList.add('visible'); revealObserver.unobserve(entry.target); } }), {threshold:.08});
 $$('.reveal').forEach(item => revealObserver.observe(item));
 window.addEventListener('scroll', () => $('.site-header').classList.toggle('scrolled', scrollY > 20), {passive:true});
-async function updateProjectDates() {
-  const projects = { cs16:'https://api.github.com/repos/kiwifypurplehero-cell/CS1-6HTML', site:'https://api.github.com/repos/kiwifypurplehero-cell/Site' };
-  await Promise.all(Object.entries(projects).map(async ([id,url]) => {
-    const area=$(`[data-update-project="${id}"]`); if(!area) return;
-    try { const response=await fetch(url,{headers:{Accept:'application/vnd.github+json'}}); if(!response.ok) throw new Error(); const data=await response.json(); const date=new Date(data.pushed_at); area.querySelector('[data-update-date]').textContent=new Intl.DateTimeFormat('pt-BR',{dateStyle:'long'}).format(date); area.querySelector('[data-update-relative]').textContent='Dados do repositório oficial'; area.querySelector('[data-update-status]').textContent='Atualizado'; }
-    catch { area.querySelector('[data-update-date]').textContent='Informação indisponível'; area.querySelector('[data-update-status]').textContent='Tente novamente mais tarde'; }
-  }));
+
+const GITHUB_REPOSITORIES_URL = 'https://api.github.com/users/kiwifypurplehero-cell/repos?per_page=100&sort=updated';
+const GAMES_CACHE_KEY = 'plumpgamesGithubReposCache';
+const GAMES_CACHE_TTL = 5 * 60 * 1000;
+const IGNORED_REPOSITORIES = [
+  'site'
+];
+let currentGames = [];
+let refreshInProgress = false;
+
+function isSafeHttpsUrl(value, allowedHost) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && (!allowedHost || url.hostname === allowedHost);
+  } catch { return false; }
 }
-$('[data-refresh-updates]').addEventListener('click',updateProjectDates); updateProjectDates();
+
+function formatRepositoryName(name) {
+  return String(name || '').replace(/[-_]+/g, ' ').trim().replace(/\p{L}+/gu, word => word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1));
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Data não informada';
+  return new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }).format(date).replace(',', ' às');
+}
+
+function formatRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Atualização não informada';
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 1) return 'Atualizado agora';
+  if (minutes < 60) return `Atualizado há ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Atualizado há ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  const days = Math.floor(hours / 24);
+  return `Atualizado há ${days} ${days === 1 ? 'dia' : 'dias'}`;
+}
+
+function shouldIgnoreRepository(repo) {
+  const name = typeof repo?.name === 'string' ? repo.name.toLowerCase() : '';
+  return !name || repo.fork === true || repo.archived === true || repo.private === true || IGNORED_REPOSITORIES.some(ignored => ignored.toLowerCase() === name);
+}
+
+function filterRepositories(repositories) {
+  if (!Array.isArray(repositories)) return [];
+  return repositories.filter(repo => repo && typeof repo === 'object' && !shouldIgnoreRepository(repo));
+}
+
+function normalizeRepository(repo) {
+  const repositoryUrl = isSafeHttpsUrl(repo.html_url, 'github.com') ? repo.html_url : '';
+  const fullName = typeof repo.full_name === 'string' ? repo.full_name : '';
+  const branch = typeof repo.default_branch === 'string' && repo.default_branch.trim() ? repo.default_branch : '';
+  let downloadUrl = '';
+  if (/^[\w.-]+\/[\w.-]+$/.test(fullName) && branch) {
+    const candidate = `https://github.com/${fullName}/archive/refs/heads/${encodeURIComponent(branch)}.zip`;
+    if (isSafeHttpsUrl(candidate, 'github.com')) downloadUrl = candidate;
+  }
+  return {
+    id: String(repo.id ?? fullName), name: formatRepositoryName(repo.name), rawName: String(repo.name || ''),
+    description: typeof repo.description === 'string' && repo.description.trim() ? repo.description.trim() : 'Projeto disponível na PlumpGames.',
+    language: typeof repo.language === 'string' && repo.language.trim() ? repo.language : 'Não informada',
+    updatedAt: repo.updated_at, createdAt: repo.created_at, branch: branch || 'Não informada', status:'Disponível',
+    repositoryUrl, downloadUrl, stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : 0,
+    forks: Number.isFinite(repo.forks_count) ? repo.forks_count : 0, size: Number.isFinite(repo.size) ? repo.size : 0
+  };
+}
+
+function loadGamesCache() {
+  try {
+    const cache = JSON.parse(localStorage.getItem(GAMES_CACHE_KEY) || 'null');
+    if (!cache || !Array.isArray(cache.repositories) || !Number.isFinite(cache.savedAt)) return null;
+    return { ...cache, valid: Date.now() - cache.savedAt < GAMES_CACHE_TTL };
+  } catch { return null; }
+}
+
+function saveGamesCache(repositories) {
+  try { localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify({ savedAt:Date.now(), repositories })); }
+  catch (error) { console.warn('Não foi possível salvar o cache de jogos.', error); }
+}
+
+async function fetchRepositories() {
+  const response = await fetch(GITHUB_REPOSITORIES_URL, { headers:{ Accept:'application/vnd.github+json' } });
+  if (!response.ok) {
+    const error = new Error(response.status === 403 ? 'Limite de consultas do GitHub atingido.' : 'Falha ao consultar o GitHub.');
+    error.status = response.status;
+    throw error;
+  }
+  const repositories = await response.json();
+  if (!Array.isArray(repositories)) throw new Error('Resposta inesperada do GitHub.');
+  return repositories;
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function createGameCover(game) {
+  const cover = element('div', 'game-card__image game-cover');
+  cover.setAttribute('role','img');
+  cover.setAttribute('aria-label', `Capa automática de ${game.name}`);
+  const status = element('span','status',game.status);
+  const initials = game.name.split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0]).join('').toLocaleUpperCase('pt-BR') || 'PG';
+  cover.append(status, element('span','game-cover__icon','🎮'), element('b','',initials), element('small','',game.name));
+  return cover;
+}
+
+function detailItem(label, value, relative = false) {
+  const wrapper = element('div');
+  wrapper.append(element('dt','',label));
+  const definition = element('dd','',value);
+  if (relative) { definition.classList.add('relative-update'); definition.dataset.updatedAt = relative; }
+  wrapper.append(definition);
+  return wrapper;
+}
+
+function safeLink(label, url, primary = false) {
+  if (!isSafeHttpsUrl(url, 'github.com')) return null;
+  const link = element('a', `button button--small ${primary ? 'button--primary' : 'button--ghost'}`, label);
+  link.href=url; link.target='_blank'; link.rel='noopener noreferrer';
+  return link;
+}
+
+function createGameCard(game) {
+  const card = element('article','game-card game-card--featured');
+  card.dataset.repositoryId=game.id;
+  const body=element('div','game-card__body');
+  body.append(element('p','card-kicker',`${game.language} • ${game.status}`), element('h3','',game.name), element('p','',game.description));
+  const details=element('dl','game-details');
+  details.append(detailItem('Linguagem',game.language), detailItem('Branch padrão',game.branch), detailItem('Última atualização',formatDate(game.updatedAt)), detailItem('Status',game.status), detailItem('Atualização relativa',formatRelativeTime(game.updatedAt),game.updatedAt));
+  body.append(details);
+  const compactMeta=element('p','compact-meta');
+  const compactRelative=element('span','relative-update',formatRelativeTime(game.updatedAt)); compactRelative.dataset.updatedAt=game.updatedAt;
+  compactMeta.append(element('span','',game.language),compactRelative); body.append(compactMeta);
+  const actions=element('div','card-actions');
+  const github=safeLink('Ver no GitHub',game.repositoryUrl); const download=safeLink('Baixar',game.downloadUrl,true);
+  if (github) actions.append(github); if (download) actions.append(download);
+  const detailsButton=element('button','button button--small button--ghost','Mais detalhes');
+  detailsButton.type='button'; detailsButton.addEventListener('click',()=>openGameDetails(game)); actions.append(detailsButton);
+  body.append(actions); card.append(createGameCover(game),body); return card;
+}
+
+function setGamesMessage(message, error = false) {
+  const area=$('#games-message'); area.textContent=message; area.hidden=!message; area.classList.toggle('is-error',error);
+}
+
+function renderGames(games) {
+  currentGames=games;
+  const list=$('#games-list'); list.replaceChildren();
+  if (!games.length) { setGamesMessage('Nenhum jogo público foi encontrado no GitHub.'); return; }
+  setGamesMessage('');
+  const fragment=document.createDocumentFragment(); games.forEach(game=>fragment.append(createGameCard(game))); list.append(fragment);
+}
+
+function repositoriesToGames(repositories) {
+  return filterRepositories(repositories).map(normalizeRepository).sort((a,b) => {
+    const dateDifference = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    return dateDifference || a.name.localeCompare(b.name,'pt-BR',{sensitivity:'base'});
+  });
+}
+
+function renderSiteUpdate(repositories) {
+  const site=Array.isArray(repositories) ? repositories.find(repo=>String(repo?.name).toLowerCase()==='site') : null;
+  const area=$('[data-update-project="site"]'); if(!site || !area) return;
+  area.querySelector('[data-update-date]').textContent=formatDate(site.updated_at);
+  area.querySelector('[data-update-relative]').textContent=formatRelativeTime(site.updated_at);
+  area.querySelector('[data-update-relative]').dataset.updatedAt=site.updated_at;
+  area.querySelector('[data-update-status]').textContent='Atualizado';
+}
+
+function showLoadFailure(hasCache, rateLimited = false) {
+  if (hasCache) setGamesMessage(rateLimited ? 'Exibindo informações salvas. O limite de consultas do GitHub foi atingido.' : 'Exibindo informações salvas. Não foi possível verificar atualizações agora.',true);
+  else {
+    setGamesMessage('Não foi possível carregar os jogos agora.',true);
+    const retry=element('button','button button--small button--ghost','Tentar novamente'); retry.type='button'; retry.addEventListener('click',()=>refreshGames(true)); $('#games-message').append(' ',retry);
+  }
+}
+
+async function refreshGames(force = false) {
+  if (refreshInProgress) return;
+  const cache=loadGamesCache();
+  if (!force && cache?.valid) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); return; }
+  refreshInProgress=true; $('#refresh-games').disabled=true;
+  if (!cache) setGamesMessage('Carregando jogos da PlumpGames…');
+  try {
+    const repositories=await fetchRepositories(); saveGamesCache(repositories); renderGames(repositoriesToGames(repositories)); renderSiteUpdate(repositories);
+  } catch (error) {
+    if (cache) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); }
+    showLoadFailure(Boolean(cache),error.status===403);
+  } finally { refreshInProgress=false; $('#refresh-games').disabled=false; }
+}
+
+function loadGitHubGames() {
+  const cache=loadGamesCache();
+  if (cache) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); }
+  return refreshGames(false);
+}
+
+function appendModalRow(list,label,value) { const row=element('div','game-modal__row'); row.append(element('dt','',label),element('dd','',String(value))); list.append(row); }
+function openGameDetails(game) {
+  lastFocus=document.activeElement;
+  $('#modal-title').textContent=game.name; const content=$('#modal-content'); const actions=$('#modal-actions'); content.replaceChildren(); actions.replaceChildren();
+  content.append(element('p','',game.description)); const list=element('dl','game-modal__details');
+  appendModalRow(list,'URL do repositório',game.repositoryUrl || 'Indisponível'); appendModalRow(list,'Linguagem',game.language); appendModalRow(list,'Branch padrão',game.branch);
+  appendModalRow(list,'Criação',formatDate(game.createdAt)); appendModalRow(list,'Última atualização',formatDate(game.updatedAt)); appendModalRow(list,'Estrelas',game.stars); appendModalRow(list,'Forks',game.forks); appendModalRow(list,'Tamanho aproximado',`${game.size.toLocaleString('pt-BR')} KB`); content.append(list);
+  const github=safeLink('Ver no GitHub',game.repositoryUrl); const download=safeLink('Baixar',game.downloadUrl,true); if(github) actions.append(github); if(download) actions.append(download);
+  $('#site-modal').hidden=false; document.body.classList.add('modal-open'); $('#site-modal .modal__close').focus();
+}
+
+function updateRelativeTimes() { $$('.relative-update[data-updated-at]').forEach(node=>node.textContent=formatRelativeTime(node.dataset.updatedAt)); }
+$('#refresh-games').addEventListener('click',()=>refreshGames(true));
+setInterval(updateRelativeTimes,60 * 1000);
+loadGitHubGames();
