@@ -1,40 +1,150 @@
-(() => {
 'use strict';
-const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const PREF='plumpgames.preferences.v2', VISITOR='plumpgames.visitor', usernamePattern=/^[a-z0-9._-]{3,24}$/;
-const themes={original:['#8b5cf6','#4776ff','#38d9f5','#050611','#0d1021','#f5f6ff','#7055ed','#38d9f5'],blue:['#2563eb','#06b6d4','#67e8f9','#04111f','#0b2036','#eefaff','#0ea5e9','#22d3ee'],purple:['#a855f7','#7c3aed','#f0abfc','#10051c','#1d0b31','#fff7ff','#9333ea','#d946ef'],dark:['#7c3aed','#2563eb','#22d3ee','#030712','#111827','#f9fafb','#6d28d9','#38bdf8']};
-const keys=['primary','secondary','accent','background','surface','text','button','glow'];
-const defaults={theme:'original',colors:themes.original,glowStrength:.42,cardOpacity:.92,animationStrength:1,view:'detailed',wallpaper:'cosmic',reduceMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
-let prefs=readPrefs(), currentUser=null, authBusy=false, registerStep=1, lastFocus=null;
-function readPrefs(){try{return {...defaults,...JSON.parse(localStorage.getItem(PREF)||'{}')}}catch{return {...defaults}}}
-function savePrefs(){localStorage.setItem(PREF,JSON.stringify(prefs))}
-function toast(message){const node=$('.toast');node.textContent=message;node.classList.add('show');setTimeout(()=>node.classList.remove('show'),2600)}
-function normalizeUsernameInput(input){input.value=input.value.trim().toLowerCase().replace(/\s/g,'')}
-function apply(){const colors=prefs.colors||themes[prefs.theme]||themes.original;keys.forEach((key,index)=>document.documentElement.style.setProperty(`--color-${key}`,colors[index]));document.documentElement.style.setProperty('--glow-strength',prefs.glowStrength);document.documentElement.style.setProperty('--card-opacity',prefs.cardOpacity);document.documentElement.style.setProperty('--animation-strength',prefs.reduceMotion?0:prefs.animationStrength);document.body.classList.toggle('reduce-animations',prefs.reduceMotion);$('#games-list').dataset.view=prefs.view;$$('[data-view-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.viewMode===prefs.view)));renderWallpaper()}
-function sync(){ $('#theme-select').value=prefs.theme;keys.forEach((key,index)=>$(`#color-${key}`).value=(prefs.colors||themes.original)[index]);$('#glow-strength').value=prefs.glowStrength;$('#card-opacity').value=prefs.cardOpacity;$('#animation-strength').value=prefs.animationStrength;$('#reduce-animations').checked=prefs.reduceMotion }
-function collect(){prefs.theme=$('#theme-select').value;prefs.colors=keys.map(key=>$(`#color-${key}`).value);prefs.glowStrength=+$('#glow-strength').value;prefs.cardOpacity=+$('#card-opacity').value;prefs.animationStrength=+$('#animation-strength').value;prefs.reduceMotion=$('#reduce-animations').checked}
-const wallpapers={cosmic:['Gradiente Cósmico','Gradiente suave em movimento','Baixo'],particles:['Partículas Neon','Pontos luminosos flutuantes','Médio'],waves:['Ondas Digitais','Ondas neon contínuas','Médio'],none:['Sem animação','Fundo estático','Nenhum']};
-function renderWallpaper(){const node=$('#live-wallpaper');node.className=`live-wallpaper wallpaper--${prefs.wallpaper}`;node.classList.toggle('is-paused',document.hidden||prefs.reduceMotion||prefs.wallpaper==='none')}
-function buildWallpapers(){const box=$('#wallpaper-selector');box.innerHTML=Object.entries(wallpapers).map(([id,item])=>`<article class="wallpaper-card"><div class="wallpaper-thumb wallpaper--${id}" aria-hidden="true"></div><div><strong>${item[0]}</strong><small>${item[1]}</small><small>Impacto: ${item[2]}</small></div><button class="button button--small ${prefs.wallpaper===id?'button--primary':'button--ghost'}" data-wallpaper="${id}">Selecionar</button></article>`).join('');$$('[data-wallpaper]',box).forEach(button=>button.onclick=()=>{prefs.wallpaper=button.dataset.wallpaper;savePrefs();apply();buildWallpapers()})}
-function avatar(id){return {controller:'🎮',rocket:'🚀',alien:'👾',bolt:'⚡'}[id]||'🎮'}
-function renderAccount(){const area=$('#account-area'), editor=$('#editor-area');if(!currentUser){area.innerHTML='<h3>Bem-vindo à PlumpGames</h3><p>Navegue como visitante ou acesse sua conta.</p><div class="account-actions"><button class="button button--primary" data-open-auth>Entrar / Criar conta</button><button class="button button--ghost" data-menu-visitor>Continuar como visitante</button></div>';editor.hidden=true}else{const badge=currentUser.role==='admin'?'<span class="admin-badge">ADMIN</span>':'';area.innerHTML=`<div class="profile-summary"><span>${avatar(currentUser.avatar)}</span><div><h3>${escapeHtml(currentUser.displayName)} ${badge}</h3><small>@${escapeHtml(currentUser.username)}</small></div></div><div class="account-actions"><button class="button button--ghost" data-edit-account>Editar perfil</button><button class="button button--ghost" data-logout>Sair</button></div>`;editor.hidden=currentUser.role!=='admin'}$('[data-open-auth]',area)?.addEventListener('click',()=>openAuth('login'));$('[data-menu-visitor]',area)?.addEventListener('click',closePanel);$('[data-edit-account]',area)?.addEventListener('click',()=>toast('Edição de perfil estará disponível em breve.'));$('[data-logout]',area)?.addEventListener('click',logout)}
-function escapeHtml(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML}
-function openPanel(){lastFocus=document.activeElement;$('#gx-side-panel').hidden=false;$('#gx-panel-backdrop').hidden=false;$('#gx-menu-button').setAttribute('aria-expanded','true');document.body.classList.add('modal-open');$('#gx-panel-close').focus()}
-function closePanel(){if($('#gx-side-panel').hidden)return;$('#gx-side-panel').hidden=true;$('#gx-panel-backdrop').hidden=true;$('#gx-menu-button').setAttribute('aria-expanded','false');document.body.classList.remove('modal-open');(lastFocus||$('#gx-menu-button')).focus()}
-function selectAuthTab(tab){const login=tab==='login';$('#login-tab').setAttribute('aria-selected',String(login));$('#register-tab').setAttribute('aria-selected',String(!login));$('#login-panel').hidden=!login;$('#register-panel').hidden=login;$('#auth-title').textContent=login?'Entrar na PlumpGames':'Criar conta na PlumpGames';(login?$('#login-username'):$('[name=username]',$('#register-form'))).focus()}
-function openAuth(tab='login'){lastFocus=document.activeElement;$('#auth-modal').hidden=false;document.body.classList.add('modal-open');selectAuthTab(tab)}
-function closeAuth(){if(authBusy)return;$('#auth-modal').hidden=true;document.body.classList.remove('modal-open');lastFocus?.focus()}
-function showRegisterStep(step){registerStep=step;$$('.register-step').forEach(node=>node.hidden=Number(node.dataset.step)!==step);$('#register-progress').textContent=`Etapa ${step} de 4`;$('#register-back').hidden=step===1;$('#register-next').hidden=step===4;$('#register-submit').hidden=step!==4;if(step===4)buildSummary()}
-function validateStep(){const form=$('#register-form'), message=$('.form-message',form);message.textContent='';if(registerStep===1){const username=form.elements.username;normalizeUsernameInput(username);if(!usernamePattern.test(username.value)){message.textContent='Use 3 a 24 letras minúsculas, números, ponto, hífen ou underline.';return false}if(!form.elements.email.checkValidity()){message.textContent='Informe um e-mail válido.';return false}if(form.elements.password.value.length<8){message.textContent='A senha deve ter no mínimo 8 caracteres.';return false}if(form.elements.password.value!==form.elements.confirmPassword.value){message.textContent='As senhas não coincidem.';return false}}if(registerStep===2&&!form.elements.displayName.value.trim()){message.textContent='Informe um nome de exibição.';return false}return true}
-function buildSummary(){const form=$('#register-form'), data=new FormData(form);$('#register-summary').innerHTML=`<p><b>Username:</b> @${escapeHtml(String(data.get('username')).trim().toLowerCase())}</p><p><b>Nome:</b> ${escapeHtml(data.get('displayName'))}</p><p><b>Avatar:</b> ${avatar(data.get('avatar'))}</p><p><b>Visibilidade:</b> ${form.elements.isPublic.checked?'Público':'Privado'}</p><p><b>Tema:</b> ${escapeHtml(data.get('theme'))}</p>`}
-async function api(path, options={}){const response=await fetch(path,{credentials:'same-origin',...options});let data={};try{data=await response.json()}catch{}return {response,data}}
-async function restoreSession(){try{const {response,data}=await api('/api/auth/session');if(response.ok&&data.authenticated)currentUser=data.user;else currentUser=null}catch{currentUser=null;toast('Não foi possível conectar ao servidor.')}finally{$('#session-loading').hidden=true;renderAccount();if(!currentUser&&!sessionStorage.getItem(VISITOR))openAuth('login')}}
-async function logout(){try{await api('/api/auth/logout',{method:'POST'});currentUser=null;renderAccount();closePanel();openAuth('login');toast('Sessão encerrada.')}catch{toast('Não foi possível conectar ao servidor.')}}
-function modal(title,content,download=false){$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-actions').innerHTML=download?'<button class="button button--ghost" data-close-modal>Cancelar</button><a class="button button--primary" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML/archive/refs/heads/main.zip">Continuar download</a>':'<button class="button button--primary" data-close-modal>Entendido</button>';$('#site-modal').hidden=false}
-function bindAuth(){['#login-username','#register-form [name=username]'].forEach(selector=>$(selector).addEventListener('input',event=>normalizeUsernameInput(event.target)));$('#login-tab').onclick=()=>selectAuthTab('login');$('#register-tab').onclick=()=>selectAuthTab('register');$$('[data-toggle-password]').forEach(button=>button.onclick=()=>{const input=$('#'+button.dataset.togglePassword), showing=input.type==='text';input.type=showing?'password':'text';button.textContent=showing?'Mostrar':'Ocultar'});$('[data-forgot]').onclick=()=>toast('A recuperação de senha estará disponível em uma versão futura.');$('[data-close-auth]').onclick=closeAuth;$('[data-continue-visitor]').onclick=()=>{sessionStorage.setItem(VISITOR,'1');closeAuth();toast('Você está navegando como visitante.')};$('#register-next').onclick=()=>{if(validateStep())showRegisterStep(registerStep+1)};$('#register-back').onclick=()=>showRegisterStep(registerStep-1);
-$('#login-form').onsubmit=async event=>{event.preventDefault();if(authBusy)return;const form=event.currentTarget,message=$('.form-message',form),username=form.elements.username.value.trim().toLowerCase();if(!usernamePattern.test(username)){message.textContent='Usuário ou senha inválidos.';return}authBusy=true;form.querySelector('[type=submit]').disabled=true;message.textContent='Entrando…';try{const {response,data}=await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:form.elements.password.value,remember:form.elements.remember.checked})});if(!response.ok){message.textContent=data.error||'Usuário ou senha inválidos.';return}currentUser=data.user;form.reset();authBusy=false;closeAuth();renderAccount();toast('Login realizado com sucesso.')}catch{message.textContent='Não foi possível conectar ao servidor.'}finally{authBusy=false;form.querySelector('[type=submit]').disabled=false}};
-$('#register-form').onsubmit=async event=>{event.preventDefault();if(authBusy||registerStep!==4)return;const form=event.currentTarget,message=$('.form-message',form),data=new FormData(form);authBusy=true;$('#register-submit').disabled=true;message.textContent='Criando conta…';const payload={username:String(data.get('username')).trim().toLowerCase(),email:data.get('email'),password:data.get('password'),displayName:data.get('displayName'),avatar:data.get('avatar'),bio:data.get('bio'),isPublic:form.elements.isPublic.checked,remember:form.elements.remember.checked,preferences:{theme:data.get('theme'),wallpaper:data.get('wallpaper'),animations:form.elements.animations.checked,view:data.get('view'),reduceMotion:form.elements.reduceMotion.checked}};try{const {response,result,data:unused}=await Promise.resolve(api('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).then(x=>({response:x.response,result:x.data,data:null}));if(!response.ok){message.textContent=result.error||'Não foi possível criar a conta.';return}currentUser=result.user;authBusy=false;prefs={...prefs,...payload.preferences,colors:themes[payload.preferences.theme]||themes.original};savePrefs();apply();form.reset();showRegisterStep(1);closeAuth();renderAccount();toast('Conta criada com sucesso.')}catch{message.textContent='Não foi possível conectar ao servidor.'}finally{authBusy=false;$('#register-submit').disabled=false}}}
-function init(){apply();sync();buildWallpapers();renderAccount();bindAuth();showRegisterStep(1);$('#gx-menu-button').onclick=()=>$('#gx-side-panel').hidden?openPanel():closePanel;$('#gx-panel-close').onclick=closePanel;$('#gx-panel-backdrop').onclick=closePanel;$$('.gx-accordion__button').forEach(button=>button.onclick=()=>{const opening=button.getAttribute('aria-expanded')!=='true';button.setAttribute('aria-expanded',String(opening));$('#'+button.getAttribute('aria-controls')).hidden=!opening});$('#theme-select').onchange=event=>{if(themes[event.target.value]){prefs.theme=event.target.value;prefs.colors=themes[prefs.theme];sync();apply()}};$('#apply-theme').onclick=()=>{collect();apply()};$('#save-theme').onclick=()=>{collect();apply();savePrefs();toast('Preferências salvas neste navegador.')};$('#reset-theme').onclick=()=>{prefs={...defaults,colors:[...themes.original]};savePrefs();sync();apply();buildWallpapers()};$$('[data-view-mode]').forEach(button=>button.onclick=()=>{prefs.view=button.dataset.viewMode;savePrefs();apply()});$('#reduce-animations').onchange=event=>{prefs.reduceMotion=event.target.checked;savePrefs();apply()};document.addEventListener('visibilitychange',renderWallpaper);
-const future=['Biblioteca de jogos','Favoritos','Conquistas','Comentários','Perfis públicos','Sincronização entre dispositivos'];$('#future-content').innerHTML=future.map(item=>`<button class="future-card" type="button"><b>${item}</b><span>Em desenvolvimento</span></button>`).join('');const tools=['Editar jogos','Editar notícias','Alterar status','Gerenciar destaques','Revisar feedbacks','Revisar bugs'];$('.editor-tools').innerHTML=tools.map(item=>`<button class="button button--ghost" type="button">${item}</button>`).join('');$$('.editor-tools button').forEach(button=>button.onclick=async()=>{const {response}=await api('/api/admin/validate');toast(response.ok?'Acesso administrativo validado no servidor.':'Acesso negado pelo servidor.')});$('#save-admin').onclick=()=>toast('Nenhuma alteração pendente.');$$('[data-open-download]').forEach(button=>button.onclick=()=>modal('Confirmar download','<p>Você baixará a versão mais recente diretamente do GitHub.</p>',true));$('[data-open-install]').onclick=()=>modal('Como instalar','<ol><li>Baixe e extraia o ZIP.</li><li>Abra o HTML principal.</li></ol>');$('[data-open-credits]').onclick=()=>modal('Créditos','<p>PlumpGames foi criada por Matheus (Plump), com ajuda do Codex.</p>');$('[data-open-privacy]').onclick=()=>modal('Política de Privacidade','<p>Preferências visuais ficam no navegador. Credenciais e sessões são protegidas no servidor.</p>');$('[data-open-terms]').onclick=()=>modal('Termos de Uso','<p>Use a PlumpGames de forma lícita e respeitosa.</p>');$('#site-modal').onclick=event=>{if(event.target.closest('[data-close-modal]'))$('#site-modal').hidden=true};document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!authBusy){if(!$('#auth-modal').hidden)closeAuth();else if(!$('#site-modal').hidden)$('#site-modal').hidden=true;else closePanel()}const trap=!$('#auth-modal').hidden?$('#auth-modal'):(!$('#gx-side-panel').hidden?$('#gx-side-panel'):null);if(event.key==='Tab'&&trap){const focusable=$$('button:not([disabled]),a[href],input,select,textarea',trap).filter(node=>!node.closest('[hidden]'));if(!focusable.length)return;const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}});$$('.reveal,.hero-entrance').forEach(node=>node.classList.add('visible'));restoreSession()}
-init();
-})();
+
+const STORAGE_KEY = 'plumpgames-preferences-v3';
+const OFFICIAL_URL = 'https://site.kiwifypurplehero.workers.dev/';
+const DEFAULT_COLORS = { primary: '#7c3aed', secondary: '#06b6d4', accent: '#f0abfc', glow: '#a855f7', menu: '#0b0c19', button: '#7c3aed' };
+const themes = {
+  original: DEFAULT_COLORS,
+  blue: { primary:'#22d3ee', secondary:'#0ea5e9', accent:'#bae6fd', glow:'#67e8f9', menu:'#07131e', button:'#0284c7' },
+  purple: { primary:'#8b5cf6', secondary:'#4f46e5', accent:'#c4b5fd', glow:'#a78bfa', menu:'#100b20', button:'#7c3aed' },
+  red: { primary:'#ef4444', secondary:'#be123c', accent:'#fecdd3', glow:'#fb7185', menu:'#1b080d', button:'#e11d48' },
+  green: { primary:'#22c55e', secondary:'#059669', accent:'#bbf7d0', glow:'#4ade80', menu:'#06170e', button:'#16a34a' },
+  light: { primary:'#4f46e5', secondary:'#0284c7', accent:'#312e81', glow:'#818cf8', menu:'#e8eaf5', button:'#4f46e5' },
+  dark: { primary:'#94a3b8', secondary:'#64748b', accent:'#f8fafc', glow:'#cbd5e1', menu:'#050611', button:'#475569' }
+};
+const wallpapers = [
+  { id:'lantern', name:'Lantern Moths', performance:'Leve', url:'https://mylivewallpapers.com/wp-content/uploads/Lifestyle/PREVIEW-Lantern-Moths.mp4', colors:{ primary:'#f59e0b', secondary:'#f97316', accent:'#fde68a', glow:'#fbbf24', menu:'#160d04', button:'#f59e0b' } },
+  { id:'cafe', name:'Cafe by the Beach', performance:'Médio', url:'https://mylivewallpapers.com/wp-content/uploads/Lifestyle/PREVIEW-Cafe-by-the-Beach.mp4', colors:{ primary:'#22d3ee', secondary:'#0ea5e9', accent:'#fef3c7', glow:'#67e8f9', menu:'#06151b', button:'#0891b2' } },
+  { id:'miyabi', name:'Hoshimi Miyabi ZZZ', performance:'Médio', url:'https://mylivewallpapers.com/wp-content/uploads/Games/PREVIEW-Hoshimi-Miyabi-ZZZ-1.mp4', colors:{ primary:'#38bdf8', secondary:'#6366f1', accent:'#e0f2fe', glow:'#60a5fa', menu:'#080d20', button:'#4f46e5' } },
+  { id:'minecraft', name:'Minecraft Mountain Cabin', performance:'Médio', url:'https://mylivewallpapers.com/wp-content/uploads/Games/PREVIEW-Minecraft-Mountain-Cabin.mp4', colors:{ primary:'#22c55e', secondary:'#65a30d', accent:'#d9f99d', glow:'#4ade80', menu:'#07160b', button:'#16a34a' } },
+  { id:'sung', name:'Sung Jin Woo and Beru', performance:'Médio', url:'https://mylivewallpapers.com/wp-content/uploads/Anime/PREVIEW-Sung-Jin-Woo-and-Beru.mp4', colors:{ primary:'#8b5cf6', secondary:'#4f46e5', accent:'#c4b5fd', glow:'#a78bfa', menu:'#0e0920', button:'#7c3aed' } },
+  { id:'none', name:'Sem animação', performance:'Muito leve', url:null, colors:DEFAULT_COLORS }
+];
+const defaults = { wallpaper:'none', wallpaperColors:true, theme:'original', custom:DEFAULT_COLORS, menuOpacity:.88, view:'detailed', reduceMotion:false, economy:false, highContrast:false, glow:1, opacity:.86, animation:1 };
+let storedPreferences = {};
+try { storedPreferences = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { localStorage.removeItem(STORAGE_KEY); }
+let preferences = { ...defaults, ...storedPreferences, custom: { ...DEFAULT_COLORS, ...(storedPreferences.custom || {}) } };
+let lastFocus = null;
+const $ = selector => document.querySelector(selector);
+const $$ = selector => [...document.querySelectorAll(selector)];
+const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+const currentWallpaper = () => wallpapers.find(item => item.id === preferences.wallpaper) || wallpapers.at(-1);
+
+function applyColors(colors) {
+  const root = document.documentElement;
+  Object.entries(colors).forEach(([key,value]) => root.style.setProperty(`--color-${key}`, value));
+  root.style.setProperty('--menu-border', `${colors.primary}88`);
+  root.style.setProperty('--menu-hover', `${colors.primary}26`);
+  root.style.setProperty('--menu-opacity', preferences.menuOpacity);
+}
+function activeColors() {
+  if (preferences.wallpaperColors) return currentWallpaper().colors;
+  return preferences.theme === 'custom' ? preferences.custom : (themes[preferences.theme] || DEFAULT_COLORS);
+}
+function syncControls() {
+  $('#theme-select').value = preferences.theme;
+  $('#wallpaper-colors').checked = preferences.wallpaperColors;
+  $('#menu-opacity').value = preferences.menuOpacity;
+  $('#reduce-animations').checked = preferences.reduceMotion;
+  $('#economy-mode').checked = preferences.economy;
+  $('#high-contrast').checked = preferences.highContrast;
+  $('#glow-strength').value = preferences.glow;
+  $('#card-opacity').value = preferences.opacity;
+  $('#animation-strength').value = preferences.animation;
+  const colors = preferences.custom;
+  ['primary','secondary','accent','menu','button','glow'].forEach(key => $(`#color-${key}`).value = colors[key]);
+  $$('[data-view-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.viewMode === preferences.view)));
+  $('#games-list').dataset.view = preferences.view;
+  document.body.classList.toggle('reduce-animations', preferences.reduceMotion);
+  document.body.classList.toggle('high-contrast', preferences.highContrast);
+  document.documentElement.style.setProperty('--glow-strength', preferences.glow);
+  document.documentElement.style.setProperty('--card-opacity', preferences.opacity);
+  document.documentElement.style.setProperty('--animation-strength', preferences.animation);
+  applyColors(activeColors());
+}
+
+function setStatus(message, error = false) {
+  const status = $('#wallpaper-status');
+  status.textContent = message;
+  status.classList.toggle('is-error', error);
+}
+async function selectWallpaper(id, restoring = false) {
+  const selected = wallpapers.find(item => item.id === id);
+  if (!selected) return;
+  const reduce = preferences.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!selected.url || reduce || preferences.economy) {
+    const video = $('#live-wallpaper-video');
+    video.pause(); video.removeAttribute('src'); video.load(); video.classList.remove('is-visible');
+    preferences.wallpaper = reduce ? 'none' : selected.id;
+    applyColors(preferences.wallpaperColors ? (reduce ? DEFAULT_COLORS : selected.colors) : activeColors());
+    save(); renderWallpapers();
+    setStatus(reduce && selected.url ? 'Movimento reduzido ativo: usando fundo estático.' : 'Wallpaper sem animação ativo.');
+    return;
+  }
+  setStatus('Carregando wallpaper…');
+  const oldVideo = $('#live-wallpaper-video');
+  const next = document.createElement('video');
+  next.className = 'live-wallpaper-video'; next.muted = true; next.loop = true; next.playsInline = true; next.autoplay = true;
+  next.setAttribute('aria-hidden','true'); next.preload = 'auto'; next.src = selected.url;
+  $('#wallpaper-stage').append(next);
+  try {
+    await new Promise((resolve, reject) => { next.addEventListener('canplay', resolve, {once:true}); next.addEventListener('error', reject, {once:true}); next.load(); });
+    await next.play();
+    next.classList.add('is-visible'); oldVideo.classList.remove('is-visible');
+    preferences.wallpaper = selected.id; save(); applyColors(activeColors()); renderWallpapers();
+    setTimeout(() => { oldVideo.remove(); next.id = 'live-wallpaper-video'; }, 450);
+    setStatus(`${selected.name} ativo.`);
+  } catch {
+    next.remove(); setStatus('Não foi possível carregar o wallpaper. O anterior foi mantido.', true);
+    if (!restoring) oldVideo.play().catch(() => {});
+  }
+}
+function renderWallpapers() {
+  $('#wallpaper-selector').innerHTML = wallpapers.map(item => `<article class="wallpaper-card${item.id === preferences.wallpaper ? ' is-selected' : ''}"><div class="wallpaper-thumb wallpaper-thumb--${item.id}" aria-hidden="true"></div><div><strong>${item.name}</strong><small>${item.performance}</small></div><button class="button button--small" type="button" data-wallpaper="${item.id}" ${item.id === preferences.wallpaper ? 'aria-pressed="true"' : ''}>${item.id === preferences.wallpaper ? 'Selecionado' : 'Selecionar'}</button></article>`).join('');
+  $$('[data-wallpaper]').forEach(button => button.addEventListener('click', () => selectWallpaper(button.dataset.wallpaper)));
+}
+
+function openPanel() { const panel=$('#gx-side-panel'); lastFocus=document.activeElement; panel.hidden=false; $('#gx-panel-backdrop').hidden=false; requestAnimationFrame(()=>panel.classList.add('is-open')); $('#gx-menu-button').setAttribute('aria-expanded','true'); document.body.classList.add('panel-open'); $('#gx-panel-close').focus(); }
+function closePanel() { const panel=$('#gx-side-panel'); panel.classList.remove('is-open'); $('#gx-menu-button').setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open'); setTimeout(()=>{panel.hidden=true;$('#gx-panel-backdrop').hidden=true;},220); lastFocus?.focus(); }
+function togglePanel() { $('#gx-side-panel').hidden ? openPanel() : closePanel(); }
+$('#gx-menu-button').addEventListener('click', togglePanel); $('#gx-panel-close').addEventListener('click', closePanel); $('#gx-panel-backdrop').addEventListener('click', closePanel);
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#gx-side-panel').hidden) closePanel(); });
+$$('.gx-accordion__button').forEach(button => button.addEventListener('click', () => { const open=button.getAttribute('aria-expanded')==='true'; button.setAttribute('aria-expanded', String(!open)); document.getElementById(button.getAttribute('aria-controls')).hidden=open; }));
+
+$('#theme-select').addEventListener('change', event => { preferences.theme=event.target.value; if (event.target.value!=='custom') preferences.custom={...(themes[event.target.value]||DEFAULT_COLORS)}; preferences.wallpaperColors=false; save(); syncControls(); });
+$('#apply-theme').addEventListener('click', () => { preferences.custom=Object.fromEntries(['primary','secondary','accent','menu','button','glow'].map(key=>[key,$(`#color-${key}`).value])); preferences.theme='custom'; preferences.wallpaperColors=false; save(); syncControls(); });
+$('#reset-theme').addEventListener('click', () => { preferences={...defaults, custom:{...DEFAULT_COLORS}}; save(); syncControls(); selectWallpaper('none'); });
+$('#wallpaper-colors').addEventListener('change', event => { preferences.wallpaperColors=event.target.checked; save(); syncControls(); });
+$('#menu-opacity').addEventListener('input', event => { preferences.menuOpacity=Number(event.target.value); save(); syncControls(); });
+$$('[data-view-mode]').forEach(button => button.addEventListener('click', () => { preferences.view=button.dataset.viewMode; save(); syncControls(); }));
+[['reduce-animations','reduceMotion'],['economy-mode','economy'],['high-contrast','highContrast']].forEach(([id,key]) => $(`#${id}`).addEventListener('change', event => { preferences[key]=event.target.checked; save(); syncControls(); if(key==='reduceMotion'||key==='economy') selectWallpaper(preferences.wallpaper); }));
+[['glow-strength','glow'],['card-opacity','opacity'],['animation-strength','animation']].forEach(([id,key]) => $(`#${id}`).addEventListener('input', event => { preferences[key]=Number(event.target.value); save(); syncControls(); }));
+$('#wallpaper-pause').addEventListener('click', () => { $('#live-wallpaper-video').pause(); setStatus('Wallpaper pausado.'); });
+$('#wallpaper-resume').addEventListener('click', () => { if(!preferences.reduceMotion&&!preferences.economy) $('#live-wallpaper-video').play().catch(()=>setStatus('O navegador bloqueou a reprodução.',true)); });
+document.addEventListener('visibilitychange', () => { const video=$('#live-wallpaper-video'); if(document.hidden) video.pause(); else if(!preferences.reduceMotion&&!preferences.economy&&currentWallpaper().url) video.play().catch(()=>{}); });
+
+const future = ['Contas','Perfis','Favoritos','Biblioteca','Conquistas','Comentários','Mais wallpapers'];
+$('#future-content').innerHTML = future.map(item => `<div class="future-card"><strong>${item}</strong><span>Em desenvolvimento</span></div>`).join('');
+function showModal(title, html, actions='') { $('#modal-title').textContent=title; $('#modal-content').innerHTML=html; $('#modal-actions').innerHTML=actions; $('#site-modal').hidden=false; }
+$$('[data-close-modal]').forEach(button=>button.addEventListener('click',()=>$('#site-modal').hidden=true));
+$('[data-open-download]').addEventListener('click',()=>showModal('Baixar CS 1.6 PLH','<p>O download é hospedado no repositório oficial do jogo.</p>','<a class="button button--primary" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML/archive/refs/heads/main.zip">Baixar pelo GitHub</a>'));
+$('[data-open-install]').addEventListener('click',()=>showModal('Sobre o jogo','<p>Projeto gratuito em HTML, atualmente em desenvolvimento. Extraia o arquivo baixado e abra o arquivo principal no navegador.</p>'));
+$('[data-open-credits]').addEventListener('click',()=>showModal('Créditos','<p>PlumpGames é criado por Matheus (Plump), com ajuda do Codex.</p>'));
+$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>As preferências ficam somente no localStorage deste navegador. O site não possui contas nem envia dados pessoais a um banco.</p>'));
+$('[data-open-terms]').addEventListener('click',()=>showModal('Termos de Uso','<p>Os projetos são oferecidos como estão. Consulte o repositório de cada jogo para detalhes.</p>'));
+
+if (!location.href.startsWith(OFFICIAL_URL) && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') console.info(`Site oficial: ${OFFICIAL_URL}`);
+renderWallpapers(); syncControls(); selectWallpaper(preferences.wallpaper, true);
+
+const revealObserver = new IntersectionObserver(entries => entries.forEach(entry => { if(entry.isIntersecting){ entry.target.classList.add('visible'); revealObserver.unobserve(entry.target); } }), {threshold:.08});
+$$('.reveal').forEach(item => revealObserver.observe(item));
+window.addEventListener('scroll', () => $('.site-header').classList.toggle('scrolled', scrollY > 20), {passive:true});
+async function updateProjectDates() {
+  const projects = { cs16:'https://api.github.com/repos/kiwifypurplehero-cell/CS1-6HTML', site:'https://api.github.com/repos/kiwifypurplehero-cell/Site' };
+  await Promise.all(Object.entries(projects).map(async ([id,url]) => {
+    const area=$(`[data-update-project="${id}"]`); if(!area) return;
+    try { const response=await fetch(url,{headers:{Accept:'application/vnd.github+json'}}); if(!response.ok) throw new Error(); const data=await response.json(); const date=new Date(data.pushed_at); area.querySelector('[data-update-date]').textContent=new Intl.DateTimeFormat('pt-BR',{dateStyle:'long'}).format(date); area.querySelector('[data-update-relative]').textContent='Dados do repositório oficial'; area.querySelector('[data-update-status]').textContent='Atualizado'; }
+    catch { area.querySelector('[data-update-date]').textContent='Informação indisponível'; area.querySelector('[data-update-status]').textContent='Tente novamente mais tarde'; }
+  }));
+}
+$('[data-refresh-updates]').addEventListener('click',updateProjectDates); updateProjectDates();

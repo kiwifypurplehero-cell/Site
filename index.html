@@ -29,20 +29,16 @@
     <script src="script.js" defer></script>
   </head>
   <body>
-    <div id="live-wallpaper" class="live-wallpaper" aria-hidden="true"></div>
+    <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true">
+      <video id="live-wallpaper-video" autoplay muted loop playsinline aria-hidden="true"></video>
+    </div>
+    <div class="wallpaper-overlay" aria-hidden="true"></div>
     <div class="ambient-glow ambient-glow--one" aria-hidden="true"></div>
     <div class="ambient-glow ambient-glow--two" aria-hidden="true"></div>
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
         <a class="brand" href="#inicio" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
-        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Abrir menu"><span></span><span></span><span></span></button>
-        <ul class="nav-links" id="main-menu">
-          <li><a class="nav-link active" href="#inicio">Início</a></li>
-          <li><a class="nav-link" href="#jogos">Jogos</a></li>
-          <li><a class="nav-link" href="#novidades">Novidades</a></li>
-          <li><a class="nav-link" href="#sobre">Sobre</a></li>
-        </ul>
         <button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button>
       </nav>
     </header>
@@ -79,7 +75,7 @@
             <div class="card-actions">
               <a class="button button--small button--ghost" href="https://github.com/kiwifypurplehero-cell/CS1-6HTML" target="_blank" rel="noopener noreferrer"><svg class="button__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Ver projeto no GitHub</a>
               <button class="button button--small button--primary" type="button" data-open-download><svg class="button__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l5-5m-5 5l-5-5M5 21h14"/></svg>Baixar jogo</button>
-              <button class="button button--small button--ghost" type="button" data-open-install>Mais detalhes</button><button class="button button--small button--ghost" type="button" data-auth-feature data-feedback-game="cs16" hidden aria-hidden="true">Dar feedback</button><button class="button button--small button--ghost" type="button" data-auth-feature data-bug-game="cs16" hidden aria-hidden="true">Reportar problema</button>
+              <button class="button button--small button--ghost" type="button" data-open-install>Mais detalhes</button>
             </div>
           </div>
         </article>
@@ -102,47 +98,22 @@
 
     <div id="gx-panel-backdrop" class="gx-backdrop" hidden></div>
     <aside id="gx-side-panel" class="gx-panel" role="dialog" aria-modal="true" aria-labelledby="gx-panel-title" hidden>
-      <header class="gx-panel__header"><div><p class="eyebrow">Central GX</p><h2 id="gx-panel-title">Menu da PlumpGames</h2></div><button id="gx-panel-close" class="modal__close" type="button" aria-label="Fechar menu">×</button></header>
-      <section id="account-area" class="gx-account" aria-live="polite"></section>
+      <header class="gx-panel__header"><div><p class="eyebrow">Central gamer</p><h2 id="gx-panel-title">Menu da PlumpGames</h2></div><button id="gx-panel-close" class="modal__close" type="button" aria-label="Fechar menu">×</button></header>
       <div class="gx-accordions">
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="appearance-content">Aparência <span>+</span></button><div id="appearance-content" class="gx-accordion__content" hidden>
           <label for="theme-select">Tema</label><select id="theme-select"><option value="original">Plump Original</option><option value="blue">Azul Neon</option><option value="purple">Roxo Gamer</option><option value="red">Vermelho Arena</option><option value="green">Verde Terminal</option><option value="light">Claro</option><option value="dark">Escuro</option><option value="custom">Personalizado</option></select>
-          <div class="settings-grid"><label>Cor principal<input id="color-primary" type="color"></label><label>Cor secundária<input id="color-secondary" type="color"></label><label>Cor de destaque<input id="color-accent" type="color"></label><label>Fundo<input id="color-background" type="color"></label><label>Cartões<input id="color-surface" type="color"></label><label>Textos<input id="color-text" type="color"></label><label>Botões<input id="color-button" type="color"></label><label>Brilho<input id="color-glow" type="color"></label></div><p id="contrast-warning" class="contrast-warning" hidden>Esta combinação pode dificultar a leitura.</p>
-          <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar</button><button id="save-theme" class="button button--ghost" type="button">Salvar neste navegador</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
+          <label class="checkbox-label"><input id="wallpaper-colors" type="checkbox" checked> Usar cores do wallpaper</label>
+          <div class="settings-grid"><label>Cor principal<input id="color-primary" type="color"></label><label>Cor secundária<input id="color-secondary" type="color"></label><label>Cor de destaque<input id="color-accent" type="color"></label><label>Menu<input id="color-menu" type="color"></label><label>Botões<input id="color-button" type="color"></label><label>Brilho<input id="color-glow" type="color"></label></div>
+          <label>Transparência do menu <input id="menu-opacity" type="range" min=".55" max=".98" step=".01"></label>
+          <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar cores</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
         </div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><div id="wallpaper-selector" class="wallpaper-selector"></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo economia</label></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed">Detalhada</button><button type="button" data-view-mode="compact">Compacta</button></div></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden><label class="checkbox-label"><input id="reduce-animations" type="checkbox"> Reduzir movimento</label></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden><label class="checkbox-label"><input id="reduce-animations" type="checkbox"> Reduzir movimento</label><label class="checkbox-label"><input id="high-contrast" type="checkbox"> Alto contraste</label></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="future-content">Futuramente <span>+</span></button><div id="future-content" class="gx-accordion__content future-grid" hidden></div></section>
       </div>
-      <section id="editor-area" class="admin-area" hidden><h3>Modo editor <span class="admin-badge">ADMIN</span></h3><div class="editor-tools"></div><button id="save-admin" class="button button--primary" type="button">Salvar alterações</button></section>
     </aside>
-
-    <div id="session-loading" class="session-loading" role="status"><span class="loader"></span><p>Verificando sessão…</p></div>
-    <div id="auth-modal" class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
-      <div class="modal__backdrop"></div><div class="modal__panel auth-panel">
-        <button class="modal__close" type="button" data-close-auth aria-label="Fechar">×</button>
-        <p class="eyebrow">Sua central gamer</p><h2 id="auth-title">Entrar na PlumpGames</h2>
-        <div class="auth-tabs" role="tablist"><button id="login-tab" role="tab" aria-selected="true" aria-controls="login-panel">Entrar</button><button id="register-tab" role="tab" aria-selected="false" aria-controls="register-panel">Criar conta</button></div>
-        <section id="login-panel" role="tabpanel" aria-labelledby="login-tab">
-          <form id="login-form"><label for="login-username">Nome de usuário</label><input id="login-username" name="username" required minlength="3" maxlength="24" pattern="[a-z0-9._-]{3,24}" autocapitalize="none" autocomplete="username" spellcheck="false">
-          <label for="login-password">Senha</label><div class="password-field"><input id="login-password" name="password" type="password" required autocomplete="current-password"><button type="button" data-toggle-password="login-password" aria-label="Mostrar senha">Mostrar</button></div>
-          <div class="login-options"><label><input name="remember" type="checkbox"> Salvar meu login</label><button class="text-button" type="button" data-forgot>Esqueci minha senha</button></div>
-          <p class="form-message" role="alert"></p><button class="button button--primary" type="submit">Entrar</button></form>
-        </section>
-        <section id="register-panel" role="tabpanel" aria-labelledby="register-tab" hidden>
-          <form id="register-form"><p id="register-progress" class="register-progress">Etapa 1 de 4</p>
-            <div class="register-step" data-step="1"><h3>Dados de acesso</h3><label>Nome de usuário<input name="username" required minlength="3" maxlength="24" pattern="[a-z0-9._-]{3,24}" autocapitalize="none" autocomplete="username" spellcheck="false"></label><label>E-mail<input name="email" type="email" required autocomplete="email"></label><label>Senha<div class="password-field"><input id="register-password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><button type="button" data-toggle-password="register-password">Mostrar</button></div></label><label>Confirmar senha<div class="password-field"><input id="confirm-password" name="confirmPassword" type="password" minlength="8" required autocomplete="new-password"><button type="button" data-toggle-password="confirm-password">Mostrar</button></div></label></div>
-            <div class="register-step" data-step="2" hidden><h3>Perfil</h3><label>Nome de exibição<input name="displayName" required maxlength="40" autocomplete="name"></label><fieldset><legend>Avatar predefinido</legend><div class="avatar-options"><label><input type="radio" name="avatar" value="controller" checked> 🎮</label><label><input type="radio" name="avatar" value="rocket"> 🚀</label><label><input type="radio" name="avatar" value="alien"> 👾</label><label><input type="radio" name="avatar" value="bolt"> ⚡</label></div></fieldset><label>Biografia opcional<textarea name="bio" maxlength="160"></textarea></label><label><input name="isPublic" type="checkbox" checked> Perfil público</label></div>
-            <div class="register-step" data-step="3" hidden><h3>Preferências</h3><label>Tema<select name="theme"><option value="original">Plump Original</option><option value="blue">Azul Neon</option><option value="purple">Roxo Gamer</option><option value="dark">Escuro</option></select></label><label>Live wallpaper<select name="wallpaper"><option value="cosmic">Cósmico</option><option value="particles">Partículas</option><option value="waves">Ondas</option><option value="none">Nenhum</option></select></label><label><input name="animations" type="checkbox" checked> Animações</label><label>Visualização<select name="view"><option value="detailed">Detalhada</option><option value="compact">Compacta</option></select></label><label><input name="reduceMotion" type="checkbox"> Reduzir movimento</label></div>
-            <div class="register-step" data-step="4" hidden><h3>Confirmação</h3><div id="register-summary" class="register-summary"></div><label class="remember-register"><input name="remember" type="checkbox"> Salvar meu login</label></div>
-            <p class="form-message" role="alert"></p><div class="step-actions"><button id="register-back" class="button button--ghost" type="button" hidden>Voltar</button><button id="register-next" class="button button--primary" type="button">Continuar</button><button id="register-submit" class="button button--primary" type="submit" hidden>Criar conta</button></div>
-          </form>
-        </section>
-        <button class="button button--visitor" type="button" data-continue-visitor>Continuar como visitante</button>
-      </div>
-    </div>
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
