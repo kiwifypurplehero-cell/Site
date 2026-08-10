@@ -444,3 +444,92 @@ $('#game-direct').addEventListener('click',event=>{ if(!activeGame) event.preven
 document.addEventListener('keydown',event=>{ if(event.key!=='Escape'||$('#game-launcher').hidden||document.activeElement===$('#game-frame')) return; if(document.fullscreenElement) document.exitFullscreen(); else closeGameLauncher(); });
 setInterval(updateRelativeTimes,60 * 1000);
 loadGitHubGames();
+
+/* PJ Assistant: o navegador envia somente texto e contexto resumido ao Worker. */
+const ASSISTANT_GREETING = 'Olá. Sou o assistente da PlumpGames. Como posso ajudar?';
+const ASSISTANT_SUGGESTIONS = ['Como jogar?','Como baixar um jogo?','Por que um jogo não abre?','Como usar tela cheia?','Quais jogos estão disponíveis?','Como funcionam os wallpapers?'];
+const ASSISTANT_MIN_INTERVAL = 1500;
+const assistantState = { history:[], busy:false, lastSentAt:0, opened:false };
+
+function assistantTime() {
+  return new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date());
+}
+function addAssistantMessage(role, content, includeHistory = true) {
+  const item=element('article',`assistant-message assistant-message--${role}`);
+  item.append(element('p','',content));
+  const time=element('time','',assistantTime()); time.dateTime=new Date().toISOString(); item.append(time);
+  $('#assistant-messages').append(item);
+  $('#assistant-messages').scrollTop=$('#assistant-messages').scrollHeight;
+  if (includeHistory) assistantState.history.push({role,content:String(content).slice(0,1000)});
+  if (role === 'assistant' && $('#plump-assistant-panel').hidden) $('#plump-assistant-button').classList.add('has-update');
+}
+function resetAssistant() {
+  assistantState.history=[];
+  $('#assistant-messages').replaceChildren();
+  addAssistantMessage('assistant',ASSISTANT_GREETING,false);
+  renderAssistantSuggestions();
+}
+function renderAssistantSuggestions() {
+  const area=$('#assistant-suggestions'); area.replaceChildren();
+  ASSISTANT_SUGGESTIONS.forEach(question=>{const chip=element('button','',question);chip.type='button';chip.addEventListener('click',()=>sendAssistantMessage(question));area.append(chip);});
+}
+function openAssistant() {
+  const panel=$('#plump-assistant-panel'); panel.hidden=false; assistantState.opened=true;
+  $('#plump-assistant-button').setAttribute('aria-expanded','true');
+  $('#plump-assistant-button').setAttribute('aria-label','Minimizar PJ Assistant');
+  $('#plump-assistant-button').classList.add('is-open'); $('#plump-assistant-button').classList.remove('has-update');
+  requestAnimationFrame(()=>$('#assistant-input').focus());
+}
+function hideAssistant() {
+  $('#plump-assistant-panel').hidden=true; $('#plump-assistant-button').setAttribute('aria-expanded','false');
+  $('#plump-assistant-button').setAttribute('aria-label','Abrir PJ Assistant'); $('#plump-assistant-button').classList.remove('is-open');
+  $('#plump-assistant-button').focus();
+}
+function localAssistantFallback(message) {
+  const text=message.toLocaleLowerCase('pt-BR');
+  if (/baix|download/.test(text)) return 'No card do jogo, selecione “Baixar” para obter o arquivo pelo GitHub. Se o botão não aparecer, consulte o repositório do projeto.';
+  if (/tela cheia|fullscreen/.test(text)) return 'Com o jogo aberto no launcher, use o botão “Tela cheia” na barra superior. Pressione Esc para sair da tela cheia.';
+  if (/jog|abrir|trav/.test(text)) return 'Escolha um jogo no catálogo e use “Jogar agora”. Se ele não carregar, tente “Nova aba”, atualize a página ou verifique sua conexão.';
+  if (/menu|três barr|tres barr/.test(text)) return 'Use o botão de três barras no topo para abrir aparência, wallpapers, visualização dos jogos e acessibilidade.';
+  if (/wallpaper|papel de parede|cores?/.test(text)) return 'Abra o menu de três barras, entre em “Live wallpapers” e escolha um fundo. A opção “Usar cores do wallpaper” adapta as cores do site e do PJ Assistant.';
+  return 'Não consegui acessar o suporte inteligente agora. Tente novamente em alguns instantes.';
+}
+function assistantGamesContext() {
+  return currentGames.slice(0,12).map(game=>({
+    name:String(game.name||'').slice(0,100), description:String(game.description||'').slice(0,240),
+    github:isSafeHttpsUrl(game.repositoryUrl,'github.com')?game.repositoryUrl:'', playUrl:getGamePlayUrl(game)
+  }));
+}
+async function sendAssistantMessage(rawMessage) {
+  const message=String(rawMessage||'').trim().slice(0,1000);
+  if (!message || assistantState.busy) return;
+  const elapsed=Date.now()-assistantState.lastSentAt;
+  if (elapsed<ASSISTANT_MIN_INTERVAL) { addAssistantMessage('assistant','Aguarde um instante antes de enviar outra mensagem.',false); return; }
+  assistantState.lastSentAt=Date.now(); assistantState.busy=true;
+  $('#assistant-input').value=''; $('#assistant-send').disabled=true; $('#assistant-typing').hidden=false;
+  $('#plump-assistant-button').classList.add('is-thinking'); $('#assistant-suggestions').hidden=true;
+  addAssistantMessage('user',message);
+  const history=assistantState.history.slice(0,-1).slice(-10);
+  try {
+    const response=await fetch('/api/support',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,history,games:assistantGamesContext()})});
+    if (!response.ok) throw new Error(`Support unavailable: ${response.status}`);
+    const payload=await response.json();
+    if (!payload || typeof payload.reply!=='string' || !payload.reply.trim()) throw new Error('Invalid support response');
+    addAssistantMessage('assistant',payload.reply.trim().slice(0,4000));
+  } catch (error) {
+    console.warn('PJ Assistant usou o modo local.',error);
+    addAssistantMessage('assistant',localAssistantFallback(message));
+  } finally {
+    assistantState.busy=false; $('#assistant-send').disabled=false; $('#assistant-typing').hidden=true;
+    $('#plump-assistant-button').classList.remove('is-thinking');
+    if (!$('#plump-assistant-panel').hidden) $('#assistant-input').focus();
+  }
+}
+
+$('#plump-assistant-button').addEventListener('click',()=>$('#plump-assistant-panel').hidden?openAssistant():hideAssistant());
+$('#assistant-minimize').addEventListener('click',hideAssistant); $('#assistant-close').addEventListener('click',hideAssistant);
+$('#assistant-clear').addEventListener('click',resetAssistant);
+$('#assistant-form').addEventListener('submit',event=>{event.preventDefault();sendAssistantMessage($('#assistant-input').value);});
+$('#assistant-input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAssistantMessage(event.currentTarget.value);}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#plump-assistant-panel').hidden)hideAssistant();});
+resetAssistant();

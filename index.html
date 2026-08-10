@@ -44,19 +44,7 @@
     </header>
 
     <main>
-      <section class="hero container" aria-labelledby="hero-title">
-        <div class="hero__content">
-          <p class="eyebrow hero-entrance">PlumpGames apresenta</p>
-          <h1 class="hero-entrance" id="hero-title">PlumpGames: <span>diversão sem barreiras</span></h1>
-          <p class="hero__text hero-entrance">Jogos gratuitos criados por Matheus (Plump) para curtir no navegador ou fazer o download de jogos com segurança.</p>
-          <div class="hero__actions hero-entrance"><a class="button button--primary" href="#jogos">Conhecer o jogo <span aria-hidden="true">→</span></a><a class="button button--ghost" href="#sobre">Sobre o estúdio</a></div>
-          <dl class="hero__stats hero-entrance" aria-label="Destaques"><div><dt>100%</dt><dd>Gratuito</dd></div><div><dt>GitHub</dt><dd>Fonte pública</dd></div><div><dt>Auto</dt><dd>Catálogo atualizado</dd></div></dl>
-        </div>
-        <div class="hero__visual hero-entrance" aria-hidden="true"><div class="orbit orbit--outer"></div><div class="orbit orbit--inner"></div><div class="game-core"><span>PJ</span><small>PLAY</small></div><span class="floating-chip chip--one">GRÁTIS</span><span class="floating-chip chip--two">HTML</span><span class="floating-chip chip--three">LEVEL UP</span></div>
-        <a class="scroll-hint" href="#jogos"><span>Explore</span><i aria-hidden="true"></i></a>
-      </section>
-
-      <section class="section container" id="jogos" aria-labelledby="games-title">
+      <section class="section section--catalog container" id="jogos" aria-labelledby="games-title">
         <div class="section-heading reveal"><div><p class="eyebrow">Jogo em destaque</p><h2 id="games-title">Jogue do seu jeito</h2></div><p>Conheça jogos para navegador e escolha entre visitar o projeto ou baixar a versão mais recente diretamente do GitHub.</p></div>
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
           <span>Visualização dos jogos</span>
@@ -81,7 +69,16 @@
       <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
     </main>
 
-    <footer class="site-footer"><div class="container footer__content"><p>PlumpGames — Criado por Matheus (Plump) com ajuda do Codex.</p><nav aria-label="Links do rodapé"><a class="footer-link" href="#inicio">Site</a><a class="footer-link" href="https://github.com/kiwifypurplehero-cell" target="_blank" rel="noopener noreferrer">GitHub da PlumpGames</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos de Uso</button></nav></div></footer>
+    <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p></div><nav aria-label="Links do rodapé"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell" target="_blank" rel="noopener noreferrer">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
+
+    <section id="plump-assistant-panel" class="assistant-panel" role="dialog" aria-labelledby="assistant-title" aria-describedby="assistant-subtitle" hidden>
+      <header class="assistant-header"><div><h2 id="assistant-title">PJ Assistant</h2><p id="assistant-subtitle">Suporte PlumpGames</p></div><div class="assistant-header__actions"><button id="assistant-clear" type="button">Limpar conversa</button><button id="assistant-minimize" type="button" aria-label="Minimizar assistente">—</button><button id="assistant-close" type="button" aria-label="Fechar assistente">×</button></div></header>
+      <div id="assistant-messages" class="assistant-messages" aria-live="polite" aria-relevant="additions"></div>
+      <div id="assistant-suggestions" class="assistant-suggestions" aria-label="Perguntas sugeridas"></div>
+      <p id="assistant-typing" class="assistant-typing" role="status" hidden>digitando…</p>
+      <form id="assistant-form" class="assistant-form"><label class="sr-only" for="assistant-input">Digite sua pergunta</label><textarea id="assistant-input" maxlength="1000" rows="1" placeholder="Digite sua pergunta…"></textarea><button id="assistant-send" type="submit" aria-label="Enviar mensagem">➤</button></form>
+    </section>
+    <button id="plump-assistant-button" class="assistant-button" type="button" aria-label="Abrir PJ Assistant" aria-expanded="false" aria-controls="plump-assistant-panel"><span>PJ</span><small>AI</small><i aria-hidden="true"></i></button>
 
 
     <div id="gx-panel-backdrop" class="gx-backdrop" hidden></div>

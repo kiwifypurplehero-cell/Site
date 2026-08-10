@@ -2,7 +2,9 @@
 
 Site estático oficial da PlumpGames: <https://site.kiwifypurplehero.workers.dev/>.
 
-O Cloudflare Worker serve somente os assets do site, sem banco de dados, autenticação, contas, cookies de sessão ou secrets. As opções de aparência, acessibilidade, visualização e live wallpaper são armazenadas localmente no navegador com `localStorage`.
+O Cloudflare Worker serve os assets do site e o endpoint `POST /api/support` do PJ Assistant, sem banco de dados, autenticação, contas, cookies de sessão ou secrets. As opções de aparência, acessibilidade, visualização e live wallpaper são armazenadas localmente no navegador com `localStorage`.
+
+O assistente usa o binding `AI` do Workers AI, configurado em `wrangler.jsonc`, e o modelo `@cf/meta/llama-3.1-8b-instruct-fast`. Nenhum token é enviado ou armazenado no navegador. Em desenvolvimento, `npx wrangler dev` disponibiliza tanto os assets quanto o binding; se a IA estiver indisponível, o frontend responde localmente a dúvidas básicas sobre jogos, downloads, menu, wallpapers e tela cheia.
 
 ## Desenvolvimento
 
