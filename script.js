@@ -151,8 +151,16 @@ const GAMES_CACHE_TTL = 5 * 60 * 1000;
 const IGNORED_REPOSITORIES = [
   'site'
 ];
+const PLAYABLE_REPOSITORIES = {
+  'cs1-6html': {
+    name: 'CS 1.6 PLH',
+    playUrl: 'https://kiwifypurplehero-cell.github.io/CS1-6HTML/'
+  }
+};
 let currentGames = [];
 let refreshInProgress = false;
+let activeGame = null;
+let wallpaperWasPlaying = false;
 
 function isSafeHttpsUrl(value, allowedHost) {
   try {
@@ -203,14 +211,79 @@ function normalizeRepository(repo) {
     const candidate = `https://github.com/${fullName}/archive/refs/heads/${encodeURIComponent(branch)}.zip`;
     if (isSafeHttpsUrl(candidate, 'github.com')) downloadUrl = candidate;
   }
+  const rawName = String(repo.name || '');
+  const playableConfig = PLAYABLE_REPOSITORIES[rawName.toLowerCase()];
   return {
-    id: String(repo.id ?? fullName), name: formatRepositoryName(repo.name), rawName: String(repo.name || ''),
+    id: String(repo.id ?? fullName), name: playableConfig?.name || formatRepositoryName(repo.name), rawName,
     description: typeof repo.description === 'string' && repo.description.trim() ? repo.description.trim() : 'Projeto disponível na PlumpGames.',
     language: typeof repo.language === 'string' && repo.language.trim() ? repo.language : 'Não informada',
     updatedAt: repo.updated_at, createdAt: repo.created_at, branch: branch || 'Não informada', status:'Disponível',
     repositoryUrl, downloadUrl, stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : 0,
     forks: Number.isFinite(repo.forks_count) ? repo.forks_count : 0, size: Number.isFinite(repo.size) ? repo.size : 0
   };
+}
+
+function getGitHubPagesUrl(repo) {
+  const name = String(repo?.rawName || repo?.name || '').trim();
+  return name ? `https://kiwifypurplehero-cell.github.io/${encodeURIComponent(name)}/` : '';
+}
+
+function getGamePlayUrl(repo) {
+  const configured = PLAYABLE_REPOSITORIES[String(repo?.rawName || '').toLowerCase()]?.playUrl;
+  const candidate = configured || getGitHubPagesUrl(repo);
+  return isSafeHttpsUrl(candidate, 'kiwifypurplehero-cell.github.io') ? candidate : '';
+}
+
+function setLauncherLoading(loading) {
+  $('#game-loading').hidden = !loading;
+}
+
+function openGameLauncher(game) {
+  const playUrl = getGamePlayUrl(game);
+  if (!playUrl) return;
+  activeGame = { game, playUrl };
+  lastFocus = document.activeElement;
+  $('#game-launcher-title').textContent = game.name;
+  $('#game-frame').title = game.name;
+  $('#game-external').href = playUrl;
+  $('#game-direct').href = playUrl;
+  setLauncherLoading(true);
+  $('#game-launcher').hidden = false;
+  document.body.classList.add('game-open');
+  const video = $('#live-wallpaper-video');
+  wallpaperWasPlaying = Boolean(video && !video.paused && !video.ended);
+  video?.pause();
+  requestAnimationFrame(() => { $('#game-frame').src = playUrl; $('#game-back').focus(); });
+}
+
+function closeGameLauncher() {
+  if ($('#game-launcher').hidden) return;
+  $('#game-frame').removeAttribute('src');
+  $('#game-launcher').hidden = true;
+  document.body.classList.remove('game-open');
+  setLauncherLoading(false);
+  activeGame = null;
+  if (wallpaperWasPlaying && !preferences.reduceMotion && !preferences.economy) $('#live-wallpaper-video')?.play().catch(() => {});
+  wallpaperWasPlaying = false;
+  lastFocus?.focus();
+}
+
+function restartGame() {
+  if (!activeGame) return;
+  const frame = $('#game-frame');
+  const src = activeGame.playUrl;
+  setLauncherLoading(true);
+  frame.removeAttribute('src');
+  requestAnimationFrame(() => { frame.src = src; });
+}
+
+async function openGameFullscreen() {
+  const container = $('#game-launcher-container');
+  if (!document.fullscreenElement && container.requestFullscreen) await container.requestFullscreen().catch(() => {});
+}
+
+function openGameExternal() {
+  if (activeGame) window.open(activeGame.playUrl, '_blank', 'noopener,noreferrer');
 }
 
 function loadGamesCache() {
@@ -283,8 +356,10 @@ function createGameCard(game) {
   const compactRelative=element('span','relative-update',formatRelativeTime(game.updatedAt)); compactRelative.dataset.updatedAt=game.updatedAt;
   compactMeta.append(element('span','',game.language),compactRelative); body.append(compactMeta);
   const actions=element('div','card-actions');
-  const github=safeLink('Ver no GitHub',game.repositoryUrl); const download=safeLink('Baixar',game.downloadUrl,true);
-  if (github) actions.append(github); if (download) actions.append(download);
+  const playUrl=getGamePlayUrl(game);
+  if (playUrl) { const play=element('button','button button--small button--play','▶ Jogar agora'); play.type='button'; play.addEventListener('click',()=>openGameLauncher(game)); actions.append(play); }
+  const download=safeLink('↓ Baixar',game.downloadUrl,true); const github=safeLink('GitHub',game.repositoryUrl);
+  if (download) actions.append(download); if (github) actions.append(github);
   const detailsButton=element('button','button button--small button--ghost','Mais detalhes');
   detailsButton.type='button'; detailsButton.addEventListener('click',()=>openGameDetails(game)); actions.append(detailsButton);
   body.append(actions); card.append(createGameCover(game),body); return card;
@@ -353,11 +428,19 @@ function openGameDetails(game) {
   content.append(element('p','',game.description)); const list=element('dl','game-modal__details');
   appendModalRow(list,'URL do repositório',game.repositoryUrl || 'Indisponível'); appendModalRow(list,'Linguagem',game.language); appendModalRow(list,'Branch padrão',game.branch);
   appendModalRow(list,'Criação',formatDate(game.createdAt)); appendModalRow(list,'Última atualização',formatDate(game.updatedAt)); appendModalRow(list,'Estrelas',game.stars); appendModalRow(list,'Forks',game.forks); appendModalRow(list,'Tamanho aproximado',`${game.size.toLocaleString('pt-BR')} KB`); content.append(list);
-  const github=safeLink('Ver no GitHub',game.repositoryUrl); const download=safeLink('Baixar',game.downloadUrl,true); if(github) actions.append(github); if(download) actions.append(download);
+  const playUrl=getGamePlayUrl(game); if(playUrl){const play=element('button','button button--small button--play','▶ Jogar agora');play.type='button';play.addEventListener('click',()=>{closeModal();openGameLauncher(game);});actions.append(play);}
+  const download=safeLink('↓ Baixar',game.downloadUrl,true); const github=safeLink('GitHub',game.repositoryUrl); if(download) actions.append(download); if(github) actions.append(github);
   $('#site-modal').hidden=false; document.body.classList.add('modal-open'); $('#site-modal .modal__close').focus();
 }
 
 function updateRelativeTimes() { $$('.relative-update[data-updated-at]').forEach(node=>node.textContent=formatRelativeTime(node.dataset.updatedAt)); }
 $('#refresh-games').addEventListener('click',()=>refreshGames(true));
+$('#game-frame').addEventListener('load',()=>setLauncherLoading(false));
+$('#game-back').addEventListener('click',closeGameLauncher);
+$('#game-restart').addEventListener('click',restartGame);
+$('#game-fullscreen').addEventListener('click',openGameFullscreen);
+$('#game-external').addEventListener('click',event=>{ if(!activeGame) event.preventDefault(); });
+$('#game-direct').addEventListener('click',event=>{ if(!activeGame) event.preventDefault(); });
+document.addEventListener('keydown',event=>{ if(event.key!=='Escape'||$('#game-launcher').hidden||document.activeElement===$('#game-frame')) return; if(document.fullscreenElement) document.exitFullscreen(); else closeGameLauncher(); });
 setInterval(updateRelativeTimes,60 * 1000);
 loadGitHubGames();

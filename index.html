@@ -103,6 +103,24 @@
       </div>
     </aside>
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
+    <section class="game-launcher" id="game-launcher" role="dialog" aria-modal="true" aria-labelledby="game-launcher-title" hidden>
+      <div class="game-launcher__shell" id="game-launcher-container">
+        <header class="game-launcher__toolbar">
+          <button class="launcher-control launcher-control--back" id="game-back" type="button">← <span>Voltar</span></button>
+          <h2 id="game-launcher-title">Jogo</h2>
+          <div class="game-launcher__actions">
+            <button class="launcher-control" id="game-restart" type="button" title="Reiniciar jogo">⟳ <span>Reiniciar</span></button>
+            <button class="launcher-control" id="game-fullscreen" type="button" title="Tela cheia">⛶ <span>Tela cheia</span></button>
+            <a class="launcher-control" id="game-external" href="#" target="_blank" rel="noopener noreferrer">↗ <span>Nova aba</span></a>
+          </div>
+        </header>
+        <div class="game-launcher__viewport">
+          <div class="game-loading" id="game-loading" role="status"><span class="game-spinner" aria-hidden="true"></span><strong>Carregando jogo…</strong></div>
+          <iframe id="game-frame" title="Jogo" allow="fullscreen" allowfullscreen></iframe>
+          <aside class="game-launcher__fallback">Se o jogo não carregar, abra em uma nova aba. <a id="game-direct" class="button button--small button--ghost" href="#" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></aside>
+        </div>
+      </div>
+    </section>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>
