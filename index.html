@@ -27,6 +27,7 @@
     </script>
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
+    <script src="accessibility.js" defer></script>
   </head>
   <body>
     <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true">
@@ -95,7 +96,14 @@
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo economia</label></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed">Detalhada</button><button type="button" data-view-mode="compact">Compacta</button></div></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden><label class="checkbox-label"><input id="reduce-animations" type="checkbox"> Reduzir movimento</label><label class="checkbox-label"><input id="high-contrast" type="checkbox"> Alto contraste</label></div></section>
+        <section class="gx-accordion accessibility-section"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <small id="accessibility-menu-status">Inativa</small><span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden>
+          <div class="a11y-intro"><strong>Configuração rápida</strong><p>Uma prévia é aplicada imediatamente e fica somente neste navegador.</p><div id="a11y-quick-actions" class="a11y-quick-actions" aria-label="Atalhos de acessibilidade"></div></div>
+          <div id="reduced-motion-suggestion" class="a11y-suggestion" role="status" hidden>Seu dispositivo prefere movimento reduzido. Deseja aplicar o perfil? <button type="button" data-a11y-suggest>Aplicar</button></div>
+          <div id="accessibility-profiles" class="a11y-profiles"></div>
+          <p id="a11y-conflict" class="a11y-conflict" role="status" aria-live="polite"></p>
+          <div class="a11y-footer"><button id="a11y-undo" class="button button--ghost" type="button" disabled>Desfazer</button><button id="a11y-reset" class="button button--ghost" type="button">Restaurar acessibilidade</button></div>
+          <p class="a11y-privacy">Privacidade: apenas preferências técnicas são salvas localmente. Nenhum diagnóstico é coletado ou enviado.</p>
+        </div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="future-content">Futuramente <span>+</span></button><div id="future-content" class="gx-accordion__content future-grid" hidden></div></section>
       </div>
     </aside>
