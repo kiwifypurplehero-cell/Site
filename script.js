@@ -45,9 +45,7 @@ function syncControls() {
   $('#theme-select').value = preferences.theme;
   $('#wallpaper-colors').checked = preferences.wallpaperColors;
   $('#menu-opacity').value = preferences.menuOpacity;
-  $('#reduce-animations').checked = preferences.reduceMotion;
   $('#economy-mode').checked = preferences.economy;
-  $('#high-contrast').checked = preferences.highContrast;
   $('#glow-strength').value = preferences.glow;
   $('#card-opacity').value = preferences.opacity;
   $('#animation-strength').value = preferences.animation;
@@ -117,7 +115,7 @@ $('#reset-theme').addEventListener('click', () => { preferences={...defaults, cu
 $('#wallpaper-colors').addEventListener('change', event => { preferences.wallpaperColors=event.target.checked; save(); syncControls(); });
 $('#menu-opacity').addEventListener('input', event => { preferences.menuOpacity=Number(event.target.value); save(); syncControls(); });
 $$('[data-view-mode]').forEach(button => button.addEventListener('click', () => { preferences.view=button.dataset.viewMode; save(); syncControls(); }));
-[['reduce-animations','reduceMotion'],['economy-mode','economy'],['high-contrast','highContrast']].forEach(([id,key]) => $(`#${id}`).addEventListener('change', event => { preferences[key]=event.target.checked; save(); syncControls(); if(key==='reduceMotion'||key==='economy') selectWallpaper(preferences.wallpaper); }));
+[['economy-mode','economy']].forEach(([id,key]) => $(`#${id}`).addEventListener('change', event => { preferences[key]=event.target.checked; save(); syncControls(); if(key==='reduceMotion'||key==='economy') selectWallpaper(preferences.wallpaper); }));
 [['glow-strength','glow'],['card-opacity','opacity'],['animation-strength','animation']].forEach(([id,key]) => $(`#${id}`).addEventListener('input', event => { preferences[key]=Number(event.target.value); save(); syncControls(); }));
 $('#wallpaper-pause').addEventListener('click', () => { $('#live-wallpaper-video').pause(); setStatus('Wallpaper pausado.'); });
 $('#wallpaper-resume').addEventListener('click', () => { if(!preferences.reduceMotion&&!preferences.economy) $('#live-wallpaper-video').play().catch(()=>setStatus('O navegador bloqueou a reprodução.',true)); });
@@ -447,7 +445,7 @@ loadGitHubGames();
 
 /* PJ Assistant: o navegador envia somente texto e contexto resumido ao Worker. */
 const ASSISTANT_GREETING = 'Olá. Sou o assistente da PlumpGames. Como posso ajudar?';
-const ASSISTANT_SUGGESTIONS = ['Como jogar?','Como baixar um jogo?','Por que um jogo não abre?','Como usar tela cheia?','Quais jogos estão disponíveis?','Como funcionam os wallpapers?'];
+const ASSISTANT_SUGGESTIONS = ['Como jogar?','Como baixar um jogo?','Por que um jogo não abre?','Como usar tela cheia?','Quais jogos estão disponíveis?','Como funcionam os wallpapers?','Como aumentar a letra?','Como parar as animações?','Como deixar os botões maiores?'];
 const ASSISTANT_MIN_INTERVAL = 1500;
 const assistantState = { history:[], busy:false, lastSentAt:0, opened:false };
 
@@ -487,6 +485,10 @@ function hideAssistant() {
 }
 function localAssistantFallback(message) {
   const text=message.toLocaleLowerCase('pt-BR');
+  if (/letra|texto maior|fonte/.test(text)) return 'Abra Menu → Acessibilidade → Baixa visão e ajuste “Tamanho do texto”, ou use o atalho “Texto maior”.';
+  if (/vermelho|verde|distinguir cor|daltoni/.test(text)) return 'Abra Menu → Acessibilidade → Daltonismo e escolha uma paleta. O site também pode usar símbolos junto com cores. Isso configura a interface sem fazer diagnóstico.';
+  if (/anima|movimento|parar/.test(text)) return 'Abra Menu → Acessibilidade → Sensibilidade a movimento, ou use o atalho “Sem animações”.';
+  if (/bot(ão|ao|ões|oes)|controle maior|clicável|clicavel/.test(text)) return 'Abra Menu → Acessibilidade → Dificuldade motora e ative “Modo controles ampliados” para alvos de pelo menos 44 × 44 px.';
   if (/baix|download/.test(text)) return 'No card do jogo, selecione “Baixar” para obter o arquivo pelo GitHub. Se o botão não aparecer, consulte o repositório do projeto.';
   if (/tela cheia|fullscreen/.test(text)) return 'Com o jogo aberto no launcher, use o botão “Tela cheia” na barra superior. Pressione Esc para sair da tela cheia.';
   if (/jog|abrir|trav/.test(text)) return 'Escolha um jogo no catálogo e use “Jogar agora”. Se ele não carregar, tente “Nova aba”, atualize a página ou verifique sua conexão.';
