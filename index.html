@@ -30,9 +30,7 @@
     <script src="accessibility.js" defer></script>
   </head>
   <body>
-    <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true">
-      <video id="live-wallpaper-video" autoplay muted loop playsinline aria-hidden="true"></video>
-    </div>
+    <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true"></div>
     <div class="wallpaper-overlay" aria-hidden="true"></div>
     <div class="ambient-glow ambient-glow--one" aria-hidden="true"></div>
     <div class="ambient-glow ambient-glow--two" aria-hidden="true"></div>
@@ -93,7 +91,7 @@
           <label>Transparência do menu <input id="menu-opacity" type="range" min=".55" max=".98" step=".01"></label>
           <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar cores</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
         </div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo economia</label></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><button id="wallpaper-retry" class="button button--small button--ghost" type="button" hidden>Tentar novamente</button><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo desempenho</label><p id="performance-suggestion" class="performance-suggestion" hidden>Seu dispositivo pode se beneficiar do modo desempenho.</p></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed">Detalhada</button><button type="button" data-view-mode="compact">Compacta</button></div></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
         <section class="gx-accordion accessibility-section"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <small id="accessibility-menu-status">Inativa</small><span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden>
@@ -115,13 +113,17 @@
           <h2 id="game-launcher-title">Jogo</h2>
           <div class="game-launcher__actions">
             <button class="launcher-control" id="game-restart" type="button" title="Reiniciar jogo">⟳ <span>Reiniciar</span></button>
+            <button class="launcher-control" id="game-mode" type="button" aria-haspopup="menu">▣ <span>Ajuste</span></button>
+            <button class="launcher-control" id="game-resolution" type="button" aria-haspopup="menu">▤ <span>Resolução</span></button>
             <button class="launcher-control" id="game-fullscreen" type="button" title="Tela cheia">⛶ <span>Tela cheia</span></button>
             <a class="launcher-control" id="game-external" href="#" target="_blank" rel="noopener noreferrer">↗ <span>Nova aba</span></a>
           </div>
         </header>
-        <div class="game-launcher__viewport">
+        <div class="launcher-popover" id="game-display-menu" role="menu" hidden></div>
+        <div class="game-launcher__viewport" id="game-available-viewport">
           <div class="game-loading" id="game-loading" role="status"><span class="game-spinner" aria-hidden="true"></span><strong>Carregando jogo…</strong></div>
-          <iframe id="game-frame" title="Jogo" allow="fullscreen" allowfullscreen></iframe>
+          <div class="game-resolution-stage" id="game-resolution-stage"><div class="game-resolution-canvas" id="game-resolution-canvas"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write" allowfullscreen></iframe></div></div>
+          <p class="orientation-hint" id="game-orientation-hint" hidden>Para melhor experiência, gire o dispositivo.</p>
           <aside class="game-launcher__fallback">Se o jogo não carregar, abra em uma nova aba. <a id="game-direct" class="button button--small button--ghost" href="#" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></aside>
         </div>
       </div>
