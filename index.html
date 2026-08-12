@@ -113,16 +113,20 @@
           <h2 id="game-launcher-title">Jogo</h2>
           <div class="game-launcher__actions">
             <button class="launcher-control" id="game-restart" type="button" title="Reiniciar jogo">⟳ <span>Reiniciar</span></button>
-            <button class="launcher-control" id="game-mode" type="button" aria-haspopup="menu">▣ <span>Ajuste</span></button>
-            <button class="launcher-control" id="game-resolution" type="button" aria-haspopup="menu">▤ <span>Resolução</span></button>
+            <button class="launcher-control" id="game-mode" type="button" aria-haspopup="menu" aria-controls="game-display-menu" aria-expanded="false">▣ <span>Ajuste</span></button>
+            <button class="launcher-control launcher-control--stacked" id="game-resolution" type="button" aria-haspopup="menu" aria-controls="game-display-menu" aria-expanded="false">▤ <span>Resolução<small id="game-resolution-label">Automático</small></span></button>
+            <button class="launcher-control" id="game-controls" type="button" aria-haspopup="menu" aria-controls="game-controls-menu" aria-expanded="false">🎮 <span>Controles</span></button>
             <button class="launcher-control" id="game-fullscreen" type="button" title="Tela cheia">⛶ <span>Tela cheia</span></button>
             <a class="launcher-control" id="game-external" href="#" target="_blank" rel="noopener noreferrer">↗ <span>Nova aba</span></a>
           </div>
         </header>
         <div class="launcher-popover" id="game-display-menu" role="menu" hidden></div>
+        <div class="launcher-popover launcher-popover--controls" id="game-controls-menu" role="menu" hidden></div>
         <div class="game-launcher__viewport" id="game-available-viewport">
           <div class="game-loading" id="game-loading" role="status"><span class="game-spinner" aria-hidden="true"></span><strong>Carregando jogo…</strong></div>
           <div class="game-resolution-stage" id="game-resolution-stage"><div class="game-resolution-canvas" id="game-resolution-canvas"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write" allowfullscreen></iframe></div></div>
+          <button class="iframe-interaction-overlay" id="iframe-interaction-overlay" type="button" aria-label="Fechar menu e voltar ao jogo" hidden></button>
+          <div class="virtual-gamepad" id="virtual-gamepad" aria-label="Controles virtuais" hidden></div>
           <p class="orientation-hint" id="game-orientation-hint" hidden>Para melhor experiência, gire o dispositivo.</p>
           <aside class="game-launcher__fallback">Se o jogo não carregar, abra em uma nova aba. <a id="game-direct" class="button button--small button--ghost" href="#" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></aside>
         </div>
