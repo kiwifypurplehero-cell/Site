@@ -230,7 +230,13 @@ let currentGames = [];
 let refreshInProgress = false;
 const DISPLAY_SETTINGS_KEY='plumpgamesGameDisplaySettings';
 const gameLauncherState={open:false,currentGame:null,currentUrl:'',trigger:null,mode:'fit',resolution:'auto',fitMode:'contain',custom:{width:1280,height:720},resizeTimer:0};
+const launcherPopoverState={current:null,trigger:null};
+const VIRTUAL_GAMEPAD_MAPPING=Object.freeze({up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',a:'z',b:'x',x:'a',y:'s',l1:'q',r1:'e',start:'Enter',select:'Shift'});
+const GAMEPAD_SETTINGS_KEY='plumpgamesVirtualGamepadSettings';
+const DEFAULT_GAMEPAD_SETTINGS=Object.freeze({layout:'off',size:1,opacity:.7,position:'default',large:false,hidden:[],mapping:{...VIRTUAL_GAMEPAD_MAPPING}});
+const virtualGamepadState={settings:{...DEFAULT_GAMEPAD_SETTINGS,mapping:{...VIRTUAL_GAMEPAD_MAPPING}},pressed:new Map(),sameOrigin:false};
 let gameDisplaySettings={}; try{gameDisplaySettings=JSON.parse(localStorage.getItem(DISPLAY_SETTINGS_KEY)||'{}');}catch{localStorage.removeItem(DISPLAY_SETTINGS_KEY);}
+let virtualGamepadSettings={};try{virtualGamepadSettings=JSON.parse(localStorage.getItem(GAMEPAD_SETTINGS_KEY)||'{}');}catch{localStorage.removeItem(GAMEPAD_SETTINGS_KEY);}
 let wasWallpaperPlayingBeforeGame=false, launcherAnimationFrame=0;
 
 function isSafeHttpsUrl(value, allowedHost) {
@@ -344,16 +350,39 @@ function applyGameDisplay(){
   canvas.style.transform=`scale(${scaleX},${scaleY})`; stage.dataset.fit=gameLauncherState.fitMode; stage.dataset.fixed=String(fixed);
   $('#game-launcher-container').classList.toggle('is-window',gameLauncherState.mode==='window');
   $('#game-orientation-hint').hidden=!(m.viewportWidth<700&&m.viewportHeight>m.viewportWidth&&width/height>1.4);
-  updateResolutionLabels();
+  updateResolutionLabels();updateResolutionButton();
 }
 function saveGameDisplay(){const key=String(gameLauncherState.currentGame?.rawName||gameLauncherState.currentGame?.id||'');if(!key)return;gameDisplaySettings[key]={mode:gameLauncherState.mode,resolution:gameLauncherState.resolution,fitMode:gameLauncherState.fitMode,custom:gameLauncherState.custom};localStorage.setItem(DISPLAY_SETTINGS_KEY,JSON.stringify(gameDisplaySettings));}
 function restoreGameDisplay(game){const key=String(game.rawName||game.id||''),stored=gameDisplaySettings[key]||{};Object.assign(gameLauncherState,{mode:stored.mode||'fit',resolution:stored.resolution||'auto',fitMode:stored.fitMode||'contain',custom:stored.custom||{width:1280,height:720}});}
-function closeDisplayMenu(){ $('#game-display-menu').hidden=true; }
-function renderDisplayMenu(kind){
-  const menu=$('#game-display-menu'); menu.dataset.fullscreen=String(kind==='fullscreen');
+function getPopover(id){return document.getElementById(id);}
+function positionLauncherPopover(popover,trigger){
+  if(!popover||!trigger)return;const shell=$('#game-launcher-container'),shellRect=shell.getBoundingClientRect(),buttonRect=trigger.getBoundingClientRect(),gap=8;
+  popover.classList.toggle('launcher-popover--sheet',matchMedia('(max-width: 700px)').matches);
+  if(matchMedia('(max-width: 700px)').matches){popover.style.left='8px';popover.style.right='8px';popover.style.top='auto';popover.style.bottom='8px';return;}
+  const width=Math.min(360,window.innerWidth-20),estimatedHeight=Math.min(popover.scrollHeight||420,window.innerHeight-20);
+  const left=Math.max(10,Math.min(buttonRect.right-width-shellRect.left,shellRect.width-width-10));
+  const below=buttonRect.bottom-shellRect.top+gap,above=buttonRect.top-shellRect.top-estimatedHeight-gap;
+  popover.style.left=`${left}px`;popover.style.right='auto';popover.style.bottom='auto';popover.style.top=`${below+estimatedHeight<=shellRect.height-8?below:Math.max(8,above)}px`;
+}
+function openLauncherPopover(id,trigger=document.querySelector(`[aria-controls="${id}"]`)){
+  if(launcherPopoverState.current&&launcherPopoverState.current!==id)closeLauncherPopover();
+  const popover=getPopover(id);if(!popover)return;launcherPopoverState.current=id;launcherPopoverState.trigger=trigger;popover.hidden=false;
+  trigger?.setAttribute('aria-expanded','true');$('#iframe-interaction-overlay').hidden=false;requestAnimationFrame(()=>positionLauncherPopover(popover,trigger));
+}
+function closeLauncherPopover({restoreFocus=false}={}){
+  const {current,trigger}=launcherPopoverState;if(current)getPopover(current).hidden=true;
+  document.querySelectorAll('.game-launcher__toolbar [aria-expanded]').forEach(button=>button.setAttribute('aria-expanded','false'));
+  launcherPopoverState.current=null;launcherPopoverState.trigger=null;$('#iframe-interaction-overlay').hidden=true;if(restoreFocus&&trigger?.isConnected)trigger.focus();
+}
+function toggleLauncherPopover(id,trigger){if(launcherPopoverState.current===id)closeLauncherPopover({restoreFocus:true});else openLauncherPopover(id,trigger);}
+function closeDisplayMenu(){closeLauncherPopover();}
+function resolutionLabel(){const m=measureDisplay(),value=gameLauncherState.resolution;if(value==='auto')return 'Automático / Ajustado';if(value==='current')return `Atual ${m.availableWidth} × ${m.availableHeight}`;if(value==='screen')return `Tela ${m.screenWidth} × ${m.screenHeight}`;if(value==='custom')return `${gameLauncherState.custom.width} × ${gameLauncherState.custom.height}`;return value.replace('x',' × ');}
+function updateResolutionButton(){$('#game-resolution-label').textContent=resolutionLabel();}
+function renderDisplayMenu(kind,trigger){
+  const menu=$('#game-display-menu'); menu.dataset.kind=kind;
   if(kind==='mode') menu.innerHTML=`<strong>Ajuste</strong><button data-mode="fit">Ajustado</button><button data-mode="window">Janela</button><strong>Escala</strong><button data-fit="contain">Conter</button><button data-fit="cover">Preencher</button><button data-fit="stretch">Esticar <small>Pode distorcer a imagem.</small></button>`;
   else menu.innerHTML=`<strong>AJUSTE</strong><button data-resolution="auto">Automático / Ajustado</button><strong>DISPOSITIVO</strong><button data-resolution="current"></button><button data-resolution="screen"></button><strong>WIDESCREEN 16:9</strong>${['1920x1080','1600x900','1366x768','1280x720'].map(x=>`<button data-resolution="${x}">${x.replace('x',' × ')}</button>`).join('')}<strong>CLÁSSICO 4:3</strong>${['1280x960','1024x768','800x600','640x480'].map(x=>`<button data-resolution="${x}">${x.replace('x',' × ')}</button>`).join('')}<strong>5:4</strong><button data-resolution="1280x1024">1280 × 1024</button><strong>PERSONALIZADO</strong><button data-resolution="custom">Definir resolução…</button>`;
-  menu.hidden=false; updateResolutionLabels(); menu.querySelector('button')?.focus();
+  updateResolutionLabels();toggleLauncherPopover('game-display-menu',trigger);if(launcherPopoverState.current==='game-display-menu')menu.querySelector('button')?.focus();
 }
 function customResolution(){
   const width=Number(prompt('Largura (320–7680):',gameLauncherState.custom.width));if(!width)return;
@@ -361,18 +390,41 @@ function customResolution(){
   if(width<320||width>7680||height<240||height>4320){alert('Use valores entre 320 × 240 e 7680 × 4320.');return;}
   gameLauncherState.custom={width:Math.round(width),height:Math.round(height)};gameLauncherState.resolution='custom';saveGameDisplay();applyGameDisplay();
 }
-function stopGameFrame(){const frame=$('#game-frame');cancelAnimationFrame(launcherAnimationFrame);launcherAnimationFrame=0;frame.src='about:blank';frame.removeAttribute('src');frame.title='Jogo';}
+function gameSettingsKey(){return String(gameLauncherState.currentGame?.rawName||gameLauncherState.currentGame?.id||'');}
+function restoreVirtualGamepad(){const stored=virtualGamepadSettings[gameSettingsKey()]||{};virtualGamepadState.settings={...DEFAULT_GAMEPAD_SETTINGS,...stored,hidden:Array.isArray(stored.hidden)?stored.hidden:[],mapping:{...VIRTUAL_GAMEPAD_MAPPING,...stored.mapping}};renderVirtualGamepad();}
+function saveVirtualGamepad(){if(!gameSettingsKey())return;virtualGamepadSettings[gameSettingsKey()]={...virtualGamepadState.settings,mapping:{...virtualGamepadState.settings.mapping}};localStorage.setItem(GAMEPAD_SETTINGS_KEY,JSON.stringify(virtualGamepadSettings));}
+function keyboardTargets(){const frame=$('#game-frame'),targets=[window,document];virtualGamepadState.sameOrigin=false;try{const frameDocument=frame.contentDocument;if(frameDocument){virtualGamepadState.sameOrigin=true;targets.unshift(frame.contentWindow,frameDocument,frameDocument.body);}}catch{virtualGamepadState.sameOrigin=false;}return targets.filter(Boolean);}
+function dispatchVirtualKey(type,key){const options={key,code:key.length===1?`Key${key.toUpperCase()}`:key,bubbles:true,cancelable:true};keyboardTargets().forEach(target=>target.dispatchEvent(new KeyboardEvent(type,options)));if(!virtualGamepadState.sameOrigin)$('#game-frame').focus();}
+function releaseVirtualControls(){virtualGamepadState.pressed.forEach(key=>dispatchVirtualKey('keyup',key));virtualGamepadState.pressed.clear();document.querySelectorAll('.gamepad-button.is-pressed').forEach(button=>button.classList.remove('is-pressed'));}
+function gamepadButton(id,label,text){return `<button class="gamepad-button gamepad-button--${id}" type="button" data-gamepad-button="${id}" aria-label="${label}">${text}</button>`;}
+function renderVirtualGamepad(){
+  const overlay=$('#virtual-gamepad'),settings=virtualGamepadState.settings;releaseVirtualControls();overlay.hidden=settings.layout==='off';overlay.dataset.layout=settings.layout;overlay.dataset.position=settings.position;overlay.style.setProperty('--gamepad-size',String(settings.size*((settings.large||document.documentElement.classList.contains('a11y-motor'))?1.2:1)));overlay.style.setProperty('--gamepad-opacity',String(settings.opacity));
+  if(settings.layout==='off'){overlay.replaceChildren();return;}const visible=id=>!settings.hidden.includes(id);
+  const dpad=`<div class="gamepad-cluster gamepad-dpad">${visible('up')?gamepadButton('up','Direcional para cima','↑'):''}${visible('left')?gamepadButton('left','Direcional para esquerda','←'):''}${visible('down')?gamepadButton('down','Direcional para baixo','↓'):''}${visible('right')?gamepadButton('right','Direcional para direita','→'):''}</div>`;
+  const face=settings.layout==='dpad'?'':`<div class="gamepad-cluster gamepad-face">${settings.layout==='classic'&&visible('y')?gamepadButton('y','Botão Y','Y'):''}${settings.layout==='classic'&&visible('x')?gamepadButton('x','Botão X','X'):''}${visible('b')?gamepadButton('b','Botão B','B'):''}${visible('a')?gamepadButton('a','Botão A','A'):''}</div>`;
+  const shoulders=settings.layout==='classic'?`<div class="gamepad-shoulders">${visible('l1')?gamepadButton('l1','Botão L1','L1'):''}${visible('r1')?gamepadButton('r1','Botão R1','R1'):''}</div>`:'';
+  const center=settings.layout==='dpad'?'':`<div class="gamepad-center">${settings.layout==='classic'&&visible('select')?gamepadButton('select','Select','Select'):''}${visible('start')?gamepadButton('start','Start','Start'):''}</div>`;
+  overlay.innerHTML=shoulders+dpad+face+center;
+}
+function setGamepadLayout(layout){virtualGamepadState.settings.layout=layout==='custom'?'classic':layout;saveVirtualGamepad();renderVirtualGamepad();renderControlsMenu();closeLauncherPopover();showToast(layout==='off'?'Controles virtuais desativados.':virtualGamepadState.sameOrigin?'Controles virtuais ativados.':'Controles ativados. Em jogos de outra origem, o teclado virtual pode ser bloqueado pelo navegador.');}
+function renderControlsMenu(){
+  const menu=$('#game-controls-menu'),s=virtualGamepadState.settings,layouts=[['off','Desativado'],['classic','Gamepad clássico'],['compact','Gamepad compacto'],['dpad','Somente direcional']];
+  menu.innerHTML=`<strong>CONTROLES VIRTUAIS</strong>${layouts.map(([id,label])=>`<button data-gamepad-layout="${id}" aria-pressed="${s.layout===id}">${label}</button>`).join('')}<button data-gamepad-custom>Personalizado</button><div class="gamepad-custom-settings" ${menu.dataset.custom==='true'?'':'hidden'}><label>Opacidade dos controles <output>${Math.round(s.opacity*100)}%</output><input data-gamepad-opacity type="range" min="30" max="100" value="${Math.round(s.opacity*100)}"></label><label>Tamanho <input data-gamepad-size type="range" min="70" max="150" value="${Math.round(s.size*100)}"></label><label><input data-gamepad-large type="checkbox" ${s.large?'checked':''}> Controles ampliados</label><label>Posição <select data-gamepad-position><option value="default">Automática</option><option value="low">Mais abaixo</option><option value="high">Mais acima</option></select></label><fieldset><legend>Botões visíveis</legend>${['a','b','x','y','l1','r1','start','select'].map(id=>`<label><input data-gamepad-visible="${id}" type="checkbox" ${s.hidden.includes(id)?'':'checked'}> ${id.toUpperCase()}</label>`).join('')}</fieldset><fieldset><legend>Mapeamento</legend>${Object.entries(s.mapping).map(([id,key])=>`<label>${id.toUpperCase()} <input data-gamepad-map="${id}" value="${key}" maxlength="12"></label>`).join('')}</fieldset><button data-gamepad-reset>Restaurar padrão</button><small>Eventos de teclado são enviados diretamente apenas para jogos da mesma origem. Em jogos externos, o navegador impede a injeção; o iframe recebe foco, mas a Gamepad API não permite registrar controles virtuais reais.</small></div>`;
+  menu.querySelector('[data-gamepad-position]')?.querySelector(`option[value="${s.position}"]`)?.setAttribute('selected','');
+}
+function openControlsMenu(trigger){renderControlsMenu();toggleLauncherPopover('game-controls-menu',trigger);}
+function stopGameFrame(){releaseVirtualControls();const frame=$('#game-frame');cancelAnimationFrame(launcherAnimationFrame);launcherAnimationFrame=0;frame.src='about:blank';frame.removeAttribute('src');frame.title='Jogo';}
 function setLauncherLoading(loading){$('#game-loading').hidden=!loading;$('#game-loading strong').textContent=loading?'Carregando jogo…':'';}
 async function closeGameLauncher({returnToGames=true}={}){
   const trigger=gameLauncherState.trigger;if(document.fullscreenElement&&document.exitFullscreen)try{await document.exitFullscreen();}catch(error){console.warn('Não foi possível sair da tela cheia.',error);}
   clearTimeout(gameLauncherState.resizeTimer);window.removeEventListener('resize',scheduleGameDisplay);window.removeEventListener('orientationchange',scheduleGameDisplay);window.visualViewport?.removeEventListener('resize',scheduleGameDisplay);document.removeEventListener('fullscreenchange',applyGameDisplay);
-  stopGameFrame();closeDisplayMenu();setLauncherLoading(false);$('#game-launcher').hidden=true;document.body.classList.remove('game-open','launcher-open');document.documentElement.classList.remove('game-open','launcher-open');unlockPageScroll('launcher');
+  closeLauncherPopover();stopGameFrame();virtualGamepadState.settings.layout='off';renderVirtualGamepad();setLauncherLoading(false);$('#game-launcher').hidden=true;document.body.classList.remove('game-open','launcher-open');document.documentElement.classList.remove('game-open','launcher-open');unlockPageScroll('launcher');
   Object.assign(gameLauncherState,{open:false,currentGame:null,currentUrl:'',trigger:null,mode:'fit',resolution:'auto',fitMode:'contain'});if(wasWallpaperPlayingBeforeGame)resumeWallpaper();wasWallpaperPlayingBeforeGame=false;if(returnToGames)$('#jogos')?.scrollIntoView({block:'start'});if(trigger?.isConnected)trigger.focus();resetTransientUIState();
 }
 async function openGameLauncher(game,trigger=document.activeElement){
-  const playUrl=getGamePlayUrl(game);if(!playUrl)return;if(gameLauncherState.open)await closeGameLauncher({returnToGames:false});closePanel({restoreFocus:false});closeModal();Object.assign(gameLauncherState,{open:true,currentGame:game,currentUrl:playUrl,trigger});restoreGameDisplay(game);
+  const playUrl=getGamePlayUrl(game);if(!playUrl)return;if(gameLauncherState.open)await closeGameLauncher({returnToGames:false});closePanel({restoreFocus:false});closeModal();closeLauncherPopover();releaseVirtualControls();Object.assign(gameLauncherState,{open:true,currentGame:game,currentUrl:playUrl,trigger});restoreGameDisplay(game);restoreVirtualGamepad();
   $('#game-launcher-title').textContent=game.name;$('#game-frame').title=game.name;$('#game-external').href=playUrl;$('#game-direct').href=playUrl;setLauncherLoading(true);$('#game-launcher').hidden=false;document.body.classList.add('game-open','launcher-open');document.documentElement.classList.add('game-open','launcher-open');lockPageScroll('launcher');
-  wasWallpaperPlayingBeforeGame=Boolean(wallpaperManager.active&&!wallpaperManager.active.paused);pauseWallpaper(false);window.addEventListener('resize',scheduleGameDisplay);window.addEventListener('orientationchange',scheduleGameDisplay);window.visualViewport?.addEventListener('resize',scheduleGameDisplay);document.addEventListener('fullscreenchange',applyGameDisplay);
+  if(matchMedia('(pointer: coarse)').matches&&virtualGamepadState.settings.layout==='off'&&!sessionStorage.getItem('gamepadSuggestionShown')){showToast('Dica: ative Controles para usar um gamepad virtual na tela.');sessionStorage.setItem('gamepadSuggestionShown','1');}wasWallpaperPlayingBeforeGame=Boolean(wallpaperManager.active&&!wallpaperManager.active.paused);pauseWallpaper(false);window.addEventListener('resize',scheduleGameDisplay);window.addEventListener('orientationchange',scheduleGameDisplay);window.visualViewport?.addEventListener('resize',scheduleGameDisplay);document.addEventListener('fullscreenchange',applyGameDisplay);
   launcherAnimationFrame=requestAnimationFrame(()=>{if(!gameLauncherState.open)return;applyGameDisplay();$('#game-frame').src=playUrl;$('#game-back').focus();});
 }
 function scheduleGameDisplay(){clearTimeout(gameLauncherState.resizeTimer);gameLauncherState.resizeTimer=setTimeout(applyGameDisplay,120);}
@@ -533,15 +585,22 @@ function openGameDetails(game) {
 
 function updateRelativeTimes() { $$('.relative-update[data-updated-at]').forEach(node=>node.textContent=formatRelativeTime(node.dataset.updatedAt)); }
 $('#refresh-games').addEventListener('click',()=>refreshGames(true));
-$('#game-frame').addEventListener('load',()=>setLauncherLoading(false));
+$('#game-frame').addEventListener('load',event=>{setLauncherLoading(false);try{virtualGamepadState.sameOrigin=new URL(event.currentTarget.src,location.href).origin===location.origin;}catch{virtualGamepadState.sameOrigin=false;}});
 $('#game-back').addEventListener('click',closeGameLauncher);
 $('#game-restart').addEventListener('click',restartGame);
-$('#game-fullscreen').addEventListener('click',()=>renderDisplayMenu('fullscreen'));
-$('#game-mode').addEventListener('click',()=>renderDisplayMenu('mode')); $('#game-resolution').addEventListener('click',()=>renderDisplayMenu('resolution'));
-$('#game-display-menu').addEventListener('click',async event=>{const menu=event.currentTarget,button=event.target.closest('button');if(!button)return;if(button.dataset.mode)gameLauncherState.mode=button.dataset.mode;if(button.dataset.fit)gameLauncherState.fitMode=button.dataset.fit;if(button.dataset.resolution){if(button.dataset.resolution==='custom')customResolution();else gameLauncherState.resolution=button.dataset.resolution;}saveGameDisplay();closeDisplayMenu();if(menu.dataset.fullscreen==='true')await openGameFullscreen();applyGameDisplay();});
+$('#game-fullscreen').addEventListener('click',()=>{closeLauncherPopover();openGameFullscreen();});
+$('#game-mode').addEventListener('click',event=>renderDisplayMenu('mode',event.currentTarget));$('#game-resolution').addEventListener('click',event=>renderDisplayMenu('resolution',event.currentTarget));$('#game-controls').addEventListener('click',event=>openControlsMenu(event.currentTarget));
+$('#game-display-menu').addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;if(button.dataset.mode)gameLauncherState.mode=button.dataset.mode;if(button.dataset.fit)gameLauncherState.fitMode=button.dataset.fit;if(button.dataset.resolution){if(button.dataset.resolution==='custom')customResolution();else gameLauncherState.resolution=button.dataset.resolution;}saveGameDisplay();closeLauncherPopover();applyGameDisplay();});
+$('#game-controls-menu').addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;if(button.dataset.gamepadLayout)setGamepadLayout(button.dataset.gamepadLayout);if(button.hasAttribute('data-gamepad-custom')){event.currentTarget.dataset.custom=event.currentTarget.dataset.custom==='true'?'false':'true';renderControlsMenu();positionLauncherPopover(event.currentTarget,$('#game-controls'));}if(button.hasAttribute('data-gamepad-reset')){virtualGamepadState.settings={...DEFAULT_GAMEPAD_SETTINGS,mapping:{...VIRTUAL_GAMEPAD_MAPPING},layout:'classic'};saveVirtualGamepad();renderVirtualGamepad();renderControlsMenu();}});
+$('#game-controls-menu').addEventListener('input',event=>{const input=event.target,s=virtualGamepadState.settings;if(input.matches('[data-gamepad-opacity]'))s.opacity=Number(input.value)/100;if(input.matches('[data-gamepad-size]'))s.size=Number(input.value)/100;if(input.matches('[data-gamepad-large]'))s.large=input.checked;if(input.matches('[data-gamepad-position]'))s.position=input.value;if(input.matches('[data-gamepad-visible]'))s.hidden=input.checked?s.hidden.filter(id=>id!==input.dataset.gamepadVisible):[...new Set([...s.hidden,input.dataset.gamepadVisible])];if(input.matches('[data-gamepad-map]')&&input.value.trim())s.mapping[input.dataset.gamepadMap]=input.value.trim();saveVirtualGamepad();renderVirtualGamepad();const output=$('#game-controls-menu output');if(output)output.textContent=`${Math.round(s.opacity*100)}%`;});
+$('#virtual-gamepad').addEventListener('pointerdown',event=>{const button=event.target.closest('[data-gamepad-button]');if(!button)return;event.preventDefault();button.setPointerCapture?.(event.pointerId);const key=virtualGamepadState.settings.mapping[button.dataset.gamepadButton];virtualGamepadState.pressed.set(event.pointerId,key);button.classList.add('is-pressed');dispatchVirtualKey('keydown',key);});
+function releaseGamepadPointer(event){const button=event.target.closest('[data-gamepad-button]'),key=virtualGamepadState.pressed.get(event.pointerId);if(!key)return;event.preventDefault();virtualGamepadState.pressed.delete(event.pointerId);button?.classList.remove('is-pressed');dispatchVirtualKey('keyup',key);}
+['pointerup','pointercancel','pointerleave'].forEach(type=>$('#virtual-gamepad').addEventListener(type,releaseGamepadPointer));
+$('#iframe-interaction-overlay').addEventListener('pointerdown',event=>{event.preventDefault();closeLauncherPopover();requestAnimationFrame(()=>$('#game-frame').focus());});
+document.addEventListener('pointerdown',event=>{if(!launcherPopoverState.current)return;const path=typeof event.composedPath==='function'?event.composedPath():[];const popover=getPopover(launcherPopoverState.current),trigger=launcherPopoverState.trigger;const inside=path.length?(path.includes(popover)||path.includes(trigger)):(popover?.contains(event.target)||trigger?.contains(event.target));if(inside)return;closeLauncherPopover();},{capture:true});
 $('#game-external').addEventListener('click',event=>{ if(!gameLauncherState.open) event.preventDefault(); });
 $('#game-direct').addEventListener('click',event=>{ if(!gameLauncherState.open) event.preventDefault(); });
-document.addEventListener('keydown',event=>{ if(event.key!=='Escape'||$('#game-launcher').hidden||document.activeElement===$('#game-frame')) return; closeGameLauncher(); });
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||$('#game-launcher').hidden)return;if(launcherPopoverState.current){event.preventDefault();event.stopImmediatePropagation();closeLauncherPopover({restoreFocus:true});return;}if(document.activeElement!==$('#game-frame'))closeGameLauncher();});
 setInterval(updateRelativeTimes,60 * 1000);
 loadGitHubGames();
 
