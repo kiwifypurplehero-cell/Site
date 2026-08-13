@@ -106,32 +106,6 @@
       </div>
     </aside>
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
-    <section class="game-launcher" id="game-launcher" role="dialog" aria-modal="true" aria-labelledby="game-launcher-title" hidden>
-      <div class="game-launcher__shell" id="game-launcher-container">
-        <header class="game-launcher__toolbar">
-          <button class="launcher-control launcher-control--back" id="game-back" type="button">← <span>Voltar</span></button>
-          <h2 id="game-launcher-title">Jogo</h2>
-          <div class="game-launcher__actions">
-            <button class="launcher-control" id="game-restart" type="button" title="Reiniciar jogo">⟳ <span>Reiniciar</span></button>
-            <button class="launcher-control" id="game-mode" type="button" aria-haspopup="menu" aria-controls="game-display-menu" aria-expanded="false">▣ <span>Ajuste</span></button>
-            <button class="launcher-control launcher-control--stacked" id="game-resolution" type="button" aria-haspopup="menu" aria-controls="game-display-menu" aria-expanded="false">▤ <span>Resolução<small id="game-resolution-label">Automático</small></span></button>
-            <button class="launcher-control" id="game-controls" type="button" aria-haspopup="menu" aria-controls="game-controls-menu" aria-expanded="false">🎮 <span>Controles</span></button>
-            <button class="launcher-control" id="game-fullscreen" type="button" title="Tela cheia">⛶ <span>Tela cheia</span></button>
-            <a class="launcher-control" id="game-external" href="#" target="_blank" rel="noopener noreferrer">↗ <span>Nova aba</span></a>
-          </div>
-        </header>
-        <div class="launcher-popover" id="game-display-menu" role="menu" hidden></div>
-        <div class="launcher-popover launcher-popover--controls" id="game-controls-menu" role="menu" hidden></div>
-        <div class="game-launcher__viewport" id="game-available-viewport">
-          <div class="game-loading" id="game-loading" role="status" aria-live="polite"><span class="game-spinner" aria-hidden="true"></span><strong>Carregando jogo…</strong><p id="game-loading-detail">Preparando o launcher…</p><div class="game-loading__actions" id="game-loading-actions" hidden><button id="game-loading-retry" class="button button--small" type="button">Tentar novamente</button><a id="game-loading-external" class="button button--small button--ghost" href="#" target="_blank" rel="noopener noreferrer">Abrir em nova aba</a><button id="game-loading-back" class="button button--small button--ghost" type="button">Voltar</button></div></div>
-          <div class="game-resolution-stage" id="game-resolution-stage"><div class="game-resolution-canvas" id="game-resolution-canvas"></div></div>
-          <button class="iframe-interaction-overlay" id="iframe-interaction-overlay" type="button" aria-label="Fechar menu e voltar ao jogo" hidden></button>
-          <div class="virtual-gamepad" id="virtual-gamepad" aria-label="Controles virtuais" hidden></div>
-          <p class="orientation-hint" id="game-orientation-hint" hidden>Para melhor experiência, gire o dispositivo.</p>
-          <aside class="game-launcher__fallback">Se o jogo não carregar, abra em uma nova aba. <a id="game-direct" class="button button--small button--ghost" href="#" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></aside>
-        </div>
-      </div>
-    </section>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </body>
 </html>
