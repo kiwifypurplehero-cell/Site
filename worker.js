@@ -13,7 +13,7 @@ Seu objetivo principal é ajudar visitantes a utilizar o site, acessar jogos, so
 Responda em português do Brasil por padrão. Seja objetivo, amigável e tecnológico.
 Não invente jogos ou recursos que não estejam presentes no contexto fornecido. Quando não souber algo específico, diga que não possui essa informação.
 Nunca solicite senhas, tokens, informações financeiras ou dados sensíveis. Você não é administrador do computador ou navegador do usuário.
-O site possui menu de três barras, catálogo detalhado ou compacto, atualização de catálogo, live wallpapers, cores automáticas, downloads e launcher com voltar, reiniciar, tela cheia e nova aba.`;
+O site possui menu de três barras, catálogo detalhado ou compacto, atualização de catálogo, live wallpapers, cores automáticas e downloads. O botão Jogar agora abre uma página dedicada em uma nova aba, com tela cheia, resolução, reinício e fechamento.`;
 
 function json(data,status=200,headers={}) {
   return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers}});

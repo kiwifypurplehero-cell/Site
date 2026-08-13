@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,follow">
+  <meta name="theme-color" content="#080a12">
+  <title>Jogar — PlumpGames</title>
+  <link rel="stylesheet" href="play.css">
+  <script src="play.js" defer></script>
+</head>
+<body>
+  <header class="play-toolbar">
+    <h1 id="game-name">PlumpGames</h1>
+    <nav aria-label="Controles do jogo">
+      <button id="fullscreen" type="button">Tela cheia</button>
+      <div class="resolution-control">
+        <button id="resolution" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="resolution-menu">Resolução</button>
+        <div id="resolution-menu" class="resolution-menu" role="menu" hidden></div>
+      </div>
+      <button id="restart" type="button">Reiniciar</button>
+      <button id="close" type="button">Fechar</button>
+    </nav>
+  </header>
+  <main id="game-area">
+    <div id="game-stage"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <button id="menu-shield" type="button" aria-label="Fechar menu de resolução" hidden></button>
+    <section id="loading" class="notice" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><strong>Carregando jogo...</strong></section>
+    <section id="error" class="notice" role="alert" hidden><strong>Não foi possível carregar o jogo.</strong><p>O jogo pode estar indisponível ou impedir a exibição nesta página.</p><div><button id="retry" type="button">Tentar novamente</button><a id="direct" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></div></section>
+  </main>
+  <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+</body>
+</html>
