@@ -80,12 +80,27 @@ test('a implementação ativa não contém launcher ou controle virtual legado',
   assert.doesNotMatch(source, /dispatchVirtualKey|VIRTUAL_GAMEPAD_MAPPING|openGameLauncher|closeGameLauncher/i);
 });
 
-test('a página dedicada mantém apenas os quatro controles principais', () => {
+test('a barra dedicada contém somente a engrenagem e o menu completo', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'play.html'), 'utf8');
   const toolbar = html.match(/<header class="play-toolbar">([\s\S]*?)<\/header>/)?.[1] || '';
   const ids = [...toolbar.matchAll(/<button id="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(ids, ['fullscreen', 'resolution', 'restart', 'close']);
+  assert.deepEqual(ids, ['game-settings-button']);
+  assert.match(toolbar, /aria-label="Configurações do jogo"/);
+  assert.match(toolbar, /aria-controls="game-settings-menu"/);
+  assert.match(html, /id="game-settings-menu"/);
+  for (const option of ['Tela cheia', 'Resolução', 'Reiniciar', 'Loadouts', 'Fechar']) assert.match(html, new RegExp(`>${option}`));
+  assert.match(html, /id="game-stage"/);
+  assert.match(html, /id="game-resolution-frame"/);
   assert.match(html, /Carregando jogo\.\.\./);
   assert.match(html, /Tentar novamente/);
   assert.match(html, /Abrir jogo diretamente/);
+});
+
+test('loadouts são persistidos por jogo sem tentar acessar o documento do iframe', () => {
+  const script = fs.readFileSync(path.join(__dirname, '..', 'play.js'), 'utf8');
+  assert.match(script, /plumpgamesLoadouts/);
+  assert.match(script, /const gameDisplayState = \{ mode:'auto'/);
+  assert.doesNotMatch(script, /contentDocument|contentWindow|dispatchEvent\(/);
+  for (const action of ['Cima','Baixo','Esquerda','Direita','Pular','Ação principal','Pausar','Confirmar','Voltar']) assert.match(script, new RegExp(action));
+  for (const button of ['△ Triângulo','○ Círculo','× X','□ Quadrado','Touchpad Press']) assert.match(script, new RegExp(button));
 });

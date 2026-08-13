@@ -13,19 +13,32 @@
 <body>
   <header class="play-toolbar">
     <h1 id="game-name">PlumpGames</h1>
-    <nav aria-label="Controles do jogo">
-      <button id="fullscreen" type="button">Tela cheia</button>
-      <div class="resolution-control">
-        <button id="resolution" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="resolution-menu">Resolução</button>
-        <div id="resolution-menu" class="resolution-menu" role="menu" hidden></div>
-      </div>
-      <button id="restart" type="button">Reiniciar</button>
-      <button id="close" type="button">Fechar</button>
-    </nav>
+    <div class="settings-control">
+      <button id="game-settings-button" type="button" aria-label="Configurações do jogo" aria-haspopup="menu" aria-expanded="false" aria-controls="game-settings-menu">⚙</button>
+      <section id="game-settings-menu" class="settings-menu" role="menu" aria-label="Configurações do jogo" hidden>
+        <div id="settings-main" class="menu-view">
+          <button type="button" role="menuitem" data-command="fullscreen">Tela cheia</button>
+          <button type="button" role="menuitem" data-view="resolution">Resolução <span aria-hidden="true">›</span></button>
+          <button type="button" role="menuitem" data-command="restart">Reiniciar</button>
+          <button type="button" role="menuitem" data-view="loadouts">Loadouts <span aria-hidden="true">›</span></button>
+          <button type="button" role="menuitem" data-command="close">Fechar</button>
+        </div>
+        <div id="resolution-view" class="menu-view" hidden>
+          <header><button type="button" data-back aria-label="Voltar">‹</button><h2>Resolução</h2></header>
+          <div id="resolution-options"></div>
+        </div>
+        <div id="loadouts-view" class="menu-view loadouts-view" hidden>
+          <header><button type="button" data-back aria-label="Voltar">‹</button><h2>Loadouts</h2></header>
+          <div id="loadouts-content"></div>
+        </div>
+      </section>
+    </div>
   </header>
   <main id="game-area">
-    <div id="game-stage"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-    <button id="menu-shield" type="button" aria-label="Fechar menu de resolução" hidden></button>
+    <div id="game-stage" tabindex="-1">
+      <div id="game-resolution-frame"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    </div>
+    <aside id="loadout-hud" aria-label="Referência do loadout" hidden></aside>
     <section id="loading" class="notice" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><strong>Carregando jogo...</strong></section>
     <section id="error" class="notice" role="alert" hidden><strong>Não foi possível carregar o jogo.</strong><p>O jogo pode estar indisponível ou impedir a exibição nesta página.</p><div><button id="retry" type="button">Tentar novamente</button><a id="direct" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></div></section>
   </main>
