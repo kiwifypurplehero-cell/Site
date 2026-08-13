@@ -1,0 +1,7 @@
+{
+  "name": "plumpgames-site",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}

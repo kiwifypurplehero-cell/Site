@@ -25,3 +25,5 @@ Forks, repositórios arquivados e o repositório `Site` são ignorados. A lista 
 ## Página dedicada do jogo
 
 **Jogar agora** abre `play.html` em uma nova aba. A página resolve o repositório para o domínio GitHub Pages autorizado, exibe somente o jogo e oferece tela cheia, resoluções virtuais proporcionais, reinício do iframe e fechamento da aba. A página não inclui controles virtuais nem interfere no catálogo, menu ou live wallpaper da aba principal.
+
+As regras compartilhadas de URL segura e escala proporcional ficam em `play-utils.js`. Para executar os testes automatizados dessas regras e a auditoria contra código legado do launcher, use `npm test`.

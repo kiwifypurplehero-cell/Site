@@ -1,6 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'plumpgames-preferences-v3';
+const { getGamePlayUrl, buildPlayPageUrl } = PlumpPlay;
 const OFFICIAL_URL = 'https://site.kiwifypurplehero.workers.dev/';
 const DEFAULT_COLORS = { primary: '#7c3aed', secondary: '#06b6d4', accent: '#f0abfc', glow: '#a855f7', menu: '#0b0c19', button: '#7c3aed' };
 const themes = {
@@ -311,19 +312,10 @@ function getGitHubPagesUrl(repo) {
   return name ? `https://kiwifypurplehero-cell.github.io/${encodeURIComponent(name)}/` : '';
 }
 
-function getGamePlayUrl(repo) {
-  const explicit = typeof repo?.playUrl === 'string' ? repo.playUrl.trim() : '';
-  const configured = PLAYABLE_REPOSITORIES[String(repo?.rawName || repo?.name || '').toLowerCase()]?.playUrl;
-  const candidate = explicit || configured || getGitHubPagesUrl(repo);
-  return isSafeHttpsUrl(candidate) ? candidate : '';
-}
-
-
 function openGamePage(game) {
-  const repo = String(game?.rawName || '').trim();
-  if (!getGamePlayUrl(game) || !/^[A-Za-z0-9._-]+$/.test(repo)) return;
-  const params = new URLSearchParams({ repo, name:game.name || repo });
-  window.open(`play.html?${params}`, '_blank', 'noopener,noreferrer');
+  const playPageUrl = buildPlayPageUrl(game, location.href);
+  if (!playPageUrl) return;
+  window.open(playPageUrl, '_blank', 'noopener,noreferrer');
 }
 
 function loadGamesCache() {
