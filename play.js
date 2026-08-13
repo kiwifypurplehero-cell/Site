@@ -1,22 +1,8 @@
 'use strict';
 
-const OWNER = 'kiwifypurplehero-cell';
-const KNOWN_GAMES = Object.freeze({
-  fnf: { repo:'FNF', name:'FNF', url:'https://kiwifypurplehero-cell.github.io/FNF/' },
-  'cs1-6html': { repo:'CS1-6HTML', name:'CS 1.6 PLH', url:'https://kiwifypurplehero-cell.github.io/CS1-6HTML/' }
-});
-const FIXED_RESOLUTIONS = ['1920x1080','1600x900','1366x768','1280x720','1280x1024','1280x960','1024x768','800x600','640x480'];
+const { KNOWN_GAMES, FIXED_RESOLUTIONS, getGamePlayUrl, parseResolution, validCustomResolution, fitResolution } = PlumpPlay;
 const params = new URLSearchParams(location.search);
 const requestedRepo = (params.get('repo') || '').trim();
-
-function getGamePlayUrl(game) {
-  const repo = String(game?.repo || '').trim();
-  const known = KNOWN_GAMES[repo.toLowerCase()];
-  if (known) return known.url;
-  if (!/^[A-Za-z0-9._-]{1,100}$/.test(repo)) return '';
-  const candidate = new URL(`https://${OWNER}.github.io/${encodeURIComponent(repo)}/`);
-  return candidate.protocol === 'https:' && candidate.hostname === `${OWNER}.github.io` ? candidate.href : '';
-}
 
 const knownGame = KNOWN_GAMES[requestedRepo.toLowerCase()];
 const game = { repo:knownGame?.repo || requestedRepo, name:knownGame?.name || (params.get('name') || requestedRepo || 'Jogo').slice(0,100) };
@@ -52,9 +38,9 @@ function applyResolution() {
   if (resolution === 'auto' || resolution === 'current') {
     Object.assign(stage.style, { width:'100%', height:'100%', transform:'translate(-50%,-50%)' });
   } else {
-    const target = resolution === 'custom' ? custom : (() => { const [width,height] = resolution.split('x').map(Number); return {width,height}; })();
-    const scale = Math.min(available.width / target.width, available.height / target.height);
-    Object.assign(stage.style, { width:`${target.width}px`, height:`${target.height}px`, transform:`translate(-50%,-50%) scale(${scale})` });
+    const target = resolution === 'custom' ? custom : parseResolution(resolution);
+    const fitted = fitResolution(available.width, available.height, target.width, target.height);
+    Object.assign(stage.style, { width:`${fitted.width}px`, height:`${fitted.height}px`, transform:`translate(-50%,-50%) scale(${fitted.scale})` });
   }
   renderResolutionMenu();
 }
@@ -92,7 +78,7 @@ frame.addEventListener('load', () => {
 });
 document.querySelector('#resolution').addEventListener('click', () => setMenu(menu.hidden));
 menu.addEventListener('click', event => { const button = event.target.closest('[data-resolution]'); if (!button) return; resolution = button.dataset.resolution; applyResolution(); if (resolution !== 'custom') setMenu(false); });
-menu.addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); const width = Number(data.get('width')); const height = Number(data.get('height')); if (!Number.isInteger(width) || !Number.isInteger(height) || width < 320 || width > 7680 || height < 240 || height > 4320) { showMessage('Use valores entre 320 × 240 e 7680 × 4320.'); return; } custom = {width,height}; applyResolution(); setMenu(false); });
+menu.addEventListener('submit', event => { event.preventDefault(); const data = new FormData(event.target); const width = Number(data.get('width')); const height = Number(data.get('height')); if (!validCustomResolution(width, height)) { showMessage('Use valores entre 320 × 240 e 7680 × 4320.'); return; } custom = {width,height}; applyResolution(); setMenu(false); });
 shield.addEventListener('click', () => { setMenu(false); frame.focus(); });
 document.addEventListener('pointerdown', event => { if (!menu.hidden && !event.target.closest('.resolution-control') && event.target !== shield) setMenu(false); });
 document.querySelector('#restart').addEventListener('click', loadGame);
