@@ -4,7 +4,7 @@ const { KNOWN_GAMES, FIXED_RESOLUTIONS, getGamePlayUrl, parseResolution, validCu
 const params = new URLSearchParams(location.search);
 const requestedRepo = (params.get('repo') || '').trim();
 const knownGame = KNOWN_GAMES[requestedRepo.toLowerCase()];
-const game = { repo:knownGame?.repo || requestedRepo, name:knownGame?.name || (params.get('name') || requestedRepo || 'Jogo').slice(0,100) };
+const game = { repo:knownGame?.repo || requestedRepo, name:knownGame?.name || (params.get('name') || requestedRepo || 'Jogo').slice(0,100), playUrl:params.get('url') || '' };
 const gameKey = (game.repo || 'game').toLowerCase();
 const playUrl = getGamePlayUrl(game);
 const frame = document.querySelector('#game-frame');

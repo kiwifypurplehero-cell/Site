@@ -5,9 +5,20 @@
   "compatibility_date": "2026-08-06",
   "assets": {
     "directory": ".",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "ai": {
     "binding": "AI"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "plumpgames-auth",
+      "database_id": "e80405a4-2ff2-4a0b-afba-7825856ba9f8",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
