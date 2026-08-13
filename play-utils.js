@@ -29,6 +29,15 @@
   }
 
   function getGamePlayUrl(game) {
+    if (typeof game?.playUrl === 'string' && game.playUrl.trim()) {
+      try {
+        const explicit = new URL(game.playUrl.trim());
+        const host = explicit.hostname.toLowerCase();
+        const allowed = ['github.io','itch.io','gamejolt.com'].some(domain => host === domain || host.endsWith(`.${domain}`));
+        if (explicit.protocol === 'https:' && !explicit.username && !explicit.password && allowed) return explicit.href;
+      } catch {}
+      return '';
+    }
     const repo = repositoryName(game);
     const known = KNOWN_GAMES[repo.toLowerCase()];
     if (known) return known.url;
@@ -39,11 +48,13 @@
 
   function buildPlayPageUrl(game, baseUrl) {
     const repo = repositoryName(game);
-    if (!getGamePlayUrl({ repo })) return '';
+    const playUrl = getGamePlayUrl(game);
+    if (!playUrl) return '';
     const url = new URL('/play.html', baseUrl);
     url.searchParams.set('repo', repo);
     const name = String(game?.name || repo).trim().slice(0, 100);
     if (name) url.searchParams.set('name', name);
+    if (game?.playUrl) url.searchParams.set('url', playUrl);
     return url.href;
   }
 

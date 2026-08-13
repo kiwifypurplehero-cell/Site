@@ -27,3 +27,16 @@ Forks, repositórios arquivados e o repositório `Site` são ignorados. A lista 
 **Jogar agora** abre `play.html` em uma nova aba. A página resolve o repositório para o domínio GitHub Pages autorizado e reúne tela cheia, resoluções proporcionais, reinício, loadouts locais e fechamento no menu da engrenagem. Loadouts PC e PS5 são perfis de referência salvos por jogo; eles não injetam eventos em iframes externos nem exibem controles virtuais sobre o jogo.
 
 As regras compartilhadas de URL segura e escala proporcional ficam em `play-utils.js`. Para executar os testes automatizados dessas regras e a auditoria contra código legado do launcher, use `npm test`.
+
+## Catálogo da comunidade (Cloudflare D1)
+
+Os jogos enviados usam o binding D1 `DB` no Worker; preferências locais continuam separadas e não são usadas como banco do catálogo. O projeto reutiliza com segurança o D1 já provisionado, criando somente a tabela independente `community_games` (nenhuma tabela de autenticação é consultada).
+
+Antes do primeiro deploy desta versão, autentique o Wrangler e aplique a migration remota:
+
+```sh
+npx wrangler d1 migrations apply plumpgames-auth --remote
+npx wrangler deploy
+```
+
+Para desenvolvimento local, use `npx wrangler d1 migrations apply plumpgames-auth --local` e `npx wrangler dev`. Se outro banco for preferido, crie-o com `npx wrangler d1 create plumpgames-community` e substitua apenas `database_name` e `database_id` no binding `DB` de `wrangler.jsonc`.

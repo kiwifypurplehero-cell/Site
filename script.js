@@ -201,7 +201,7 @@ function showModal(title, html, actions='') {
 function closeModal() { $('#site-modal').hidden=true; document.body.classList.remove('modal-open'); unlockPageScroll('modal'); lastFocus?.focus(); }
 $$('[data-close-modal]').forEach(button=>button.addEventListener('click',closeModal));
 $('[data-open-credits]').addEventListener('click',()=>showModal('Créditos','<p>PlumpGames é criado por Matheus (Plump), com ajuda do Codex.</p>'));
-$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>As preferências e o cache de jogos ficam somente no localStorage deste navegador. O site não possui contas nem envia dados pessoais a um banco.</p>'));
+$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>Preferências e cache ficam no navegador. O site não possui contas. Dados informados voluntariamente no formulário de jogos da comunidade são publicados no catálogo compartilhado.</p>'));
 $('[data-open-terms]').addEventListener('click',()=>showModal('Termos de Uso','<p>Os projetos são oferecidos como estão. Consulte o repositório de cada jogo para detalhes.</p>'));
 
 if (!location.href.startsWith(OFFICIAL_URL) && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') console.info(`Site oficial: ${OFFICIAL_URL}`);
@@ -231,6 +231,8 @@ const PLAYABLE_REPOSITORIES = {
   }
 };
 let currentGames = [];
+let officialGames = [];
+let communityGames = [];
 let refreshInProgress = false;
 function isSafeHttpsUrl(value, allowedHost) {
   try { const url=new URL(value); return url.protocol==='https:'&&(!allowedHost||url.hostname===allowedHost); } catch{return false;}
@@ -354,8 +356,9 @@ function createGameCover(game) {
   const cover = element('div', 'game-card__image game-cover');
   cover.setAttribute('role','img');
   cover.setAttribute('aria-label', `Capa automática de ${game.name}`);
-  const status = element('span','status',game.status);
+  const status = element('span','status',game.community?'COMUNIDADE':'OFICIAL');
   const initials = game.name.split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0]).join('').toLocaleUpperCase('pt-BR') || 'PG';
+  if (game.community && isSafeHttpsUrl(game.coverUrl)) { const image=element('img','game-cover__image'); image.src=game.coverUrl; image.alt=''; image.loading='lazy'; image.referrerPolicy='no-referrer'; cover.append(image); }
   cover.append(status, element('span','game-cover__icon','🎮'), element('b','',initials), element('small','',game.name));
   return cover;
 }
@@ -377,12 +380,16 @@ function safeLink(label, url, primary = false) {
 }
 
 function createGameCard(game) {
-  const card = element('article','game-card game-card--featured');
+  const card = element('article',`game-card game-card--featured${game.community?' game-card--community':''}`);
+  card.dataset.catalog=game.community?'community':'official';
   card.dataset.repositoryId=game.id;
   const body=element('div','game-card__body');
-  body.append(element('p','card-kicker',`${game.language} • ${game.status}`), element('h3','',game.name), element('p','',game.description));
+  body.append(element('p','card-kicker',`${game.community?'COMUNIDADE':'OFICIAL'} • ${game.language} • ${game.status}`), element('h3','',game.name));
+  if(game.community)body.append(element('p','community-creator',`Por: ${game.creator}`));
+  body.append(element('p','',game.description));
   const details=element('dl','game-details');
-  details.append(detailItem('Linguagem',game.language), detailItem('Branch padrão',game.branch), detailItem('Última atualização',formatDate(game.updatedAt)), detailItem('Status',game.status), detailItem('Atualização relativa',formatRelativeTime(game.updatedAt),game.updatedAt));
+  if(game.community) details.append(detailItem('Plataforma',game.platform),detailItem('Última atualização',formatDate(game.updatedAt)),...(game.license?[detailItem('Licença',game.license)]:[]));
+  else details.append(detailItem('Linguagem',game.language), detailItem('Branch padrão',game.branch), detailItem('Última atualização',formatDate(game.updatedAt)), detailItem('Status',game.status), detailItem('Atualização relativa',formatRelativeTime(game.updatedAt),game.updatedAt));
   body.append(details);
   const compactMeta=element('p','compact-meta');
   const compactRelative=element('span','relative-update',formatRelativeTime(game.updatedAt)); compactRelative.dataset.updatedAt=game.updatedAt;
@@ -407,6 +414,17 @@ function renderGames(games) {
   if (!games.length) { setGamesMessage('Nenhum jogo público foi encontrado no GitHub.'); return; }
   setGamesMessage('');
   const fragment=document.createDocumentFragment(); games.forEach(game=>fragment.append(createGameCard(game))); list.append(fragment);
+}
+
+function renderAllGames() { renderGames([...officialGames,...communityGames]); }
+
+function normalizeCommunityGame(game) {
+  return { ...game,id:`community-${game.id}`,community:true,status:'COMUNIDADE',rawName:game.githubRepo,repositoryUrl:game.githubUrl,playUrl:game.playUrl||'',coverUrl:game.coverUrl||'',language:game.language||'Não informada',branch:'—',downloadUrl:'',updatedAt:game.updatedAt,createdAt:game.createdAt,stars:Number(game.stars)||0,forks:0,size:0 };
+}
+
+async function loadCommunityGames() {
+  try { const response=await fetch('/api/community-games',{headers:{Accept:'application/json'}}); if(!response.ok)throw new Error(String(response.status)); const payload=await response.json(); communityGames=Array.isArray(payload.games)?payload.games.map(normalizeCommunityGame):[]; $('#community-message').hidden=true; renderAllGames(); }
+  catch(error){console.warn('Community catalog unavailable',error); $('#community-message').textContent='Não foi possível carregar os jogos da comunidade agora.'; $('#community-message').hidden=false;}
 }
 
 function repositoriesToGames(repositories) {
@@ -436,20 +454,20 @@ function showLoadFailure(hasCache, rateLimited = false) {
 async function refreshGames(force = false) {
   if (refreshInProgress) return;
   const cache=loadGamesCache();
-  if (!force && cache?.valid) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); return; }
+  if (!force && cache?.valid) { officialGames=repositoriesToGames(cache.repositories); renderAllGames(); renderSiteUpdate(cache.repositories); return; }
   refreshInProgress=true; $('#refresh-games').disabled=true;
   if (!cache) setGamesMessage('Carregando jogos da PlumpGames…');
   try {
-    const repositories=await fetchRepositories(); saveGamesCache(repositories); renderGames(repositoriesToGames(repositories)); renderSiteUpdate(repositories);
+    const repositories=await fetchRepositories(); saveGamesCache(repositories); officialGames=repositoriesToGames(repositories); renderAllGames(); renderSiteUpdate(repositories);
   } catch (error) {
-    if (cache) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); }
+    if (cache) { officialGames=repositoriesToGames(cache.repositories); renderAllGames(); renderSiteUpdate(cache.repositories); }
     showLoadFailure(Boolean(cache),error.status===403);
   } finally { refreshInProgress=false; $('#refresh-games').disabled=false; }
 }
 
 function loadGitHubGames() {
   const cache=loadGamesCache();
-  if (cache) { renderGames(repositoriesToGames(cache.repositories)); renderSiteUpdate(cache.repositories); }
+  if (cache) { officialGames=repositoriesToGames(cache.repositories); renderAllGames(); renderSiteUpdate(cache.repositories); }
   return refreshGames(false);
 }
 
@@ -458,7 +476,9 @@ function openGameDetails(game) {
   lastFocus=document.activeElement;
   $('#modal-title').textContent=game.name; const content=$('#modal-content'); const actions=$('#modal-actions'); content.replaceChildren(); actions.replaceChildren();
   content.append(element('p','',game.description)); const list=element('dl','game-modal__details');
-  appendModalRow(list,'URL do repositório',game.repositoryUrl || 'Indisponível'); appendModalRow(list,'Linguagem',game.language); appendModalRow(list,'Branch padrão',game.branch);
+  appendModalRow(list,'URL do repositório',game.repositoryUrl || 'Indisponível'); appendModalRow(list,'Linguagem',game.language);
+  if(game.community){appendModalRow(list,'Criador',game.creator);appendModalRow(list,'Plataforma',game.platform);appendModalRow(list,'Licença',game.license||'Não informada');}
+  else appendModalRow(list,'Branch padrão',game.branch);
   appendModalRow(list,'Criação',formatDate(game.createdAt)); appendModalRow(list,'Última atualização',formatDate(game.updatedAt)); appendModalRow(list,'Estrelas',game.stars); appendModalRow(list,'Forks',game.forks); appendModalRow(list,'Tamanho aproximado',`${game.size.toLocaleString('pt-BR')} KB`); content.append(list);
   const playUrl=getGamePlayUrl(game); if(playUrl){const play=element('button','button button--small button--play','▶ Jogar agora');play.type='button';play.addEventListener('click',()=>openGamePage(game));actions.append(play);}
   const download=safeLink('↓ Baixar',game.downloadUrl,true); const github=safeLink('GitHub',game.repositoryUrl); if(download) actions.append(download); if(github) actions.append(github);
@@ -469,6 +489,32 @@ function updateRelativeTimes() { $$('.relative-update[data-updated-at]').forEach
 $('#refresh-games').addEventListener('click',()=>refreshGames(true));
 setInterval(updateRelativeTimes,60 * 1000);
 loadGitHubGames();
+loadCommunityGames();
+
+/* Envio público: a persistência é feita exclusivamente pelo Worker + D1. */
+const communityDialog=$('#community-dialog'); const communityForm=$('#community-game-form'); let communitySubmitting=false; let metadataRequest=0;
+function communityStatus(message,error=false){const area=$('#community-form-status');area.textContent=message;area.classList.toggle('is-error',error);}
+function openCommunityDialog(){closePanel({restoreFocus:false});lastFocus=document.activeElement;communityDialog.hidden=false;lockPageScroll('community');setTimeout(()=>communityForm.elements.githubUrl.focus(),0);}
+function closeCommunityDialog(){if(communitySubmitting)return;communityDialog.hidden=true;unlockPageScroll('community');lastFocus?.focus();}
+$('#open-add-game').addEventListener('click',openCommunityDialog); $$('[data-close-community]').forEach(button=>button.addEventListener('click',closeCommunityDialog));
+$('#show-community-games').addEventListener('click',()=>{closePanel({restoreFocus:false});const cards=$$('#games-list [data-catalog]');cards.forEach(card=>card.hidden=card.dataset.catalog!=='community');$('#jogos').scrollIntoView({behavior:preferences.reduceMotion?'auto':'smooth'});setGamesMessage(communityGames.length?'Exibindo jogos da comunidade. Atualize a página para ver todo o catálogo.':'Ainda não há jogos da comunidade.');});
+communityForm.elements.githubUrl.addEventListener('change',async event=>{
+  const request=++metadataRequest; const match=/^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/.exec(event.target.value.trim());
+  if(!match){$('#github-preview').textContent='Use uma URL como https://github.com/usuario/repositorio';return;}
+  $('#github-preview').textContent='Consultando informações públicas do GitHub…';
+  try {const response=await fetch(`https://api.github.com/repos/${encodeURIComponent(match[1])}/${encodeURIComponent(match[2])}`,{headers:{Accept:'application/vnd.github+json'}});if(!response.ok)throw new Error();const repo=await response.json();if(request!==metadataRequest)return;
+    if(!communityForm.elements.name.value)communityForm.elements.name.value=formatRepositoryName(repo.name);
+    if(!communityForm.elements.creator.value)communityForm.elements.creator.value=repo.owner?.login||match[1];
+    if(!communityForm.elements.description.value&&repo.description)communityForm.elements.description.value=repo.description.slice(0,1000);
+    $('#github-preview').textContent=`${repo.language||'Linguagem não informada'} • ${repo.license?.spdx_id||'licença não informada'} • ${repo.stargazers_count||0} estrelas • atualizado em ${formatDate(repo.updated_at)}`;
+  }catch{$('#github-preview').textContent='Não foi possível preencher automaticamente. Confira os dados manualmente.';}
+});
+communityForm.addEventListener('submit',async event=>{
+  event.preventDefault(); if(communitySubmitting||!communityForm.reportValidity())return; communitySubmitting=true;const submit=$('#community-submit');submit.disabled=true;submit.textContent='Enviando…';communityStatus('Enviando…');
+  const data=new FormData(communityForm); const payload={name:data.get('name'),creator:data.get('creator'),githubUrl:data.get('githubUrl'),playUrl:data.get('playUrl'),gameType:data.get('gameType'),description:data.get('description'),platform:data.get('platform'),coverUrl:data.get('coverUrl'),confirmed:data.get('confirmed')==='on'};
+  try {const response=await fetch('/api/community-games',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'Não foi possível adicionar o jogo.');communityGames.unshift(normalizeCommunityGame(result.game));renderAllGames();communityStatus('Jogo adicionado com sucesso.');submit.textContent='Ver jogo no catálogo';setTimeout(()=>{communitySubmitting=false;closeCommunityDialog();$('#jogos').scrollIntoView({behavior:'smooth'});communityForm.reset();submit.textContent='Adicionar ao catálogo';submit.disabled=false;},900);return;
+  }catch(error){communityStatus(error.message,true);} communitySubmitting=false;submit.disabled=false;submit.textContent='Adicionar ao catálogo';
+});
 
 /* PJ Assistant: o navegador envia somente texto e contexto resumido ao Worker. */
 const ASSISTANT_GREETING = 'Olá. Sou o assistente da PlumpGames. Como posso ajudar?';
