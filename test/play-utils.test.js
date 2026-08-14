@@ -96,11 +96,21 @@ test('a barra dedicada contém somente a engrenagem e o menu completo', () => {
   assert.match(html, /Abrir jogo diretamente/);
 });
 
-test('loadouts são persistidos por jogo sem tentar acessar o documento do iframe', () => {
+test('loadouts visuais são persistidos por jogo e tratam iframe cross-origin com segurança', () => {
   const script = fs.readFileSync(path.join(__dirname, '..', 'play.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'play.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'play.css'), 'utf8');
   assert.match(script, /plumpgamesLoadouts/);
   assert.match(script, /const gameDisplayState = \{ mode:'auto'/);
-  assert.doesNotMatch(script, /contentDocument|contentWindow|dispatchEvent\(/);
-  for (const action of ['Cima','Baixo','Esquerda','Direita','Pular','Ação principal','Pausar','Confirmar','Voltar']) assert.match(script, new RegExp(action));
+  assert.doesNotMatch(script, /contentDocument/);
+  assert.match(script, /try\{frame\.contentWindow\.dispatchEvent\(new KeyboardEvent/);
+  assert.match(script, /pointerdown/);
+  assert.match(script, /pointerup/);
+  assert.match(script, /pointercancel/);
+  assert.match(html, /id="loadout-overlay"/);
+  assert.match(css, /#loadout-overlay\{[^}]*pointer-events:none/);
+  assert.match(css, /\.virtual-control\{[^}]*pointer-events:auto/);
+  assert.match(css, /background:rgba\(15,23,42,var\(--idle\)\)/);
+  for (const action of ['Pular','Interagir','PC WASD','PC Setas','PS5 Plataforma','PS5 FPS simples']) assert.match(script, new RegExp(action));
   for (const button of ['△ Triângulo','○ Círculo','× X','□ Quadrado','Touchpad Press']) assert.match(script, new RegExp(button));
 });

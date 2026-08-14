@@ -10,213 +10,60 @@ const playUrl = getGamePlayUrl(game);
 const frame = document.querySelector('#game-frame');
 const stage = document.querySelector('#game-stage');
 const resolutionFrame = document.querySelector('#game-resolution-frame');
+const overlay = document.querySelector('#loadout-overlay');
 const settingsButton = document.querySelector('#game-settings-button');
 const settingsMenu = document.querySelector('#game-settings-menu');
 const resolutionOptions = document.querySelector('#resolution-options');
 const loadoutsContent = document.querySelector('#loadouts-content');
-const DEFAULT_ACTIONS = ['Cima','Baixo','Esquerda','Direita','Pular','Ação principal','Ação secundária','Interagir','Pausar','Confirmar','Voltar'];
-const PC_KEYS = ['W','A','S','D','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','Shift','Ctrl','Alt',...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',...'0123456789',...'F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12'.split(' ')];
-const PS5_KEYS = ['△ Triângulo','○ Círculo','× X','□ Quadrado','L1','R1','L2','R2','L3','R3','D-pad Cima','D-pad Baixo','D-pad Esquerda','D-pad Direita','Options','Create','Touchpad Press','Analógico esquerdo','Analógico direito'];
+const PC_KEYS = ['W','A','S','D','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','Shift','Ctrl','Alt','Escape','E','F','Q','R','Z','X',...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',...'0123456789',...'F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12'.split(' ')];
+const PS5_KEYS = ['△ Triângulo','○ Círculo','× X','□ Quadrado','L1','R1','L2','R2','L3','R3','D-pad Cima','D-pad Baixo','D-pad Esquerda','D-pad Direita','Options','Create','Touchpad Press'];
+const KEY_DATA = { Space:[' ','Space'], Enter:['Enter','Enter'], Shift:['Shift','ShiftLeft'], Ctrl:['Control','ControlLeft'], Alt:['Alt','AltLeft'], Escape:['Escape','Escape'], ArrowUp:['ArrowUp','ArrowUp'], ArrowDown:['ArrowDown','ArrowDown'], ArrowLeft:['ArrowLeft','ArrowLeft'], ArrowRight:['ArrowRight','ArrowRight'] };
 const gameDisplayState = { mode:'auto', targetWidth:null, targetHeight:null, scale:1, fitMode:'contain' };
-let loadTimer;
-let messageTimer;
-let editingLoadout = null;
+let loadTimer, messageTimer, editingLoadout = null, layoutEditing = false;
+const pressedPointers = new Map();
 
 document.querySelector('#game-name').textContent = game.name;
 frame.title = game.name;
 document.title = `${game.name} — PlumpGames`;
 document.querySelector('#direct').href = playUrl || '#';
 
-function showMessage(text) {
-  const message = document.querySelector('#message');
-  clearTimeout(messageTimer);
-  message.textContent = text;
-  message.hidden = false;
-  messageTimer = setTimeout(() => { message.hidden = true; }, 3500);
-}
+function showMessage(text) { const el=document.querySelector('#message'); clearTimeout(messageTimer); el.textContent=text; el.hidden=false; messageTimer=setTimeout(()=>{el.hidden=true;},3500); }
+function availableSize() { const box=stage.getBoundingClientRect(); return {width:Math.max(1,box.width),height:Math.max(1,box.height)}; }
+function applyResolution() { const available=availableSize(); resolutionFrame.style.transform='none'; if (gameDisplayState.mode==='fixed'||gameDisplayState.mode==='custom') { const fitted=fitResolution(available.width,available.height,gameDisplayState.targetWidth,gameDisplayState.targetHeight); gameDisplayState.scale=fitted?.scale||1; resolutionFrame.style.width=`${gameDisplayState.targetWidth}px`; resolutionFrame.style.height=`${gameDisplayState.targetHeight}px`; resolutionFrame.style.transform=`scale(${gameDisplayState.scale})`; } else { gameDisplayState.targetWidth=Math.round(available.width); gameDisplayState.targetHeight=Math.round(available.height); gameDisplayState.scale=1; resolutionFrame.style.width='100%'; resolutionFrame.style.height='100%'; } if (!document.querySelector('#resolution-view').hidden) renderResolutionOptions(); }
+function resolutionButton(value,label) { const selected=value===gameDisplayState.mode||(gameDisplayState.mode==='fixed'&&value===`${gameDisplayState.targetWidth}x${gameDisplayState.targetHeight}`); return `<button class="resolution-option" type="button" role="radio" data-resolution="${value}" aria-checked="${selected}">${label}</button>`; }
+function renderResolutionOptions() { const size=availableSize(); resolutionOptions.innerHTML=resolutionButton('auto','Automático / Ajustado')+resolutionButton('current',`Resolução atual — ${Math.round(size.width)} × ${Math.round(size.height)}`)+FIXED_RESOLUTIONS.map(v=>resolutionButton(v,v.replace('x',' × '))).join('')+resolutionButton('custom','Personalizado')+(gameDisplayState.mode==='custom'?`<form class="custom-fields"><label>Largura<input name="width" type="number" min="320" max="7680" required value="${gameDisplayState.targetWidth}"></label><label>Altura<input name="height" type="number" min="240" max="4320" required value="${gameDisplayState.targetHeight}"></label><button type="submit">Aplicar</button></form>`:''); }
+function showView(name) { document.querySelectorAll('.menu-view').forEach(v=>{v.hidden=v.id!==`${name==='main'?'settings':name}-view`&&!(name==='main'&&v.id==='settings-main');}); if(name==='resolution')renderResolutionOptions(); if(name==='loadouts')renderLoadouts(); }
+function setSettingsOpen(open,restoreFocus=false) { settingsMenu.hidden=!open; settingsButton.setAttribute('aria-expanded',String(open)); if(open){showView('main');settingsMenu.querySelector('button')?.focus();}else if(restoreFocus)settingsButton.focus(); }
+function chooseResolution(value) { if(value==='auto'||value==='current')Object.assign(gameDisplayState,{mode:value,targetWidth:null,targetHeight:null,scale:1,fitMode:value==='auto'?'contain':'native'}); else if(value==='custom')Object.assign(gameDisplayState,{mode:'custom',targetWidth:gameDisplayState.targetWidth||1280,targetHeight:gameDisplayState.targetHeight||720,fitMode:'contain'}); else {const target=parseResolution(value);Object.assign(gameDisplayState,{mode:'fixed',targetWidth:target.width,targetHeight:target.height,fitMode:'contain'});} applyResolution(); if(value!=='custom')setSettingsOpen(false,true); }
+function loadGame(){ releaseAll(); clearTimeout(loadTimer); document.querySelector('#loading').hidden=false;document.querySelector('#error').hidden=true;if(!playUrl)return showLoadError();frame.src='about:blank';requestAnimationFrame(()=>{frame.src=playUrl;loadTimer=setTimeout(showLoadError,20000);});}
+function showLoadError(){clearTimeout(loadTimer);document.querySelector('#loading').hidden=true;document.querySelector('#error').hidden=false;}
+function readLoadoutStore(){try{const parsed=JSON.parse(localStorage.getItem('plumpgamesLoadouts')||'{}');return parsed&&typeof parsed==='object'?parsed:{};}catch{return {};}}
+function gameLoadouts(){const entry=readLoadoutStore()[gameKey];if(entry&&Array.isArray(entry.loadouts))return {selected:entry.selected||null,visible:entry.visible??entry.hud??true,loadouts:entry.loadouts.map(normalizeLoadout)};return {selected:null,visible:true,loadouts:[]};}
+function saveGameLoadouts(entry){const store=readLoadoutStore();store[gameKey]=entry;try{localStorage.setItem('plumpgamesLoadouts',JSON.stringify(store));renderOverlay(entry);}catch{showMessage('Não foi possível salvar localmente.');}}
+function button(input,action,x,y,size=58){return {id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,input,action,x,y,size,opacity:.10,shape:'rounded'};}
+function presetButtons(preset){if(preset==='PC Setas')return [['ArrowUp','↑',18,65],['ArrowLeft','←',10,78],['ArrowDown','↓',18,78],['ArrowRight','→',26,78],['Space','Pular',82,78]].map(v=>button(...v));if(preset==='PS5 Plataforma')return [['D-pad Esquerda','←',12,78],['D-pad Direita','→',25,78],['× X','×',78,82],['○ Círculo','○',88,70],['△ Triângulo','△',78,58],['□ Quadrado','□',68,70],['L1','L1',12,12],['R1','R1',88,12],['Options','Options',55,88],['Create','Create',43,88]].map(v=>button(...v));if(preset==='PS5 FPS simples')return [['D-pad Cima','↑',18,64],['D-pad Esquerda','←',10,76],['D-pad Baixo','↓',18,88],['D-pad Direita','→',26,76],['× X','×',80,84],['○ Círculo','○',90,72],['△ Triângulo','△',80,60],['□ Quadrado','□',70,72],['L1','L1',12,10],['L2','L2',12,21],['R1','R1',88,10],['R2','R2',88,21]].map(v=>button(...v));return [['W','W',18,65],['A','A',10,78],['S','S',18,78],['D','D',26,78],['Space','Pular',82,78],['E','Interagir',90,64]].map(v=>button(...v));}
+function normalizeLoadout(item){if(Array.isArray(item.buttons))return item;const mappings=item.mappings||[];return {...item,buttons:mappings.map((m,i)=>button(m.input,m.action,12+(i%5)*18,64+Math.floor(i/5)*14))};}
+function escapeHtml(value){const el=document.createElement('span');el.textContent=String(value);return el.innerHTML;}
+function renderLoadouts(){const entry=gameLoadouts();const selected=entry.loadouts.find(i=>i.id===entry.selected);loadoutsContent.innerHTML=`<p class="loadout-summary">Loadout atual: <strong>${escapeHtml(selected?.name||'Nenhum')}</strong></p><div class="loadout-list">${entry.loadouts.map(i=>`<button type="button" class="loadout-card ${i.id===entry.selected?'selected':''}" data-select-loadout="${i.id}"><strong>${escapeHtml(i.name)}</strong><small>${i.type==='PS5'?'Controle':'PC'} · ${i.buttons.length} botões</small></button>`).join('')||'<p class="loadout-summary">Nenhum loadout salvo.</p>'}</div><label class="hud-toggle"><input type="checkbox" data-visible ${entry.visible?'checked':''}> Mostrar controles na tela</label><div class="loadout-actions"><button type="button" data-create="PC">Criar Loadout PC</button><button type="button" data-create="PS5">Criar Loadout Controle</button>${selected?'<button type="button" data-layout>Editar layout</button><button type="button" data-loadout-action="rename">Renomear</button><button type="button" data-loadout-action="edit">Editar botões</button><button type="button" data-loadout-action="duplicate">Duplicar</button><button type="button" data-loadout-action="delete">Excluir</button>':''}<button type="button" data-loadout-action="restore">Restaurar padrão</button></div><p class="security-note">Este jogo pode limitar controles virtuais por segurança do navegador.</p><p class="loadout-summary">Presets: PC WASD, PC Setas, PS5 Plataforma e PS5 FPS simples.</p>`;}
+function editLoadout(loadout){editingLoadout=structuredClone(loadout);const keys=editingLoadout.type==='PC'?PC_KEYS:PS5_KEYS;loadoutsContent.innerHTML=`<form id="loadout-editor"><div class="editor-fields"><label class="wide">Nome<input name="name" maxlength="50" required value="${escapeHtml(editingLoadout.name)}"></label><label class="wide">Preset<select name="preset"><option>${editingLoadout.type==='PC'?'PC WASD':'PS5 Plataforma'}</option><option>${editingLoadout.type==='PC'?'PC Setas':'PS5 FPS simples'}</option></select></label></div><div id="mapping-list">${editingLoadout.buttons.map((b,i)=>mappingRow(b,i,keys)).join('')}</div><button type="button" data-add-action>+ Adicionar botão</button><div class="editor-footer"><button type="button" data-cancel-editor>Cancelar</button><button type="submit">Salvar</button></div></form>`;}
+function mappingRow(b,index,keys){return `<div class="mapping-row button-editor" data-index="${index}"><label>Nome<input data-action maxlength="40" required value="${escapeHtml(b.action)}"></label><label>${editingLoadout.type==='PC'?'Tecla':'Botão'}<select data-input>${keys.map(k=>`<option ${k===b.input?'selected':''}>${escapeHtml(k)}</option>`).join('')}</select></label><label>Tamanho<input data-size type="range" min="36" max="120" value="${b.size}"></label><label>Opacidade<input data-opacity type="range" min="0.05" max="0.5" step="0.05" value="${b.opacity}"></label><label>Formato<select data-shape><option value="rounded" ${b.shape==='rounded'?'selected':''}>Arredondado</option><option value="circle" ${b.shape==='circle'?'selected':''}>Circular</option></select></label><button type="button" data-remove-action aria-label="Excluir botão">×</button></div>`;}
+function syncEditor(){editingLoadout.buttons=[...loadoutsContent.querySelectorAll('.mapping-row')].map((row,i)=>({...editingLoadout.buttons[i],action:row.querySelector('[data-action]').value.trim(),input:row.querySelector('[data-input]').value,size:Number(row.querySelector('[data-size]').value),opacity:Number(row.querySelector('[data-opacity]').value),shape:row.querySelector('[data-shape]').value}));}
+function renderOverlay(entry=gameLoadouts()){releaseAll();const selected=entry.loadouts.find(i=>i.id===entry.selected);overlay.hidden=!entry.visible||!selected;overlay.classList.toggle('editing',layoutEditing);overlay.innerHTML=selected?selected.buttons.map(b=>`<button type="button" class="virtual-control ${b.shape==='circle'?'circle':''}" data-button-id="${b.id}" style="--x:${b.x}%;--y:${b.y}%;--size:${b.size}px;--idle:${b.opacity}" aria-label="${escapeHtml(b.action)}"><span>${escapeHtml(b.action)}</span>${layoutEditing?'<i aria-hidden="true">↘</i>':''}</button>`).join(''):'';}
+function loadoutAction(action){const entry=gameLoadouts();const selected=entry.loadouts.find(i=>i.id===entry.selected);if(action==='restore'){const presets=[['PC WASD','PC'],['PC Setas','PC'],['PS5 Plataforma','PS5'],['PS5 FPS simples','PS5']].map(([name,type],i)=>({id:`preset-${i}`,name,type,buttons:presetButtons(name)}));entry.loadouts=presets;entry.selected=presets[0].id;entry.visible=true;saveGameLoadouts(entry);renderLoadouts();return;}if(!selected)return;if(action==='edit')return editLoadout(selected);if(action==='rename'){const name=prompt('Novo nome do loadout:',selected.name)?.trim();if(name)selected.name=name.slice(0,50);}if(action==='duplicate'){const copy=structuredClone(selected);copy.id=`${Date.now()}-${Math.random()}`;copy.name+= ' (cópia)';copy.buttons.forEach(b=>b.id=`${b.id}-copy`);entry.loadouts.push(copy);entry.selected=copy.id;}if(action==='delete'&&confirm(`Excluir “${selected.name}”?`)){entry.loadouts=entry.loadouts.filter(i=>i.id!==selected.id);entry.selected=entry.loadouts[0]?.id||null;}saveGameLoadouts(entry);renderLoadouts();}
+function keyboardData(input){if(KEY_DATA[input])return KEY_DATA[input];if(/^F\d+$/.test(input))return[input,input];const value=input.length===1?input.toLowerCase():input;return[value,/^[A-Z]$/.test(input)?`Key${input}`:/^\d$/.test(input)?`Digit${input}`:input];}
+function sendKeyboard(input,type){const [key,code]=keyboardData(input);try{frame.contentWindow.dispatchEvent(new KeyboardEvent(type,{key,code,bubbles:true,cancelable:true}));return true;}catch{return false;}}
+function press(buttonEl,pointerId){const entry=gameLoadouts(),selected=entry.loadouts.find(i=>i.id===entry.selected),button=selected?.buttons.find(b=>b.id===buttonEl.dataset.buttonId);if(!button)return;buttonEl.classList.add('pressed');pressedPointers.set(pointerId,{buttonEl,button});buttonEl.setPointerCapture?.(pointerId);if(selected.type==='PC'&&!sendKeyboard(button.input,'keydown'))showMessage('Este jogo pode limitar controles virtuais por segurança do navegador.');}
+function release(pointerId){const active=pressedPointers.get(pointerId);if(!active)return;active.buttonEl.classList.remove('pressed');const selected=gameLoadouts().loadouts.find(i=>i.id===gameLoadouts().selected);if(selected?.type==='PC')sendKeyboard(active.button.input,'keyup');pressedPointers.delete(pointerId);}
+function releaseAll(){for(const id of [...pressedPointers.keys()])release(id);}
+function startLayoutEditing(){layoutEditing=true;setSettingsOpen(false);renderOverlay();showMessage('Arraste os botões. Toque duas vezes em “Concluir layout” para sair.');settingsButton.textContent='Concluir layout';settingsButton.setAttribute('aria-label','Concluir edição do layout');}
+function finishLayoutEditing(){layoutEditing=false;settingsButton.textContent='⚙';settingsButton.setAttribute('aria-label','Configurações do jogo');renderOverlay();showMessage('Layout salvo automaticamente.');}
 
-function availableSize() {
-  const box = stage.getBoundingClientRect();
-  return { width:Math.max(1,box.width), height:Math.max(1,box.height) };
-}
-
-function applyResolution() {
-  const available = availableSize();
-  resolutionFrame.style.transform = 'none';
-  if (gameDisplayState.mode === 'fixed' || gameDisplayState.mode === 'custom') {
-    const fitted = fitResolution(available.width, available.height, gameDisplayState.targetWidth, gameDisplayState.targetHeight);
-    gameDisplayState.scale = fitted?.scale || 1;
-    resolutionFrame.style.width = `${gameDisplayState.targetWidth}px`;
-    resolutionFrame.style.height = `${gameDisplayState.targetHeight}px`;
-    resolutionFrame.style.transform = `scale(${gameDisplayState.scale})`;
-  } else {
-    gameDisplayState.targetWidth = Math.round(available.width);
-    gameDisplayState.targetHeight = Math.round(available.height);
-    gameDisplayState.scale = 1;
-    resolutionFrame.style.width = '100%';
-    resolutionFrame.style.height = '100%';
-  }
-  if (!document.querySelector('#resolution-view').hidden) renderResolutionOptions();
-}
-
-function resolutionButton(value, label) {
-  const selected = value === gameDisplayState.mode || (gameDisplayState.mode === 'fixed' && value === `${gameDisplayState.targetWidth}x${gameDisplayState.targetHeight}`);
-  return `<button class="resolution-option" type="button" role="radio" data-resolution="${value}" aria-checked="${selected}">${label}</button>`;
-}
-
-function renderResolutionOptions() {
-  const size = availableSize();
-  resolutionOptions.innerHTML = resolutionButton('auto','Automático / Ajustado') + resolutionButton('current',`Resolução atual — ${Math.round(size.width)} × ${Math.round(size.height)}`) + FIXED_RESOLUTIONS.map(value => resolutionButton(value,value.replace('x',' × '))).join('') + resolutionButton('custom','Personalizado') + (gameDisplayState.mode === 'custom' ? `<form class="custom-fields"><label>Largura<input name="width" type="number" min="320" max="7680" required value="${gameDisplayState.targetWidth}"></label><label>Altura<input name="height" type="number" min="240" max="4320" required value="${gameDisplayState.targetHeight}"></label><button type="submit">Aplicar</button></form>` : '');
-}
-
-function showView(name) {
-  document.querySelectorAll('.menu-view').forEach(view => { view.hidden = view.id !== `${name === 'main' ? 'settings' : name}-view` && !(name === 'main' && view.id === 'settings-main'); });
-  if (name === 'resolution') renderResolutionOptions();
-  if (name === 'loadouts') renderLoadouts();
-}
-
-function setSettingsOpen(open, restoreFocus = false) {
-  settingsMenu.hidden = !open;
-  settingsButton.setAttribute('aria-expanded', String(open));
-  if (open) { showView('main'); settingsMenu.querySelector('button')?.focus(); }
-  else if (restoreFocus) settingsButton.focus();
-}
-
-function chooseResolution(value) {
-  if (value === 'auto' || value === 'current') Object.assign(gameDisplayState,{mode:value,targetWidth:null,targetHeight:null,scale:1,fitMode:value === 'auto' ? 'contain' : 'native'});
-  else if (value === 'custom') Object.assign(gameDisplayState,{mode:'custom',targetWidth:gameDisplayState.targetWidth || 1280,targetHeight:gameDisplayState.targetHeight || 720,fitMode:'contain'});
-  else { const target = parseResolution(value); Object.assign(gameDisplayState,{mode:'fixed',targetWidth:target.width,targetHeight:target.height,fitMode:'contain'}); }
-  applyResolution();
-  if (value !== 'custom') setSettingsOpen(false, true);
-}
-
-function loadGame() {
-  clearTimeout(loadTimer);
-  document.querySelector('#loading').hidden = false;
-  document.querySelector('#error').hidden = true;
-  if (!playUrl) return showLoadError();
-  frame.src = 'about:blank';
-  requestAnimationFrame(() => { frame.src = playUrl; loadTimer = setTimeout(showLoadError, 20000); });
-}
-
-function showLoadError() {
-  clearTimeout(loadTimer);
-  document.querySelector('#loading').hidden = true;
-  document.querySelector('#error').hidden = false;
-}
-
-function readLoadoutStore() {
-  try { const parsed = JSON.parse(localStorage.getItem('plumpgamesLoadouts') || '{}'); return parsed && typeof parsed === 'object' ? parsed : {}; }
-  catch { return {}; }
-}
-
-function gameLoadouts() {
-  const entry = readLoadoutStore()[gameKey];
-  return entry && Array.isArray(entry.loadouts) ? entry : { selected:null, hud:false, loadouts:[] };
-}
-
-function saveGameLoadouts(entry) {
-  const store = readLoadoutStore();
-  store[gameKey] = entry;
-  try { localStorage.setItem('plumpgamesLoadouts', JSON.stringify(store)); updateHud(entry); }
-  catch { showMessage('Não foi possível salvar localmente.'); }
-}
-
-function defaultMappings(type) {
-  const defaults = type === 'PC' ? ['W','S','A','D','Space','Enter','Shift','E','Escape','Enter','Escape'] : ['D-pad Cima','D-pad Baixo','D-pad Esquerda','D-pad Direita','× X','□ Quadrado','△ Triângulo','○ Círculo','Options','× X','○ Círculo'];
-  return DEFAULT_ACTIONS.map((action,index) => ({ action, input:defaults[index] }));
-}
-
-function escapeHtml(value) {
-  const element = document.createElement('span'); element.textContent = String(value); return element.innerHTML;
-}
-
-function renderLoadouts() {
-  const entry = gameLoadouts();
-  const selected = entry.loadouts.find(item => item.id === entry.selected);
-  loadoutsContent.innerHTML = `<p class="loadout-summary">Loadout atual: <strong>${escapeHtml(selected?.name || 'Nenhum')}</strong></p><div class="loadout-list">${entry.loadouts.map(item => `<button type="button" class="loadout-card ${item.id === entry.selected ? 'selected' : ''}" data-select-loadout="${item.id}"><strong>${escapeHtml(item.name)}</strong><small>${item.type}</small></button>`).join('') || '<p class="loadout-summary">Nenhum loadout salvo.</p>'}</div><div class="loadout-actions"><button type="button" data-create="PC">Criar Loadout PC</button><button type="button" data-create="PS5">Criar Loadout PS5</button>${selected ? '<button type="button" data-loadout-action="rename">Renomear</button><button type="button" data-loadout-action="edit">Editar</button><button type="button" data-loadout-action="duplicate">Duplicar</button><button type="button" data-loadout-action="delete">Excluir</button>' : ''}<button type="button" data-loadout-action="restore">Restaurar padrão</button></div><label class="hud-toggle"><input type="checkbox" data-hud ${entry.hud ? 'checked' : ''}> Mostrar HUD de referência</label>`;
-}
-
-function editLoadout(loadout) {
-  editingLoadout = JSON.parse(JSON.stringify(loadout));
-  const keys = editingLoadout.type === 'PC' ? PC_KEYS : PS5_KEYS;
-  loadoutsContent.innerHTML = `<form id="loadout-editor"><div class="editor-fields"><label class="wide">Nome<input name="name" maxlength="50" required value="${escapeHtml(editingLoadout.name)}"></label></div><div id="mapping-list">${editingLoadout.mappings.map((mapping,index) => mappingRow(mapping,index,keys)).join('')}</div><button type="button" data-add-action>+ Adicionar ação personalizada</button>${editingLoadout.type === 'PS5' ? '<div id="controller-preview" class="controller-preview"></div>' : ''}<div class="editor-footer"><button type="button" data-cancel-editor>Cancelar</button><button type="submit">Salvar</button></div></form>`;
-  renderPreview();
-}
-
-function mappingRow(mapping,index,keys) {
-  const options = keys.map(key => `<option ${key === mapping.input ? 'selected' : ''}>${escapeHtml(key)}</option>`).join('');
-  return `<div class="mapping-row" data-index="${index}"><label>Ação<input data-action maxlength="40" required value="${escapeHtml(mapping.action)}"></label><label>${editingLoadout.type === 'PC' ? 'Tecla' : 'Botão'}<select data-input>${options}</select></label><button type="button" data-remove-action aria-label="Remover ação">×</button></div>`;
-}
-
-function syncEditor() {
-  editingLoadout.mappings = [...loadoutsContent.querySelectorAll('.mapping-row')].map(row => ({ action:row.querySelector('[data-action]').value.trim(), input:row.querySelector('[data-input]').value }));
-}
-
-function renderPreview() {
-  const preview = document.querySelector('#controller-preview');
-  if (!preview) return;
-  syncEditor();
-  preview.innerHTML = editingLoadout.mappings.filter(item => item.action).map(item => `<span><strong>${escapeHtml(item.input.split(' ')[0])}</strong> ${escapeHtml(item.action)}</span>`).join('');
-}
-
-function updateHud(entry = gameLoadouts()) {
-  const hud = document.querySelector('#loadout-hud');
-  const selected = entry.loadouts.find(item => item.id === entry.selected);
-  hud.hidden = !entry.hud || !selected;
-  hud.innerHTML = selected ? `<strong>${escapeHtml(selected.name)} · ${selected.type}</strong><br>${selected.mappings.slice(0,5).map(item => `${escapeHtml(item.input)} — ${escapeHtml(item.action)}`).join('<br>')}` : '';
-}
-
-function loadoutAction(action) {
-  const entry = gameLoadouts();
-  const selected = entry.loadouts.find(item => item.id === entry.selected);
-  if (action === 'restore') { entry.selected = null; entry.loadouts = []; saveGameLoadouts(entry); renderLoadouts(); return; }
-  if (!selected) return;
-  if (action === 'edit') return editLoadout(selected);
-  if (action === 'rename') { const name = prompt('Novo nome do loadout:', selected.name)?.trim(); if (name) selected.name = name.slice(0,50); }
-  if (action === 'duplicate') { const copy = JSON.parse(JSON.stringify(selected)); copy.id = `${Date.now()}-${Math.random().toString(16).slice(2)}`; copy.name = `${copy.name} (cópia)`; entry.loadouts.push(copy); entry.selected = copy.id; }
-  if (action === 'delete' && confirm(`Excluir “${selected.name}”?`)) { entry.loadouts = entry.loadouts.filter(item => item.id !== selected.id); entry.selected = entry.loadouts[0]?.id || null; }
-  saveGameLoadouts(entry); renderLoadouts();
-}
-
-frame.addEventListener('load', () => { if (frame.src === 'about:blank') return; clearTimeout(loadTimer); document.querySelector('#loading').hidden = true; document.querySelector('#error').hidden = true; });
-settingsButton.addEventListener('click', () => setSettingsOpen(settingsMenu.hidden, true));
-settingsMenu.addEventListener('click', async event => {
-  const view = event.target.closest('[data-view]')?.dataset.view;
-  if (view) return showView(view);
-  if (event.target.closest('[data-back]')) return showView('main');
-  const command = event.target.closest('[data-command]')?.dataset.command;
-  if (command === 'restart') { setSettingsOpen(false); return loadGame(); }
-  if (command === 'close') { setSettingsOpen(false); window.close(); return setTimeout(() => { if (!window.closed) showMessage('Você pode fechar esta aba pelo navegador.'); },150); }
-  if (command === 'fullscreen') { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); setSettingsOpen(false); } catch { showMessage('Tela cheia não está disponível neste navegador.'); } }
-  const resolution = event.target.closest('[data-resolution]')?.dataset.resolution;
-  if (resolution) return chooseResolution(resolution);
-  const type = event.target.closest('[data-create]')?.dataset.create;
-  if (type) return editLoadout({ id:`${Date.now()}-${Math.random().toString(16).slice(2)}`, name:`Meu Loadout ${type}`, type, mappings:defaultMappings(type) });
-  const selectedId = event.target.closest('[data-select-loadout]')?.dataset.selectLoadout;
-  if (selectedId) { const entry = gameLoadouts(); entry.selected = selectedId; saveGameLoadouts(entry); return renderLoadouts(); }
-  const action = event.target.closest('[data-loadout-action]')?.dataset.loadoutAction;
-  if (action) return loadoutAction(action);
-  if (event.target.closest('[data-add-action]')) { syncEditor(); editingLoadout.mappings.push({action:'Nova ação',input:editingLoadout.type === 'PC' ? 'Space' : '× X'}); return editLoadout(editingLoadout); }
-  if (event.target.closest('[data-remove-action]')) { syncEditor(); editingLoadout.mappings.splice(Number(event.target.closest('.mapping-row').dataset.index),1); return editLoadout(editingLoadout); }
-  if (event.target.closest('[data-cancel-editor]')) renderLoadouts();
-});
-settingsMenu.addEventListener('input', event => { if (event.target.matches('[data-action],[data-input]')) renderPreview(); });
-settingsMenu.addEventListener('change', event => { if (event.target.matches('[data-hud]')) { const entry = gameLoadouts(); entry.hud = event.target.checked; saveGameLoadouts(entry); } });
-settingsMenu.addEventListener('submit', event => {
-  event.preventDefault();
-  if (event.target.matches('.custom-fields')) { const data = new FormData(event.target); const width = Number(data.get('width')); const height = Number(data.get('height')); if (!validCustomResolution(width,height)) return showMessage('Use valores entre 320 × 240 e 7680 × 4320.'); Object.assign(gameDisplayState,{mode:'custom',targetWidth:width,targetHeight:height,fitMode:'contain'}); applyResolution(); return setSettingsOpen(false,true); }
-  if (event.target.id === 'loadout-editor') { syncEditor(); const name = new FormData(event.target).get('name').trim(); editingLoadout.name = name; const entry = gameLoadouts(); const index = entry.loadouts.findIndex(item => item.id === editingLoadout.id); if (index < 0) entry.loadouts.push(editingLoadout); else entry.loadouts[index] = editingLoadout; entry.selected = editingLoadout.id; saveGameLoadouts(entry); showMessage('Loadout salvo.'); renderLoadouts(); }
-});
-document.addEventListener('pointerdown', event => { if (!settingsMenu.hidden && !event.target.closest('.settings-control')) setSettingsOpen(false); });
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && !settingsMenu.hidden) { event.preventDefault(); setSettingsOpen(false,true); } });
-stage.addEventListener('pointerdown', () => setSettingsOpen(false));
-document.querySelector('#retry').addEventListener('click', loadGame);
-document.addEventListener('fullscreenchange', applyResolution);
-window.addEventListener('resize', applyResolution);
-window.addEventListener('orientationchange', applyResolution);
-window.visualViewport?.addEventListener('resize', applyResolution);
-
-applyResolution();
-updateHud();
-loadGame();
+overlay.addEventListener('pointerdown',event=>{const el=event.target.closest('.virtual-control');if(!el)return;event.preventDefault();if(!layoutEditing)return press(el,event.pointerId);const rect=overlay.getBoundingClientRect(),entry=gameLoadouts(),selected=entry.loadouts.find(i=>i.id===entry.selected),button=selected.buttons.find(b=>b.id===el.dataset.buttonId);el.setPointerCapture(event.pointerId);const move=e=>{button.x=Math.max(0,Math.min(100,(e.clientX-rect.left)/rect.width*100));button.y=Math.max(0,Math.min(100,(e.clientY-rect.top)/rect.height*100));el.style.setProperty('--x',`${button.x}%`);el.style.setProperty('--y',`${button.y}%`);};const done=()=>{el.removeEventListener('pointermove',move);saveGameLoadouts(entry);};el.addEventListener('pointermove',move);el.addEventListener('pointerup',done,{once:true});el.addEventListener('pointercancel',done,{once:true});});
+overlay.addEventListener('pointerup',e=>release(e.pointerId));overlay.addEventListener('pointercancel',e=>release(e.pointerId));
+frame.addEventListener('load',()=>{if(frame.src==='about:blank')return;clearTimeout(loadTimer);document.querySelector('#loading').hidden=true;document.querySelector('#error').hidden=true;});
+settingsButton.addEventListener('click',()=>{if(layoutEditing)return finishLayoutEditing();setSettingsOpen(settingsMenu.hidden,true);});
+settingsMenu.addEventListener('click',async event=>{const view=event.target.closest('[data-view]')?.dataset.view;if(view)return showView(view);if(event.target.closest('[data-back]'))return showView('main');const command=event.target.closest('[data-command]')?.dataset.command;if(command==='restart'){setSettingsOpen(false);return loadGame();}if(command==='close'){setSettingsOpen(false);window.close();return setTimeout(()=>{if(!window.closed)showMessage('Você pode fechar esta aba pelo navegador.');},150);}if(command==='fullscreen'){try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();setSettingsOpen(false);}catch{showMessage('Tela cheia não está disponível neste navegador.');}}const resolution=event.target.closest('[data-resolution]')?.dataset.resolution;if(resolution)return chooseResolution(resolution);const type=event.target.closest('[data-create]')?.dataset.create;if(type)return editLoadout({id:`${Date.now()}-${Math.random()}`,name:`Meu Loadout ${type==='PC'?'PC':'Controle'}`,type,buttons:presetButtons(type==='PC'?'PC WASD':'PS5 Plataforma')});const id=event.target.closest('[data-select-loadout]')?.dataset.selectLoadout;if(id){const entry=gameLoadouts();entry.selected=id;saveGameLoadouts(entry);return renderLoadouts();}const action=event.target.closest('[data-loadout-action]')?.dataset.loadoutAction;if(action)return loadoutAction(action);if(event.target.closest('[data-layout]'))return startLayoutEditing();if(event.target.closest('[data-add-action]')){syncEditor();editingLoadout.buttons.push(button(editingLoadout.type==='PC'?'Space':'× X','Nova ação',50,50));return editLoadout(editingLoadout);}if(event.target.closest('[data-remove-action]')){syncEditor();editingLoadout.buttons.splice(Number(event.target.closest('.mapping-row').dataset.index),1);return editLoadout(editingLoadout);}if(event.target.closest('[data-cancel-editor]'))renderLoadouts();});
+settingsMenu.addEventListener('change',event=>{if(event.target.matches('[data-visible]')){const entry=gameLoadouts();entry.visible=event.target.checked;saveGameLoadouts(entry);}if(event.target.matches('[name=preset]')){editingLoadout.buttons=presetButtons(event.target.value);editLoadout(editingLoadout);}});
+settingsMenu.addEventListener('submit',event=>{event.preventDefault();if(event.target.matches('.custom-fields')){const data=new FormData(event.target),width=Number(data.get('width')),height=Number(data.get('height'));if(!validCustomResolution(width,height))return showMessage('Use valores entre 320 × 240 e 7680 × 4320.');Object.assign(gameDisplayState,{mode:'custom',targetWidth:width,targetHeight:height,fitMode:'contain'});applyResolution();return setSettingsOpen(false,true);}if(event.target.id==='loadout-editor'){syncEditor();editingLoadout.name=new FormData(event.target).get('name').trim();const entry=gameLoadouts(),index=entry.loadouts.findIndex(i=>i.id===editingLoadout.id);if(index<0)entry.loadouts.push(editingLoadout);else entry.loadouts[index]=editingLoadout;entry.selected=editingLoadout.id;entry.visible=true;saveGameLoadouts(entry);showMessage('Loadout salvo.');renderLoadouts();}});
+document.addEventListener('pointerdown',event=>{if(!settingsMenu.hidden&&!event.target.closest('.settings-control'))setSettingsOpen(false);});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!settingsMenu.hidden){event.preventDefault();setSettingsOpen(false,true);}});window.addEventListener('blur',releaseAll);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseAll();});stage.addEventListener('pointerdown',event=>{if(!event.target.closest('.virtual-control'))setSettingsOpen(false);});document.querySelector('#retry').addEventListener('click',loadGame);document.addEventListener('fullscreenchange',applyResolution);window.addEventListener('resize',applyResolution);window.addEventListener('orientationchange',applyResolution);window.visualViewport?.addEventListener('resize',applyResolution);
+applyResolution();renderOverlay();loadGame();
