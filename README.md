@@ -1,5 +1,26 @@
 # PlumpGames
 
+## Bridge de controles para jogos incorporados
+
+Jogos publicados na mesma origem da PlumpGames recebem os eventos virtuais
+diretamente. Para um jogo controlado pela equipe, mas hospedado em outra origem,
+copie `plumpgames-input-bridge.js` para o projeto do jogo e carregue-o antes do
+script principal:
+
+```html
+<script src="/plumpgames-input-bridge.js"></script>
+<script src="/game.js"></script>
+```
+
+O bridge aceita mensagens somente de
+`https://site.kiwifypurplehero.workers.dev`, responde à detecção automática e
+transforma `keydown`/`keyup` em `KeyboardEvent` dentro do jogo. Ele também evita
+eventos duplicados e solta teclas em `blur`, `pagehide` e `beforeunload`.
+
+Jogos externos cross-origin que não incluam o bridge não podem receber teclado
+sintético por causa do isolamento de origem do navegador. Nesse caso, a
+indisponibilidade aparece somente nas configurações de Loadouts.
+
 Site estático oficial da PlumpGames: <https://site.kiwifypurplehero.workers.dev/>.
 
 O Cloudflare Worker serve os assets do site e o endpoint `POST /api/support` do PJ Assistant, sem banco de dados, autenticação, contas, cookies de sessão ou secrets. As opções de aparência, acessibilidade, visualização e live wallpaper são armazenadas localmente no navegador com `localStorage`.
