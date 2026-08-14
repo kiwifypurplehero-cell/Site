@@ -36,9 +36,8 @@
   </header>
   <main id="game-area">
     <div id="game-stage" tabindex="-1">
-      <div id="game-resolution-frame"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+      <div id="game-resolution-frame"><iframe id="game-frame" title="Jogo" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe><div id="loadout-overlay" aria-label="Controles virtuais do jogo"></div></div>
     </div>
-    <aside id="loadout-hud" aria-label="Referência do loadout" hidden></aside>
     <section id="loading" class="notice" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><strong>Carregando jogo...</strong></section>
     <section id="error" class="notice" role="alert" hidden><strong>Não foi possível carregar o jogo.</strong><p>O jogo pode estar indisponível ou impedir a exibição nesta página.</p><div><button id="retry" type="button">Tentar novamente</button><a id="direct" target="_blank" rel="noopener noreferrer">Abrir jogo diretamente</a></div></section>
   </main>
