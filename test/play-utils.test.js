@@ -96,21 +96,38 @@ test('a barra dedicada contém somente a engrenagem e o menu completo', () => {
   assert.match(html, /Abrir jogo diretamente/);
 });
 
-test('loadouts visuais são persistidos por jogo e tratam iframe cross-origin com segurança', () => {
+test('LDT mobile persiste controles relativos, editáveis e multitouch', () => {
   const script = fs.readFileSync(path.join(__dirname, '..', 'play.js'), 'utf8');
   const html = fs.readFileSync(path.join(__dirname, '..', 'play.html'), 'utf8');
   const css = fs.readFileSync(path.join(__dirname, '..', 'play.css'), 'utf8');
   assert.match(script, /plumpgamesLoadouts/);
-  assert.match(script, /const gameDisplayState = \{ mode:'auto'/);
+  assert.match(script, /xPercent/);
+  assert.match(script, /yPercent/);
+  assert.match(script, /color: '#7c3aed'/);
+  assert.match(script, /opacity: \.10/);
   assert.doesNotMatch(script, /contentDocument/);
-  assert.match(script, /try\{frame\.contentWindow\.dispatchEvent\(new KeyboardEvent/);
+  assert.match(script, /function sendVirtualKey\(input\)/);
+  assert.match(script, /setPointerCapture/);
   assert.match(script, /pointerdown/);
+  assert.match(script, /pointermove/);
   assert.match(script, /pointerup/);
   assert.match(script, /pointercancel/);
+  assert.match(script, /buttonPointers = new Map/);
   assert.match(html, /id="loadout-overlay"/);
+  assert.match(html, /id="ldt-panel"/);
   assert.match(css, /#loadout-overlay\{[^}]*pointer-events:none/);
   assert.match(css, /\.virtual-control\{[^}]*pointer-events:auto/);
-  assert.match(css, /background:rgba\(15,23,42,var\(--idle\)\)/);
-  for (const action of ['Pular','Interagir','PC WASD','PC Setas','PS5 Plataforma','PS5 FPS simples']) assert.match(script, new RegExp(action));
-  for (const button of ['△ Triângulo','○ Círculo','× X','□ Quadrado','Touchpad Press']) assert.match(script, new RegExp(button));
+  assert.match(css, /top:max\(12px,env\(safe-area-inset-top\)\)/);
+  assert.match(css, /left:50%/);
+  for (const preset of ['WASD + Space', 'Setas + Enter', 'PS5 básico']) assert.ok(script.includes(preset));
+  for (const button of ['△', '○', '×', '□', 'L1', 'R1', 'L2', 'R2', 'L3', 'R3', 'Options', 'Create']) assert.match(script, new RegExp(button));
+});
+
+test('bridge valida a origem oficial e gerencia teclas presas', () => {
+  const bridge = fs.readFileSync(path.join(__dirname, '..', 'plumpgames-input-bridge.js'), 'utf8');
+  assert.match(bridge, /https:\/\/site\.kiwifypurplehero\.workers\.dev/);
+  assert.match(bridge, /plumpgames-input-ready/);
+  assert.match(bridge, /new KeyboardEvent/);
+  assert.match(bridge, /pressedCodes = new Set/);
+  assert.match(bridge, /beforeunload/);
 });
