@@ -1,4 +1,6 @@
-/** Cloudflare Worker da PlumpGames: assets estáticos e suporte via Workers AI. */
+import {emulatorApi} from './emulator-api.js';
+
+/** Cloudflare Worker da PlumpGames: assets estáticos e APIs. */
 const SUPPORT_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 const MAX_BODY_BYTES = 24_000;
 const MAX_MESSAGE_LENGTH = 1_000;
@@ -122,6 +124,7 @@ async function support(request,env) {
 export default {async fetch(request,env){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
+  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname))||json({error:'Endpoint não encontrado.'},404);
   let response=await env.ASSETS.fetch(request);
   if(response.status===404&&request.method==='GET'&&request.headers.get('Accept')?.includes('text/html'))response=await env.ASSETS.fetch(new Request(new URL('/index.html',url),request));
   return response;
