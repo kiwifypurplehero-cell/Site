@@ -7,7 +7,11 @@
     "directory": ".",
     "binding": "ASSETS",
     "run_worker_first": [
-      "/api/*"
+      "/api/*",
+      "/emulators",
+      "/emulators/",
+      "/emulators/ps2",
+      "/emulators/ps2/"
     ]
   },
   "ai": {
