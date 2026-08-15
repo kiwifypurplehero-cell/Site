@@ -45,7 +45,7 @@ Forks, repositórios arquivados e o repositório `Site` são ignorados. A lista 
 
 ## Página dedicada do jogo
 
-**Jogar agora** abre `play.html` em uma nova aba. A página resolve o repositório para o domínio GitHub Pages autorizado e reúne tela cheia, resoluções proporcionais, reinício, loadouts locais e fechamento no menu da engrenagem. Loadouts PC e PS5 são perfis de referência salvos por jogo; eles não injetam eventos em iframes externos nem exibem controles virtuais sobre o jogo.
+**Jogar agora** abre `play.html` em uma nova aba. A página resolve o repositório para o domínio GitHub Pages autorizado e reúne tela cheia, resoluções proporcionais, reinício, loadouts locais e fechamento no menu da engrenagem. Loadouts PC e PS5 são salvos por jogo e enviam eventos pelo bridge `postMessage` quando o jogo incorporado confirma compatibilidade.
 
 As regras compartilhadas de URL segura e escala proporcional ficam em `play-utils.js`. Para executar os testes automatizados dessas regras e a auditoria contra código legado do launcher, use `npm test`.
 
