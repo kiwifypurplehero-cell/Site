@@ -125,6 +125,8 @@ export default {async fetch(request,env){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
   if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname))||json({error:'Endpoint não encontrado.'},404);
+  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
+  if(emulatorPages.has(url.pathname))return env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
   let response=await env.ASSETS.fetch(request);
   if(response.status===404&&request.method==='GET'&&request.headers.get('Accept')?.includes('text/html'))response=await env.ASSETS.fetch(new Request(new URL('/index.html',url),request));
   return response;
