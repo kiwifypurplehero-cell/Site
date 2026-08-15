@@ -106,7 +106,13 @@ test('LDT mobile persiste controles relativos, editáveis e multitouch', () => {
   assert.match(script, /color: '#7c3aed'/);
   assert.match(script, /opacity: \.10/);
   assert.doesNotMatch(script, /contentDocument/);
-  assert.match(script, /function sendVirtualKey\(input\)/);
+  assert.doesNotMatch(script, /contentWindow[^\n]*document|targetOrigin[^\n]*['"]\*['"]|return ['"]\*['"]/);
+  assert.match(script, /const gameOrigin = playUrl \? new URL\(playUrl\)\.origin : null/);
+  assert.match(script, /function sendVirtualKey\(\{ action, key, code \}\)/);
+  assert.match(script, /postMessage\(\{ type: 'plumpgames-input-ping' \}, gameOrigin\)/);
+  assert.match(script, /postMessage\(\{ type: 'plumpgames-input', action, key, code \}, gameOrigin\)/);
+  assert.match(script, /Bridge:.*conectado/);
+  assert.match(script, /Bridge:.*não disponível/);
   assert.match(script, /setPointerCapture/);
   assert.match(script, /pointerdown/);
   assert.match(script, /pointermove/);
@@ -120,6 +126,7 @@ test('LDT mobile persiste controles relativos, editáveis e multitouch', () => {
   assert.match(css, /top:max\(12px,env\(safe-area-inset-top\)\)/);
   assert.match(css, /left:50%/);
   for (const preset of ['WASD + Space', 'Setas + Enter', 'PS5 básico']) assert.ok(script.includes(preset));
+  for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Z', 'X', 'C']) assert.ok(script.includes(key));
   for (const button of ['△', '○', '×', '□', 'L1', 'R1', 'L2', 'R2', 'L3', 'R3', 'Options', 'Create']) assert.match(script, new RegExp(button));
 });
 
