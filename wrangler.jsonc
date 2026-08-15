@@ -13,6 +13,12 @@
   "ai": {
     "binding": "AI"
   },
+  "r2_buckets": [
+    {
+      "binding": "GAME_ROMS",
+      "bucket_name": "plumpgames-roms"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
