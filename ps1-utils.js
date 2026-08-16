@@ -107,21 +107,62 @@ export async function createPs1Archive(files) {
   return new Blob([...parts, ...central, end.bytes], {type: 'application/zip'});
 }
 
-export async function downloadPs1Archive(game, {fetchImpl = fetch, onProgress} = {}) {
+function responseSize(response) {
+  const range = response.headers.get('Content-Range')?.match(/\/(\d+)$/);
+  const value = range?.[1] || response.headers.get('Content-Length');
+  return /^\d+$/.test(value || '') ? Number(value) : null;
+}
+
+async function discoverSize(source, fetchImpl, signal) {
+  const head = await fetchImpl(source.url, {method: 'HEAD', signal});
+  if (!head.ok) return null;
+  return responseSize(head);
+}
+
+async function downloadBlob(source, {fetchImpl, signal, onChunk}) {
+  const response = await fetchImpl(source.url, {signal});
+  if (!response.ok) throw new Error(`Não foi possível baixar ${decodePs1Key(source.key).split('/').pop()} (HTTP ${response.status}).`);
+  const total = responseSize(response);
+  if (!response.body?.getReader) {
+    const blob = await response.blob(); onChunk?.(blob.size, total || blob.size, source.key);
+    return blob;
+  }
+  const reader = response.body.getReader(), chunks = [];
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      chunks.push(value); onChunk?.(value.byteLength, total, source.key);
+    }
+  } catch (error) { await reader.cancel(error).catch(() => {}); throw error; }
+  return new Blob(chunks, {type: response.headers.get('Content-Type') || 'application/octet-stream'});
+}
+
+/** Download every boot file once and expose the resulting Blob URL to EmulatorJS. */
+export async function downloadPs1Content(game, {fetchImpl = fetch, signal, onMetadata, onProgress} = {}) {
   const launch = resolvePs1Launch(game);
-  if (!launch.dependencies.length) return {...launch, gameUrl: launch.bootUrl, archive: null};
   const sources = [{key: game.bootKey || game.key, url: launch.bootUrl}, ...launch.dependencies];
+  const sizes = await Promise.all(sources.map(source => discoverSize(source, fetchImpl, signal).catch(error => {
+    if (error?.name === 'AbortError') throw error;
+    return null;
+  })));
+  const knownTotal = sizes.every(Number.isFinite) ? sizes.reduce((sum, size) => sum + size, 0) : null;
+  onMetadata?.({totalBytes: knownTotal, files: sources.map((source, index) => ({...source, size: sizes[index]}))});
   const files = [];
+  let loadedBytes = 0;
   for (let index = 0; index < sources.length; index += 1) {
     const source = sources[index];
-    onProgress?.(index, sources.length, source.key);
-    const response = await fetchImpl(source.url);
-    if (!response.ok) throw new Error(`Não foi possível baixar ${decodePs1Key(source.key).split('/').pop()} (HTTP ${response.status}).`);
-    files.push({key: source.key, blob: await response.blob()});
+    const blob = await downloadBlob(source, {fetchImpl, signal, onChunk(bytes, responseTotal, key) {
+      loadedBytes += bytes;
+      onProgress?.({loadedBytes, totalBytes: knownTotal, currentFile: key, fileTotal: sizes[index] || responseTotal});
+    }});
+    files.push({key: source.key, blob});
   }
-  const archive = await createPs1Archive(files);
-  return {...launch, gameUrl: URL.createObjectURL(archive), archive};
+  const content = launch.dependencies.length ? await createPs1Archive(files) : files[0].blob;
+  return {...launch, gameUrl: URL.createObjectURL(content), archive: launch.dependencies.length ? content : null, blob: content, loadedBytes, totalBytes: knownTotal || loadedBytes};
 }
+
+export const downloadPs1Archive = downloadPs1Content;
 
 function fetchFailure(error) {
   if (error?.name === 'AbortError') return {kind: 'abort', message: 'A verificação do arquivo foi cancelada ou excedeu o tempo limite.'};

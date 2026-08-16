@@ -13,7 +13,15 @@
   <header id="toolbar"><a id="back" href="/?view=ps1">← Voltar para PlumpGames</a><strong id="game-name">PlayStation 1</strong><button id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings">⚙</button></header>
   <main id="player-shell">
     <div id="ps1-emulator"></div>
-    <div id="loading" role="status"><span></span><b>Preparando emulador…</b></div>
+    <section id="loading" role="status" aria-live="polite">
+      <h1 id="loading-game">PlayStation 1</h1>
+      <b id="loading-phase">Preparando emulador</b>
+      <div id="progress-track" role="progressbar" aria-label="Progresso do carregamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress-bar"></i></div>
+      <strong id="loading-percent">0%</strong>
+      <div id="loading-details" hidden><span id="loading-bytes"></span><span id="loading-speed"></span><span id="loading-eta"></span></div>
+      <div id="initializing" hidden><span class="spinner"></span><span id="initializing-text">Inicializando PCSX-ReARMed…</span></div>
+      <button id="cancel" type="button">Cancelar</button>
+    </section>
     <section id="error" hidden><b>Não foi possível iniciar o jogo.</b><p></p><button id="retry" type="button">Tentar novamente</button></section>
     <button id="fullscreen-prompt" type="button">Jogar em tela cheia</button>
   </main>

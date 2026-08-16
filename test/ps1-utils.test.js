@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPs1Archive, inspectPs1File, ps1StreamUrl} from '../ps1-utils.js';
+import {createPs1Archive, downloadPs1Content, inspectPs1File, ps1StreamUrl} from '../ps1-utils.js';
 
 test('codifica espaço e barra da key exatamente uma vez', () => {
   const expected = '/api/emulators/ps1/file/Jogos%2FGran%20Turismo.iso';
@@ -58,4 +58,26 @@ test('monta CUE e BIN em ZIP armazenado com nomes que o CUE consegue resolver', 
   assert.match(text, /Crash\.bin/);
   assert.equal(new DataView(bytes.buffer).getUint32(0, true), 0x04034b50);
   assert.equal(new DataView(bytes.buffer).getUint32(bytes.length - 22, true), 0x06054b50);
+});
+
+test('mede progresso agregado real de CUE+BIN e transfere cada arquivo uma vez', async () => {
+  const bodies = new Map([['cue', new Uint8Array(20)], ['bin', new Uint8Array(980)]]), gets = [];
+  const game = {bootKey:'Crash.cue',format:'cue+bin',files:[{key:'Crash.cue'},{key:'Crash.bin'}]};
+  const progress = [];
+  const result = await downloadPs1Content(game, {fetchImpl:async (url, init={}) => {
+    const key = url.endsWith('Crash.cue') ? 'cue' : 'bin', body=bodies.get(key);
+    if(init.method==='HEAD') return new Response(null,{headers:{'Content-Length':String(body.length)}});
+    gets.push(key); return new Response(body,{headers:{'Content-Length':String(body.length)}});
+  },onProgress:value=>progress.push(value)});
+  assert.deepEqual(gets,['cue','bin']); assert.equal(result.loadedBytes,1000); assert.equal(result.totalBytes,1000);
+  assert.equal(progress.at(-1).loadedBytes,1000); assert.equal(progress.at(-1).totalBytes,1000);
+  URL.revokeObjectURL(result.gameUrl);
+});
+
+test('ISO usa uma única transferência GET e respeita AbortSignal', async () => {
+  let gets=0; const game={bootKey:'Gran Turismo.iso',format:'iso',files:[{key:'Gran Turismo.iso'}]};
+  const result=await downloadPs1Content(game,{fetchImpl:async(_url,init={})=>{if(init.method==='HEAD')return new Response(null,{headers:{'Content-Length':'4'}});gets++;return new Response(new Uint8Array(4),{headers:{'Content-Length':'4'}});}});
+  assert.equal(gets,1); assert.equal(result.archive,null); assert.equal(result.totalBytes,4); URL.revokeObjectURL(result.gameUrl);
+  const controller=new AbortController();controller.abort();
+  await assert.rejects(downloadPs1Content(game,{signal:controller.signal,fetchImpl:async(_url,{signal})=>{if(signal.aborted)throw new DOMException('Aborted','AbortError');}}),{name:'AbortError'});
 });
