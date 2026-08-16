@@ -37,3 +37,11 @@ test('erro de rede não é convertido em HTTP 403 nem bloqueia o loader', async 
   assert.equal(result.warning.kind, 'network-or-cors');
   assert.doesNotMatch(result.warning.message, /403/);
 });
+
+import {resolvePs1Launch} from '../ps1-utils.js';
+
+test('resolve launch usa bootKey CUE e expõe BIN como dependência segura', () => {
+  const launch = resolvePs1Launch({bootKey: 'Jogos/Crash (PT-BR)/Crash.cue', format: 'cue+bin', files: [{key: 'Jogos/Crash (PT-BR)/Crash.cue'}, {key: 'Jogos/Crash (PT-BR)/Crash.bin', type: 'bin'}]});
+  assert.equal(launch.bootUrl, '/api/emulators/ps1/file/Jogos%2FCrash%20(PT-BR)%2FCrash.cue');
+  assert.equal(launch.dependencies[0].url, '/api/emulators/ps1/file/Jogos%2FCrash%20(PT-BR)%2FCrash.bin');
+});

@@ -9,7 +9,13 @@ function decodePs1Key(key) {
 }
 
 export function ps1StreamUrl(game) {
-  return `/api/emulators/ps1/file/${encodeURIComponent(decodePs1Key(game.key))}`;
+  return `/api/emulators/ps1/file/${encodeURIComponent(decodePs1Key(game.bootKey || game.key))}`;
+}
+
+export function resolvePs1Launch(game) {
+  if (!game || typeof (game.bootKey || game.key) !== 'string') throw new TypeError('Jogo PS1 inválido.');
+  const dependencies = (game.files || []).filter(file => file.key !== (game.bootKey || game.key)).map(file => ({...file, url: `/api/emulators/ps1/file/${encodeURIComponent(decodePs1Key(file.key))}`}));
+  return {bootUrl: ps1StreamUrl(game), format: game.format, dependencies, coverUrl: game.coverUrl || null};
 }
 
 function fetchFailure(error) {

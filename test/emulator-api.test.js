@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emulatorApi, parseB2Error} from '../emulator-api.js';
+import {emulatorApi, normalizePs1Library, parseB2Error} from '../emulator-api.js';
 
 const ps1Env = {B2_PS1_ACCESS_KEY_ID: 'test-id', B2_PS1_SECRET_ACCESS_KEY: 'test-secret'};
 
@@ -76,25 +76,58 @@ test('bloqueia traversal e objetos fora de Jogos/', async () => {
   }
 });
 
-test('lista automaticamente apenas imagens PS1 aceitas com metadados amigáveis', async t => {
+test('scanner normaliza raiz, pastas, prioridade, capas e multidisc sem duplicar arquivos', () => {
+  const objects = [
+    {key: 'Jogos/Gran Turismo.iso', size: 679619808},
+    {key: 'Jogos/Crash Bandicoot (PT-BR)/Crash Bandicoot (PT-BR).bin', size: 250000000},
+    {key: 'Jogos/Crash Bandicoot (PT-BR)/Crash Bandicoot (PT-BR).cue', size: 500},
+    {key: 'Jogos/Crash Bandicoot (PT-BR)/Crash Bandicoot (PT-BR).JPG', size: 9000},
+    {key: 'Jogos/Resident Evil 2/Disc 1/Disc 1.cue', size: 100},
+    {key: 'Jogos/Resident Evil 2/Disc 1/Disc 1.bin', size: 10},
+    {key: 'Jogos/Resident Evil 2/Resident Evil 2.m3u', size: 50},
+    {key: 'Jogos/Resident Evil 2/capa.webp', size: 1000},
+    {key: 'Jogos/Tekken 3.chd', size: 3},
+    {key: 'Jogos/Final Fantasy (Edição Áurea).pbp', size: 4},
+    {key: 'Jogos/folder.JPG', size: 2},
+    {key: 'Jogos/x/../segredo.iso', size: 1}
+  ];
+  const games = normalizePs1Library(objects);
+  assert.equal(games.length, 5);
+  const crash = games.find(game => game.id === 'crash-bandicoot-pt-br');
+  assert.equal(crash.type, 'folder'); assert.equal(crash.format, 'cue+bin');
+  assert.match(crash.bootKey, /\.cue$/); assert.match(crash.coverKey, /\.JPG$/);
+  assert.equal(crash.files.length, 2); assert.equal(crash.size, 250000500);
+  const multidisc = games.find(game => game.id === 'resident-evil-2');
+  assert.match(multidisc.bootKey, /\.m3u$/); assert.equal(multidisc.files.length, 3);
+  assert.equal(games.filter(game => game.name === 'Gran Turismo').length, 1);
+  assert.ok(games.some(game => game.name === 'Final Fantasy (Edição Áurea)'));
+  assert.ok(games.some(game => game.format === 'chd'));
+  assert.equal(games.some(game => game.name === 'folder'), false);
+  assert.equal(JSON.stringify(games).includes('segredo'), false);
+});
+
+test('listagem usa somente ListObjects e devolve jogos normalizados', async t => {
+  const originalFetch = globalThis.fetch; let calls = 0;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async request => { calls += 1; assert.match(String(request), /prefix=Jogos%2F/); return new Response(`<ListBucketResult>
+    <Contents><Key>Jogos/Gran Turismo.iso</Key><Size>123</Size></Contents>
+    <Contents><Key>Jogos/Crash/Crash.bin</Key><Size>100</Size></Contents>
+    <Contents><Key>Jogos/Crash/Crash.cue</Key><Size>1</Size></Contents>
+    <Contents><Key>Jogos/Crash/cover.JPG</Key><Size>2</Size></Contents>
+  </ListBucketResult>`, {status: 200}); };
+  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), ps1Env);
+  const games = (await response.json()).games;
+  assert.equal(response.status, 200); assert.equal(calls, 1); assert.equal(games.length, 2);
+  assert.equal(games.find(game => game.name === 'Crash').format, 'cue+bin');
+});
+
+test('capa segura preserva stream, Content-Type e cache público', async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async request => {
-    assert.match(String(request), /plumpgames-storage-ps1.*prefix=Jogos%2F/);
-    return new Response(`<ListBucketResult>
-      <Contents><Key>Jogos/Gran Turismo.iso</Key><LastModified>2026-08-16T00:00:00Z</LastModified><Size>123456789</Size></Contents>
-      <Contents><Key>Jogos/.oculto.bin</Key><Size>1</Size></Contents>
-      <Contents><Key>Jogos/capa.jpg</Key><Size>2</Size></Contents>
-      <Contents><Key>Jogos/Crash_Bandicoot.chd</Key><LastModified>2026-08-17T00:00:00Z</LastModified><Size>42</Size></Contents>
-    </ListBucketResult>`, {status: 200});
-  };
-  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), ps1Env);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('cache-control'), 'public, max-age=60, stale-while-revalidate=300');
-  assert.deepEqual((await response.json()).games, [
-    {key: 'Jogos/Crash_Bandicoot.chd', name: 'Crash Bandicoot', format: 'chd', size: 42, lastModified: '2026-08-17T00:00:00Z'},
-    {key: 'Jogos/Gran Turismo.iso', name: 'Gran Turismo', format: 'iso', size: 123456789, lastModified: '2026-08-16T00:00:00Z'}
-  ]);
+  globalThis.fetch = async () => new Response(new Uint8Array([1, 2]), {headers: {'Content-Type': 'application/octet-stream'}});
+  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/cover/Jogos%2FCrash%2FCrash.JPG'), ps1Env);
+  assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'image/jpeg');
+  assert.match(response.headers.get('cache-control'), /max-age=86400/); assert.ok(response.body instanceof ReadableStream);
 });
 
 test('amplia Range pequeno para bloco alinhado e devolve 206 correto', async t => {
