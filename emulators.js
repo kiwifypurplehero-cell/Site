@@ -9,7 +9,7 @@ const VIEW_TITLES = {
   ps2: 'PlayStation 2 — PlumpGames'
 };
 const appViewState = {currentView: 'home', homeScrollY: 0};
-export const PS1EmulatorState = {libraryLoaded: false, selectedGame: null, coreReady: false, running: false, loading: false, error: null, biosMode: 'hle'};
+export const PS1EmulatorState = {libraryLoaded: false, selectedGame: null, instance: null, coreReady: false, running: false, loading: false, error: null, biosMode: 'hle'};
 const EMULATORJS_DATA = 'https://cdn.emulatorjs.org/stable/data/';
 let ps1LibraryPromise;
 let biosObjectUrl;
@@ -17,6 +17,55 @@ let libraryPromise;
 let ps1Attempt = 0;
 let ps1Timeout;
 let ps1PerformanceObserver;
+let ps1LayoutMutationObserver;
+let ps1LayoutResizeObserver;
+let ps1HeadController;
+let ps1LoadingTimer;
+
+function stopPs1LayoutDiagnostics() {
+  ps1LayoutMutationObserver?.disconnect(); ps1LayoutMutationObserver = undefined;
+  ps1LayoutResizeObserver?.disconnect(); ps1LayoutResizeObserver = undefined;
+}
+
+function startPs1LayoutDiagnostics(attempt) {
+  stopPs1LayoutDiagnostics();
+  const shell = document.querySelector('.ps1-emulator-shell');
+  const player = document.querySelector('#ps1-emulator');
+  if (!shell || !player) return;
+  const heights = new WeakMap();
+  const describe = element => element?.id ? `#${element.id}` : element?.className ? `.${String(element.className).trim().replace(/\s+/g, '.')}` : element?.tagName?.toLowerCase();
+  const report = changed => {
+    if (attempt !== ps1Attempt) return;
+    const canvas = player.querySelector('canvas');
+    const wrapper = player.querySelector('#game,.ejs_parent,.ejs_game') || player.firstElementChild;
+    console.log('[PS1-LAYOUT]', {
+      changed: describe(changed),
+      playerHeight: player.getBoundingClientRect().height,
+      canvasHeight: canvas?.getBoundingClientRect().height ?? 0,
+      wrapperHeight: wrapper?.getBoundingClientRect().height ?? 0,
+      scrollHeight: document.documentElement.scrollHeight,
+      innerHeight: window.innerHeight
+    });
+  };
+  ps1LayoutResizeObserver = new ResizeObserver(entries => {
+    for (const {target, contentRect} of entries) {
+      if (heights.get(target) === contentRect.height) continue;
+      heights.set(target, contentRect.height); report(target);
+    }
+  });
+  const observeLayoutNodes = () => {
+    [shell, player, ...player.querySelectorAll('#game,.ejs_parent,.ejs_game,canvas,iframe')].forEach(node => {
+      if (!heights.has(node)) ps1LayoutResizeObserver.observe(node);
+    });
+  };
+  ps1LayoutMutationObserver = new MutationObserver(mutations => {
+    const added = mutations.flatMap(mutation => [...mutation.addedNodes]).filter(node => node.nodeType === Node.ELEMENT_NODE);
+    if (added.length) console.log('[PS1-LAYOUT] elementos adicionados:', added.map(describe));
+    observeLayoutNodes(); report(added[0] || player);
+  });
+  ps1LayoutMutationObserver.observe(player, {childList: true, subtree: true});
+  observeLayoutNodes(); report(shell);
+}
 
 function requestedView() {
   const view = new URL(location.href).searchParams.get('view') || 'home';
@@ -170,18 +219,24 @@ function clearEmulatorGlobals() {
 function stopPs1({showLibrary = true} = {}) {
   ps1Attempt += 1;
   clearTimeout(ps1Timeout);
+  clearTimeout(ps1LoadingTimer);
+  ps1HeadController?.abort(); ps1HeadController = undefined;
   try { window.EJS_emulator?.gameManager?.saveState?.(); } catch {}
   try { window.EJS_emulator?.stop?.(); } catch {}
   document.querySelector('#ps1-emulator')?.replaceChildren();
   document.querySelectorAll('script[data-emulatorjs-loader]').forEach(node => node.remove());
   clearEmulatorGlobals();
   ps1PerformanceObserver?.disconnect(); ps1PerformanceObserver = undefined;
-  Object.assign(PS1EmulatorState, {coreReady: false, selectedGame: null, running: false, loading: false, error: null});
+  stopPs1LayoutDiagnostics();
+  Object.assign(PS1EmulatorState, {instance: null, coreReady: false, selectedGame: null, running: false, loading: false, error: null});
   document.querySelector('#ps1-player-panel').hidden = true;
   document.querySelector('#ps1-library').hidden = !showLibrary;
 }
 
 async function startPs1(game) {
+  if (!game) return;
+  // Never let loader.js attach a second EmulatorJS tree to a live container.
+  if (PS1EmulatorState.instance || PS1EmulatorState.loading) console.warn('[PS1] descartando a instância anterior antes de iniciar outra');
   stopPs1({showLibrary: false});
   const attempt = ps1Attempt;
   Object.assign(PS1EmulatorState, {selectedGame: game, loading: true, error: null});
@@ -189,6 +244,7 @@ async function startPs1(game) {
   const errorBox = document.querySelector('#ps1-error'); errorBox.hidden = true;
   document.querySelector('#ps1-diagnostics').hidden = !new URL(location.href).searchParams.has('debug');
   setPs1Loading('Preparando emulador...');
+  startPs1LayoutDiagnostics(attempt);
   const gameUrl = ps1StreamUrl(game);
   const loadStarted = performance.now();
   let observedRequests = 0, observedBytes = 0;
@@ -224,15 +280,16 @@ async function startPs1(game) {
   if (PS1EmulatorState.biosMode === 'custom' && biosObjectUrl) window.EJS_biosUrl = biosObjectUrl;
   window.EJS_onGameStart = () => {
     if (attempt !== ps1Attempt) return;
-    Object.assign(PS1EmulatorState, {coreReady: true, running: true, loading: false, error: null});
+    Object.assign(PS1EmulatorState, {instance: window.EJS_emulator || document.querySelector('#ps1-emulator canvas'), coreReady: true, running: true, loading: false, error: null});
     clearTimeout(ps1Timeout);
     setPs1Diagnostic('coreStart', `${((performance.now() - loadStarted) / 1000).toFixed(1)} s`);
     updatePerformance();
     updateLoaderState('Executando...');
-    setTimeout(() => { if (attempt === ps1Attempt && PS1EmulatorState.running) setPs1Loading(''); }, 900);
+    ps1LoadingTimer = setTimeout(() => { if (attempt === ps1Attempt && PS1EmulatorState.running) setPs1Loading(''); }, 900);
   };
   updateLoaderState('Conectando ao arquivo...');
-  const controller = new AbortController();
+  ps1HeadController = new AbortController();
+  const controller = ps1HeadController;
   const headTimeout = setTimeout(() => controller.abort(), 12000);
   try {
     const inspection = await inspectPs1File(gameUrl, {signal: controller.signal});
@@ -247,7 +304,7 @@ async function startPs1(game) {
     if (attempt !== ps1Attempt) return;
     failPs1(new Error(error.name === 'AbortError' ? 'A conexão com o arquivo demorou demais. Tente novamente.' : error.message));
     return;
-  } finally { clearTimeout(headTimeout); }
+  } finally { clearTimeout(headTimeout); if (ps1HeadController === controller) ps1HeadController = undefined; }
   if (attempt !== ps1Attempt) return;
   updateLoaderState('Carregando jogo...');
   const loader = document.createElement('script'); loader.src = `${EMULATORJS_DATA}loader.js`; loader.dataset.emulatorjsLoader = 'true';
@@ -266,7 +323,7 @@ document.addEventListener('click', event => {
 });
 window.addEventListener('popstate', () => setView(requestedView(), {historyMode: 'none'}));
 document.querySelector('[data-ps1-back]')?.addEventListener('click', () => { stopPs1(); setView('emulators'); });
-document.querySelector('[data-ps1-close]')?.addEventListener('click', () => stopPs1());
+document.querySelectorAll('[data-ps1-close]').forEach(control => control.addEventListener('click', () => stopPs1()));
 document.querySelector('#ps1-retry')?.addEventListener('click', () => PS1EmulatorState.selectedGame && startPs1(PS1EmulatorState.selectedGame));
 document.querySelector('#ps1-fullscreen')?.addEventListener('click', () => document.querySelector('#ps1-player-panel')?.requestFullscreen?.());
 document.querySelector('#ps1-restart')?.addEventListener('click', () => { try { window.EJS_emulator?.restart?.(); } catch (error) { failPs1(error); } });
