@@ -40,12 +40,21 @@ test('tentar novamente repete a consulta e voltar restaura a página principal',
 
 test('player PS1 preserva BIN+CUE, core leve e defaults seguros', () => {
   const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
-  assert.match(source, /downloadPs1Archive/);
+  assert.match(source, /downloadPs1Content/);
   assert.match(source, /EJS_core:'psx'/);
   assert.match(source, /EJS_threads:false/);
   assert.match(source, /pcsx_rearmed_drc: 'enabled'/);
   assert.match(source, /pcsx_rearmed_duping_enable/);
   assert.match(source, /pcsx_rearmed_neon_enhancement_enable: 'disabled'/);
+});
+
+test('loading dedicado usa estado real, cancelamento e só some no início do jogo', () => {
+  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
+  assert.match(source, /export const ps1LoadState/); assert.match(source, /new AbortController\(\)/);
+  assert.match(source, /window\.EJS_onGameStart=.*\$\('#loading'\)\.hidden=true/);
+  assert.match(source, /setTimeout\(renderLoadState,150\)/);
+  assert.match(html, /id="progress-track"/); assert.match(html, /id="loading-bytes"/); assert.match(html, /id="cancel"/);
 });
 
 test('página dedicada não carrega scripts gerais da PlumpGames', () => {
