@@ -1,4 +1,4 @@
-import {downloadPs1Archive, inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
+import {downloadPs1Archive, fetchPs1Game, inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
 
 const DATA = 'https://cdn.emulatorjs.org/stable/data/';
 const query = new URLSearchParams(location.search);
@@ -34,10 +34,15 @@ function diagnostics() {
 function measure(now) { if (!sampleStart) sampleStart = now; if (lastFrame && now-lastFrame > 34) dropped += Math.max(0, Math.round((now-lastFrame)/16.67)-1); lastFrame=now; frames++; if(now-sampleStart>=3000){renderedFps=frames*1000/(now-sampleStart); frames=0; sampleStart=now; diagnostics(); autoTune();} raf=requestAnimationFrame(measure); }
 function autoTune(){ if($('#frameskip').value!=='auto'||!window.EJS_emulator)return; const next=renderedFps>=50?'0':renderedFps>=40?'1':renderedFps>=30?'2':'3'; setCoreOption('pcsx_rearmed_frameskip',next); }
 function fail(error){$('#loading').hidden=true;$('#error').hidden=false;$('#error p').textContent=error.message||String(error);}
+function debug(label, value) { if (debugEnabled) console.debug(`[PS1-PLAYER] ${label}`, value); }
 async function start(){
   $('#error').hidden=true; $('#loading').hidden=false;
   try {
-    const response=await fetch('/api/emulators/ps1/games'); const payload=await response.json(); if(!response.ok)throw new Error(payload.error); game=payload.games.find(item=>item.id===gameId); if(!game)throw new Error('Jogo não encontrado na biblioteca.');
+    debug('requested game id', gameId || '(missing)');
+    const resolved=await fetchPs1Game(gameId); game=resolved.game;
+    debug('library loaded', `${resolved.count} game(s)`);
+    debug('matched game', {id: game.id, name: game.name, format: game.format});
+    debug('bootKey', game.bootKey || game.key);
     $('#game-name').textContent=game.name; document.title=`${game.name} — PlumpGames`; const launch=resolvePs1Launch(game); let gameUrl=launch.bootUrl;
     const inspection=await inspectPs1File(gameUrl); if(inspection.ok===false)throw new Error(`Arquivo indisponível (HTTP ${inspection.details.status}).`);
     if(launch.dependencies.length){const prepared=await downloadPs1Archive(game,{onProgress:(i,total,key)=>{$('#loading b').textContent=`Baixando ${String(key).split('/').pop()} (${i+1}/${total})…`;}}); objectUrl=prepared.gameUrl;gameUrl=objectUrl;}
@@ -49,7 +54,8 @@ async function start(){
 async function fullscreen(){try{await $('#player-shell').requestFullscreen();await screen.orientation?.lock?.('landscape').catch(()=>{});}catch{}}
 $('#settings-toggle').onclick=()=>{const open=$('#settings').hidden;$('#settings').hidden=!open;$('#settings-toggle').setAttribute('aria-expanded',open);};
 $('#diagnostics-toggle').onclick=()=>{$('#diagnostics').hidden=!$('#diagnostics').hidden;diagnostics();}; $('#diagnostics').hidden=!debugEnabled;
-$('#fullscreen').onclick=fullscreen; $('#fullscreen-prompt').onclick=fullscreen; $('#retry').onclick=()=>location.reload(); $('#restart').onclick=()=>location.reload();
+$('#fullscreen').onclick=fullscreen; $('#fullscreen-prompt').onclick=fullscreen; $('#retry').onclick=start; $('#restart').onclick=()=>location.reload();
+$('#back').onclick=event=>{event.preventDefault();if(window.opener&&!window.opener.closed){window.opener.focus();window.close();setTimeout(()=>{location.href='/?view=ps1';},250);}else location.href='/?view=ps1';};
 for(const id of ['profile','frameskip','audio']) $(`#${id}`).onchange=()=>{persist(); if(id!=='audio')for(const [key,value]of Object.entries(coreOptions()))setCoreOption(key,value);};
 document.addEventListener('visibilitychange',()=>{try{if(document.hidden)window.EJS_emulator?.pause?.();else window.EJS_emulator?.play?.();}catch{}});
 addEventListener('pagehide',()=>{cancelAnimationFrame(raf);try{window.EJS_emulator?.gameManager?.saveState?.();window.EJS_emulator?.stop?.();}catch{}if(objectUrl)URL.revokeObjectURL(objectUrl);});

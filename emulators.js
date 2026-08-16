@@ -184,7 +184,7 @@ async function loadPs1Library({refresh = false} = {}) {
         const metadata = document.createElement('small'); metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`;
         const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar';
         play.addEventListener('click', () => {
-          const url = new URL('/play/ps1/', location.origin);
+          const url = new URL('/ps1-player', location.origin);
           url.searchParams.set('game', game.id);
           window.open(url.href, '_blank');
         }); details.append(title, metadata); card.append(cover, details, play); return card;

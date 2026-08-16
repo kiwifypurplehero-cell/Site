@@ -125,10 +125,10 @@ export default {async fetch(request,env,ctx){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
   if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
-  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
+  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
   if(emulatorPages.has(url.pathname)) {
     const asset=await env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
-    if(!url.pathname.startsWith('/play/ps1')) return asset;
+    if(!url.pathname.startsWith('/play/ps1')&&!url.pathname.startsWith('/ps1-player')) return asset;
     const headers=new Headers(asset.headers); headers.set('Cross-Origin-Opener-Policy','same-origin');
     // EmulatorJS is currently served by its CDN. Enabling COEP would block that
     // un-versioned cross-origin dependency, so threads remain capability-gated off.
