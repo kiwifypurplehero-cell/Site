@@ -1,6 +1,11 @@
 import {EMULATORS, findEmulator} from './emulator-registry.js';
 
 const PUBLIC_CACHE = 'public, max-age=60, stale-while-revalidate=300';
+const PS1_COVER_CACHE = 'public, max-age=86400, stale-while-revalidate=604800';
+const PS1_BOOT_PRIORITY = Object.freeze(['m3u', 'cue', 'chd', 'pbp', 'ccd', 'img', 'iso', 'bin']);
+const PS1_BOOT_EXTENSIONS = new Set(PS1_BOOT_PRIORITY);
+const PS1_AUX_EXTENSIONS = new Set(['bin', 'ecm', 'sub']);
+const PS1_COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const SAFE_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
 const DEFAULT_PREFIX = 'ps2/jogos/';
 const PS1_DEFAULTS = Object.freeze({
@@ -177,19 +182,90 @@ function friendlyName(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function validPs1Key(key, prefix, extensions) {
-  if (!key.startsWith(prefix) || key === prefix) return false;
+function extensionOf(key) {
+  const filename = key.split('/').pop() || '';
+  const dot = filename.lastIndexOf('.');
+  return dot < 1 ? '' : filename.slice(dot + 1).toLowerCase();
+}
+
+function safeObjectKey(key, prefix) {
+  if (typeof key !== 'string' || !key.startsWith(prefix) || key === prefix || key.includes('\\')) return false;
   const relative = key.slice(prefix.length);
-  const parts = relative.split('/');
-  if (parts.some(part => !part || part.startsWith('.') || part.endsWith('~') || /\.(?:tmp|part|crdownload)$/i.test(part))) return false;
-  return extensions.includes(relative.split('.').pop()?.toLowerCase());
+  return relative.split('/').every(part => part && part !== '.' && part !== '..' && !part.startsWith('.') && !part.endsWith('~') && !/\.(?:tmp|part|crdownload)$/i.test(part));
+}
+
+function ps1Slug(name) {
+  const slug = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80).replace(/-$/g, '');
+  return slug || 'jogo';
+}
+
+function fileKind(extension) {
+  if (extension === 'cue') return 'cue';
+  if (extension === 'bin') return 'bin';
+  if (PS1_AUX_EXTENSIONS.has(extension)) return 'auxiliary';
+  return 'disc';
+}
+
+function chooseCover(objects, gameName) {
+  const images = objects.filter(object => PS1_COVER_EXTENSIONS.has(object.extension));
+  if (!images.length) return null;
+  const preferred = ['cover', 'capa', 'folder', gameName.toLowerCase()];
+  return [...images].sort((a, b) => {
+    const aName = friendlyName(a.key.split('/').pop()).toLowerCase(), bName = friendlyName(b.key.split('/').pop()).toLowerCase();
+    const aRank = preferred.indexOf(aName), bRank = preferred.indexOf(bName);
+    return (aRank < 0 ? preferred.length : aRank) - (bRank < 0 ? preferred.length : bRank) || a.key.localeCompare(b.key, 'pt-BR');
+  })[0].key;
+}
+
+/** Normaliza exclusivamente metadados do ListObjects; nenhum conteúdo de ROM é lido. */
+export function normalizePs1Library(objects, prefix = PS1_DEFAULTS.prefix) {
+  const rootFiles = [], folders = new Map();
+  for (const source of objects) {
+    const key = source?.key;
+    if (!safeObjectKey(key, prefix)) continue;
+    const extension = extensionOf(key);
+    if (!PS1_BOOT_EXTENSIONS.has(extension) && !PS1_AUX_EXTENSIONS.has(extension) && !PS1_COVER_EXTENSIONS.has(extension)) continue;
+    const object = {key, extension, size: Number(source.size) || 0, lastModified: source.lastModified || null};
+    const relative = key.slice(prefix.length), slash = relative.indexOf('/');
+    if (slash < 0) rootFiles.push(object);
+    else {
+      const root = relative.slice(0, slash);
+      if (!folders.has(root)) folders.set(root, []);
+      folders.get(root).push(object);
+    }
+  }
+  const candidates = [], consumedRoot = new Set();
+  for (const object of rootFiles.filter(item => PS1_BOOT_EXTENSIONS.has(item.extension) && item.extension !== 'bin')) {
+    const stem = object.key.replace(/\.[^.]+$/, '').toLocaleLowerCase('pt-BR');
+    const related = rootFiles.filter(item => item === object || ((PS1_AUX_EXTENSIONS.has(item.extension) || PS1_COVER_EXTENSIONS.has(item.extension)) && item.key.replace(/\.[^.]+$/, '').toLocaleLowerCase('pt-BR') === stem));
+    related.forEach(item => consumedRoot.add(item));
+    candidates.push({name: friendlyName(object.key.split('/').pop()), type: 'single', objects: related, boot: object});
+  }
+  for (const object of rootFiles.filter(item => item.extension === 'bin' && !consumedRoot.has(item))) candidates.push({name: friendlyName(object.key.split('/').pop()), type: 'single', objects: [object], boot: object});
+  for (const [name, folderObjects] of folders) {
+    const boot = [...folderObjects].filter(object => PS1_BOOT_EXTENSIONS.has(object.extension)).sort((a, b) => PS1_BOOT_PRIORITY.indexOf(a.extension) - PS1_BOOT_PRIORITY.indexOf(b.extension) || a.key.localeCompare(b.key, 'pt-BR'))[0];
+    if (boot) candidates.push({name, type: 'folder', objects: folderObjects, boot});
+  }
+  const usedIds = new Map();
+  return candidates.map(candidate => {
+    const base = ps1Slug(candidate.name), count = (usedIds.get(base) || 0) + 1; usedIds.set(base, count);
+    const files = candidate.objects.filter(object => PS1_BOOT_EXTENSIONS.has(object.extension) || PS1_AUX_EXTENSIONS.has(object.extension)).sort((a, b) => a.key.localeCompare(b.key, 'pt-BR'));
+    const hasBin = files.some(file => file.extension === 'bin');
+    const format = candidate.boot.extension === 'cue' && hasBin ? 'cue+bin' : candidate.boot.extension;
+    const coverKey = candidate.type === 'folder' ? chooseCover(candidate.objects, candidate.name) : null;
+    return {id: count === 1 ? base : `${base}-${count}`, name: candidate.name, type: candidate.type, format, bootKey: candidate.boot.key, key: candidate.boot.key, coverKey, coverUrl: coverKey ? `/api/emulators/ps1/cover/${encodeURIComponent(coverKey)}` : null, files: files.map(file => ({key: file.key, type: fileKind(file.extension), size: file.size})), size: files.reduce((total, file) => total + file.size, 0), lastModified: files.map(file => file.lastModified).filter(Boolean).sort().at(-1) || null};
+  }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+function validPs1Key(key, prefix, extensions) {
+  return safeObjectKey(key, prefix) && extensions.includes(extensionOf(key));
 }
 
 async function listPs1Games(config, emulator) {
   console.log('[PS1-B2] listing bucket');
   console.log(`[PS1-B2] bucket=${config.bucket}`);
   console.log(`[PS1-B2] prefix=${config.prefix}`);
-  const games = [];
+  const objects = [];
   let continuationToken = '';
   do {
     const params = [['list-type', '2'], ['prefix', config.prefix]];
@@ -199,20 +275,20 @@ async function listPs1Games(config, emulator) {
     const xml = await response.text();
     for (const content of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
       const key = decodeXml(content[1].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || '');
-      if (!validPs1Key(key, config.prefix, emulator.romExtensions)) continue;
-      const filename = key.split('/').pop();
-      games.push({key, name: friendlyName(filename), format: filename.split('.').pop().toLowerCase(), size: Number(content[1].match(/<Size>(\d+)<\/Size>/)?.[1] || 0), lastModified: content[1].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1] || null});
+      if (!safeObjectKey(key, config.prefix)) continue;
+      objects.push({key, size: Number(content[1].match(/<Size>(\d+)<\/Size>/)?.[1] || 0), lastModified: content[1].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1] || null});
     }
     continuationToken = decodeXml(xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] || '');
   } while (continuationToken);
-  console.log(`[PS1-B2] result count=${games.length}`);
-  if (!games.length) {
+  const games = normalizePs1Library(objects, config.prefix);
+  console.log(`[PS1-B2] object count=${objects.length}; game count=${games.length}`);
+  if (!objects.length) {
     const probe = await signedB2Fetch(config, 'GET', '', [['list-type', '2'], ['max-keys', '1']]);
     if (!probe.ok) throw await b2Failure(probe);
     const probeXml = await probe.text();
     if (/<Contents>/.test(probeXml)) throw new B2Error('wrong_prefix', 404, 'PrefixNotFound', `Nenhum jogo encontrado no prefixo ${config.prefix}`);
   }
-  return games.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  return games;
 }
 
 async function findGame(env, emulator, slug) {
@@ -354,7 +430,7 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
     const key = new URL(request.url).searchParams.get('game') || '';
     const emulator = findEmulator('ps1');
     if (!hasB2Config(env, 'ps1')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
-    if (!validPs1Key(key, config.prefix, emulator.romExtensions)) return json({error: 'Arquivo não encontrado.'}, 404);
+    if (!safeObjectKey(key, config.prefix) || (!PS1_BOOT_EXTENSIONS.has(extensionOf(key)) && !PS1_AUX_EXTENSIONS.has(extensionOf(key)))) return json({error: 'Arquivo não encontrado.'}, 404);
     return json({url: await presignedB2Url(config, key), expiresIn: PS1_SIGNED_URL_TTL, method: 'GET'}, 200, {'Cache-Control': 'no-store'});
   }
   const gamesMatch = pathname.match(/^\/api\/emulators\/([^/]+)\/games$/);
@@ -366,7 +442,10 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
       if (emulator.id === 'ps1' && String(env.PS1_DIAGNOSTIC_MODE).toLowerCase() === 'true') payload.diagnostic = 'credentials_not_configured';
       return json(payload, 503);
     }
-    try { return json({emulator: emulator.id, games: await listGames(env, emulator)}, 200, {'Cache-Control': PUBLIC_CACHE}); }
+    try {
+      const refresh = new URL(request.url).searchParams.get('refresh') === '1';
+      return json({emulator: emulator.id, games: await listGames(env, emulator)}, 200, {'Cache-Control': refresh ? 'no-store' : PUBLIC_CACHE});
+    }
     catch (error) {
       if (emulator.id === 'ps1') safeB2Log(b2Config(env, 'ps1'), error);
       else console.error('B2 listing failure', error);
@@ -375,6 +454,24 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
       return json(payload, 503);
     }
   }
+  const ps1CoverMatch = pathname.match(/^\/api\/emulators\/ps1\/cover\/(.+)$/);
+  if (ps1CoverMatch) {
+    let key;
+    try { key = decodeURIComponent(ps1CoverMatch[1]); } catch { return json({error: 'Capa inválida.'}, 400); }
+    const config = b2Config(env, 'ps1');
+    if (!hasB2Config(env, 'ps1')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
+    if (!safeObjectKey(key, config.prefix) || !PS1_COVER_EXTENSIONS.has(extensionOf(key))) return json({error: 'Capa não encontrada.'}, 404);
+    try {
+      const response = await signedB2Fetch(config, request.method, key);
+      if (response.status === 404) return json({error: 'Capa não encontrada.'}, 404);
+      const headers = new Headers(response.headers);
+      const types = {jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp'};
+      headers.set('Content-Type', types[extensionOf(key)]);
+      headers.set('Cache-Control', PS1_COVER_CACHE);
+      headers.set('X-Content-Type-Options', 'nosniff');
+      return new Response(request.method === 'HEAD' ? null : response.body, {status: response.status, headers});
+    } catch (error) { console.error('B2 cover failure', error); return json({error: 'Capa temporariamente indisponível.'}, 503); }
+  }
   const ps1FileMatch = pathname.match(/^\/api\/emulators\/ps1\/file\/(.+)$/);
   if (ps1FileMatch) {
     const emulator = findEmulator('ps1');
@@ -382,7 +479,7 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
     try { key = decodeURIComponent(ps1FileMatch[1]); } catch { return json({error: 'Arquivo inválido.'}, 400); }
     const config = b2Config(env, 'ps1');
     if (!hasB2Config(env, 'ps1')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
-    if (!validPs1Key(key, config.prefix, emulator.romExtensions)) return json({error: 'Arquivo não encontrado.'}, 404);
+    if (!safeObjectKey(key, config.prefix) || (!PS1_BOOT_EXTENSIONS.has(extensionOf(key)) && !PS1_AUX_EXTENSIONS.has(extensionOf(key)))) return json({error: 'Arquivo não encontrado.'}, 404);
     const finishTrace = beginPs1Trace(env, key, request);
     const headers = request.headers.has('Range') ? {Range: request.headers.get('Range')} : {};
     try {

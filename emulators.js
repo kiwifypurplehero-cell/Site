@@ -1,5 +1,5 @@
 import {findEmulator} from './emulator-registry.js';
-import {inspectPs1File, ps1StreamUrl} from './ps1-utils.js';
+import {inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
 
 const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'ps2']);
 const VIEW_TITLES = {
@@ -158,7 +158,8 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 ** exponent).toLocaleString('pt-BR', {maximumFractionDigits: 1})} ${units[exponent - 1]}`;
 }
 
-async function loadPs1Library() {
+async function loadPs1Library({refresh = false} = {}) {
+  if (refresh) ps1LibraryPromise = undefined;
   if (ps1LibraryPromise) return ps1LibraryPromise;
   const status = document.querySelector('#ps1-games-status');
   const list = document.querySelector('#ps1-rom-list');
@@ -166,18 +167,22 @@ async function loadPs1Library() {
   status.textContent = 'Carregando biblioteca PS1...';
   ps1LibraryPromise = (async () => {
     try {
-      const response = await fetch('/api/emulators/ps1/games');
+      const response = await fetch(`/api/emulators/ps1/games${refresh ? '?refresh=1' : ''}`, {cache: refresh ? 'no-store' : 'default'});
       const payload = await response.json();
       if (!response.ok) throw new Error(`${payload.error || 'Não foi possível acessar a biblioteca PS1.'}${payload.diagnostic ? ` (${payload.diagnostic})` : ''}`);
       PS1EmulatorState.libraryLoaded = true;
       status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo PS1 publicado ainda.';
       list.replaceChildren(...payload.games.map(game => {
-        const card = document.createElement('article'); card.className = 'rom-card';
+        const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
+        const cover = game.coverUrl ? document.createElement('img') : document.createElement('div');
+        cover.className = 'ps1-rom-cover';
+        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; }
+        else { cover.textContent = 'P'; cover.setAttribute('aria-label', 'Capa padrão da PlumpGames'); }
         const details = document.createElement('div');
         const title = document.createElement('strong'); title.textContent = game.name;
         const metadata = document.createElement('small'); metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`;
         const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar';
-        play.addEventListener('click', () => startPs1(game)); details.append(title, metadata); card.append(details, play); return card;
+        play.addEventListener('click', () => startPs1(game)); details.append(title, metadata); card.append(cover, details, play); return card;
       }));
     } catch (error) {
       PS1EmulatorState.libraryLoaded = false;
@@ -245,7 +250,8 @@ async function startPs1(game) {
   document.querySelector('#ps1-diagnostics').hidden = !new URL(location.href).searchParams.has('debug');
   setPs1Loading('Preparando emulador...');
   startPs1LayoutDiagnostics(attempt);
-  const gameUrl = ps1StreamUrl(game);
+  const launch = resolvePs1Launch(game);
+  const gameUrl = launch.bootUrl;
   const loadStarted = performance.now();
   let observedRequests = 0, observedBytes = 0;
   const updatePerformance = () => {
@@ -265,7 +271,8 @@ async function startPs1(game) {
     ps1PerformanceObserver.observe({type: 'resource', buffered: true});
   }
   updatePerformance();
-  console.log('[PS1] key:', game.key);
+  console.log('[PS1] boot key:', game.bootKey || game.key);
+  console.log('[PS1] dependencies:', launch.dependencies.map(file => file.key));
   console.log('[PS1] gameUrl:', gameUrl);
   window.EJS_player = '#ps1-emulator';
   window.EJS_core = document.querySelector('#ps1-core').value || 'psx';
@@ -324,6 +331,7 @@ document.addEventListener('click', event => {
 window.addEventListener('popstate', () => setView(requestedView(), {historyMode: 'none'}));
 document.querySelector('[data-ps1-back]')?.addEventListener('click', () => { stopPs1(); setView('emulators'); });
 document.querySelectorAll('[data-ps1-close]').forEach(control => control.addEventListener('click', () => stopPs1()));
+document.querySelector('#ps1-refresh-library')?.addEventListener('click', () => loadPs1Library({refresh: true}));
 document.querySelector('#ps1-retry')?.addEventListener('click', () => PS1EmulatorState.selectedGame && startPs1(PS1EmulatorState.selectedGame));
 document.querySelector('#ps1-fullscreen')?.addEventListener('click', () => document.querySelector('#ps1-player-panel')?.requestFullscreen?.());
 document.querySelector('#ps1-restart')?.addEventListener('click', () => { try { window.EJS_emulator?.restart?.(); } catch (error) { failPs1(error); } });
