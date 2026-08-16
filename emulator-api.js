@@ -41,7 +41,20 @@ async function hmac(key, value) {
 }
 
 function encodePath(path) {
-  return path.split('/').map(part => encodeURIComponent(part)).join('/');
+  return path.split('/').map(awsEncode).join('/');
+}
+
+// AWS SigV4 uses RFC 3986 encoding (encodeURIComponent leaves !'()* unescaped).
+function awsEncode(value) {
+  return encodeURIComponent(String(value)).replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function canonicalQuery(parameters = []) {
+  return parameters
+    .map(([name, value]) => [awsEncode(name), awsEncode(value)])
+    .sort(([leftName, leftValue], [rightName, rightValue]) => leftName < rightName ? -1 : leftName > rightName ? 1 : leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0)
+    .map(([name, value]) => `${name}=${value}`)
+    .join('&');
 }
 
 function b2Config(env, emulatorId) {
@@ -55,7 +68,7 @@ function b2Config(env, emulatorId) {
   return {endpoint: env.B2_ENDPOINT, bucket: env.B2_BUCKET, prefix: env.B2_PS2_PREFIX || DEFAULT_PREFIX, accessKeyId: env.B2_ACCESS_KEY_ID, secretAccessKey: env.B2_SECRET_ACCESS_KEY};
 }
 
-async function signedB2Fetch(config, method, key = '', query = '', requestHeaders = {}) {
+async function signedB2Fetch(config, method, key = '', queryParameters = [], requestHeaders = {}) {
   const endpoint = new URL(config.endpoint);
   const regionMatch = endpoint.hostname.match(/^s3\.([^.]+)\.backblazeb2\.com$/);
   const region = regionMatch?.[1];
@@ -64,7 +77,8 @@ async function signedB2Fetch(config, method, key = '', query = '', requestHeader
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
   const date = amzDate.slice(0, 8);
-  const pathname = `/${encodeURIComponent(config.bucket)}/${encodePath(key)}`;
+  const pathname = `/${awsEncode(config.bucket)}/${encodePath(key)}`;
+  const query = canonicalQuery(queryParameters);
   const url = new URL(pathname + (query ? `?${query}` : ''), endpoint);
   const headers = new Headers(requestHeaders);
   headers.set('host', endpoint.host);
@@ -89,23 +103,29 @@ function decodeXml(value) {
   return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 }
 
-async function b2Failure(response) {
-  const body = await response.text();
+export function parseB2Error(response, body) {
   const code = decodeXml(body.match(/<Code>([^<]*)<\/Code>/)?.[1] || 'UnknownError');
   const message = decodeXml(body.match(/<Message>([^<]*)<\/Message>/)?.[1] || `HTTP ${response.status}`);
+  const requestId = decodeXml(body.match(/<RequestId>([^<]*)<\/RequestId>/i)?.[1] || response.headers.get('x-amz-request-id') || response.headers.get('x-bz-request-id') || '');
   const kind = response.status === 401 || response.status === 403
     ? (code === 'InvalidAccessKeyId' || code === 'SignatureDoesNotMatch' ? 'invalid_credentials' : 'bucket_inaccessible')
     : 'bucket_inaccessible';
-  console.error('[PS1-B2] error', {status: response.status, code, message});
-  return new B2Error(kind, response.status, code, message);
+  const statusText = response.statusText?.trim() || '';
+  const error = new B2Error(kind, response.status, code, `Backblaze B2 respondeu ${response.status}${statusText ? ` ${statusText}` : ''} ${code}: ${message}`);
+  error.statusText = statusText;
+  error.requestId = requestId;
+  return error;
+}
+
+async function b2Failure(response) {
+  return parseB2Error(response, await response.text());
 }
 
 async function listGames(env, emulator) {
   const config = b2Config(env, emulator.id);
   const prefix = config.prefix;
   if (emulator.id === 'ps1') return listPs1Games(config, emulator);
-  const query = new URLSearchParams({'list-type': '2', prefix}).toString();
-  const response = await signedB2Fetch(config, 'GET', '', query);
+  const response = await signedB2Fetch(config, 'GET', '', [['list-type', '2'], ['prefix', prefix]]);
   if (!response.ok) throw new Error(`Backblaze B2 respondeu ${response.status}.`);
   const xml = await response.text();
   const games = new Map();
@@ -140,9 +160,9 @@ async function listPs1Games(config, emulator) {
   const games = [];
   let continuationToken = '';
   do {
-    const params = new URLSearchParams({'list-type': '2', prefix: config.prefix});
-    if (continuationToken) params.set('continuation-token', continuationToken);
-    const response = await signedB2Fetch(config, 'GET', '', params.toString());
+    const params = [['list-type', '2'], ['prefix', config.prefix]];
+    if (continuationToken) params.push(['continuation-token', continuationToken]);
+    const response = await signedB2Fetch(config, 'GET', '', params);
     if (!response.ok) throw await b2Failure(response);
     const xml = await response.text();
     for (const content of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
@@ -155,8 +175,7 @@ async function listPs1Games(config, emulator) {
   } while (continuationToken);
   console.log(`[PS1-B2] result count=${games.length}`);
   if (!games.length) {
-    const probeParams = new URLSearchParams({'list-type': '2', 'max-keys': '1'});
-    const probe = await signedB2Fetch(config, 'GET', '', probeParams.toString());
+    const probe = await signedB2Fetch(config, 'GET', '', [['list-type', '2'], ['max-keys', '1']]);
     if (!probe.ok) throw await b2Failure(probe);
     const probeXml = await probe.text();
     if (/<Contents>/.test(probeXml)) throw new B2Error('wrong_prefix', 404, 'PrefixNotFound', `Nenhum jogo encontrado no prefixo ${config.prefix}`);
@@ -188,22 +207,46 @@ function hasB2Config(env, emulatorId) {
   return Boolean(config.endpoint && config.bucket && config.accessKeyId && config.secretAccessKey);
 }
 
+function safeB2Log(config, error) {
+  let message = error instanceof Error ? error.message : String(error);
+  for (const secret of [config.accessKeyId, config.secretAccessKey]) if (secret) message = message.split(secret).join('[REDACTED]');
+  console.error(JSON.stringify({message: 'B2 listing failure', emulator: 'ps1', endpoint: safeEndpoint(config.endpoint), bucket: config.bucket, prefix: config.prefix, error: message}));
+}
+
+function safeEndpoint(endpoint) {
+  try { return new URL(endpoint).origin; } catch { return 'invalid_endpoint'; }
+}
+
 export async function emulatorApi(request, env, pathname = new URL(request.url).pathname) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({error: 'Método não permitido.'}, 405, {Allow: 'GET, HEAD'});
   if (pathname === '/api/emulators') return json({emulators: EMULATORS.map(({romExtensions, coreExtensions, ...item}) => item)}, 200, {'Cache-Control': PUBLIC_CACHE});
+  if (pathname === '/api/emulators/ps1/diagnostics') {
+    const config = b2Config(env, 'ps1');
+    const diagnostic = {endpoint: safeEndpoint(config.endpoint), bucket: config.bucket, prefix: config.prefix, hasAccessKeyId: Boolean(config.accessKeyId), hasSecretAccessKey: Boolean(config.secretAccessKey)};
+    if (!hasB2Config(env, 'ps1')) return json({...diagnostic, status: 'error', code: 'NotConfigured'}, 503);
+    try {
+      const response = await signedB2Fetch(config, 'GET', '', [['list-type', '2'], ['max-keys', '1'], ['prefix', config.prefix]]);
+      if (!response.ok) throw await b2Failure(response);
+      return json({...diagnostic, status: 'ok'});
+    } catch (error) {
+      safeB2Log(config, error);
+      return json({...diagnostic, status: 'error', code: error instanceof B2Error ? error.code : 'RequestFailed'}, 503);
+    }
+  }
   const gamesMatch = pathname.match(/^\/api\/emulators\/([^/]+)\/games$/);
   if (gamesMatch) {
     const emulator = findEmulator(gamesMatch[1]);
     if (!emulator) return json({error: 'Emulador não encontrado.'}, 404);
     if (!hasB2Config(env, emulator.id)) {
-      const payload = {error: emulator.id === 'ps1' ? 'Não foi possível acessar a biblioteca PS1.' : 'Biblioteca de jogos não configurada.'};
+      const payload = {error: emulator.id === 'ps1' ? 'Biblioteca temporariamente indisponível.' : 'Biblioteca de jogos não configurada.'};
       if (emulator.id === 'ps1' && String(env.PS1_DIAGNOSTIC_MODE).toLowerCase() === 'true') payload.diagnostic = 'credentials_not_configured';
       return json(payload, 503);
     }
     try { return json({emulator: emulator.id, games: await listGames(env, emulator)}, 200, {'Cache-Control': PUBLIC_CACHE}); }
     catch (error) {
-      if (emulator.id !== 'ps1') console.error('B2 listing failure', error);
-      const payload = {error: emulator.id === 'ps1' ? 'Não foi possível acessar a biblioteca PS1.' : 'Biblioteca temporariamente indisponível.'};
+      if (emulator.id === 'ps1') safeB2Log(b2Config(env, 'ps1'), error);
+      else console.error('B2 listing failure', error);
+      const payload = {error: 'Biblioteca temporariamente indisponível.'};
       if (emulator.id === 'ps1' && String(env.PS1_DIAGNOSTIC_MODE).toLowerCase() === 'true') payload.diagnostic = error.kind || 'request_failed';
       return json(payload, 503);
     }
@@ -218,7 +261,7 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
     if (!validPs1Key(key, config.prefix, emulator.romExtensions)) return json({error: 'Arquivo não encontrado.'}, 404);
     const headers = request.headers.has('Range') ? {Range: request.headers.get('Range')} : {};
     try {
-      const response = await signedB2Fetch(config, request.method, key, '', headers);
+      const response = await signedB2Fetch(config, request.method, key, [], headers);
       if (response.status === 404) return json({error: 'Arquivo não encontrado.'}, 404);
       return b2Response(response, request);
     } catch (error) { console.error('B2 stream failure', error); return json({error: 'Arquivo temporariamente indisponível.'}, 503); }
@@ -233,7 +276,7 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
   if (!found) return json({error: 'Jogo não encontrado.'}, 404);
   if (request.method === 'HEAD') return b2Response(found.response, request);
   const headers = request.headers.has('Range') ? {Range: request.headers.get('Range')} : {};
-  const response = await signedB2Fetch(b2Config(env, emulator.id), 'GET', found.key, '', headers);
+  const response = await signedB2Fetch(b2Config(env, emulator.id), 'GET', found.key, [], headers);
   if (response.status === 404) return json({error: 'Jogo não encontrado.'}, 404);
   return b2Response(response, request);
 }
