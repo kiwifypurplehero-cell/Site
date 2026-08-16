@@ -18,6 +18,91 @@ export function resolvePs1Launch(game) {
   return {bootUrl: ps1StreamUrl(game), format: game.format, dependencies, coverUrl: game.coverUrl || null};
 }
 
+const encoder = new TextEncoder();
+
+function crc32Table() {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
+    table[index] = value >>> 0;
+  }
+  return table;
+}
+
+const CRC32_TABLE = crc32Table();
+
+async function blobCrc32(blob) {
+  let crc = 0xffffffff;
+  for await (const chunk of blob.stream()) {
+    for (const byte of chunk) crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ byte) & 0xff];
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipHeader(length, signature) {
+  const bytes = new Uint8Array(length);
+  new DataView(bytes.buffer).setUint32(0, signature, true);
+  return {bytes, view: new DataView(bytes.buffer)};
+}
+
+function archivePath(key, directory) {
+  const decoded = decodePs1Key(key).replace(/^\/+/, '');
+  return decoded.startsWith(directory) ? decoded.slice(directory.length) : decoded.split('/').pop();
+}
+
+/** Build a store-only ZIP without copying the large BIN into another ArrayBuffer. */
+export async function createPs1Archive(files) {
+  if (!files.length) throw new TypeError('O conjunto de arquivos PS1 está vazio.');
+  const bootKey = decodePs1Key(files[0].key);
+  const slash = bootKey.lastIndexOf('/');
+  const directory = slash < 0 ? '' : bootKey.slice(0, slash + 1);
+  const parts = [];
+  const central = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = encoder.encode(archivePath(file.key, directory));
+    const size = file.blob.size;
+    if (size > 0xffffffff || offset > 0xffffffff) throw new RangeError('Arquivo PS1 grande demais para o contêiner ZIP.');
+    const crc = await blobCrc32(file.blob);
+    const local = zipHeader(30, 0x04034b50);
+    local.view.setUint16(4, 20, true); local.view.setUint16(6, 0x0800, true);
+    local.view.setUint32(14, crc, true); local.view.setUint32(18, size, true); local.view.setUint32(22, size, true);
+    local.view.setUint16(26, name.length, true);
+    parts.push(local.bytes, name, file.blob);
+
+    const entry = zipHeader(46, 0x02014b50);
+    entry.view.setUint16(4, 20, true); entry.view.setUint16(6, 20, true); entry.view.setUint16(8, 0x0800, true);
+    entry.view.setUint32(16, crc, true); entry.view.setUint32(20, size, true); entry.view.setUint32(24, size, true);
+    entry.view.setUint16(28, name.length, true); entry.view.setUint32(42, offset, true);
+    central.push(entry.bytes, name);
+    offset += local.bytes.length + name.length + size;
+  }
+
+  const centralSize = central.reduce((total, part) => total + part.length, 0);
+  const end = zipHeader(22, 0x06054b50);
+  end.view.setUint16(8, files.length, true); end.view.setUint16(10, files.length, true);
+  end.view.setUint32(12, centralSize, true); end.view.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.bytes], {type: 'application/zip'});
+}
+
+export async function downloadPs1Archive(game, {fetchImpl = fetch, onProgress} = {}) {
+  const launch = resolvePs1Launch(game);
+  if (!launch.dependencies.length) return {...launch, gameUrl: launch.bootUrl, archive: null};
+  const sources = [{key: game.bootKey || game.key, url: launch.bootUrl}, ...launch.dependencies];
+  const files = [];
+  for (let index = 0; index < sources.length; index += 1) {
+    const source = sources[index];
+    onProgress?.(index, sources.length, source.key);
+    const response = await fetchImpl(source.url);
+    if (!response.ok) throw new Error(`Não foi possível baixar ${decodePs1Key(source.key).split('/').pop()} (HTTP ${response.status}).`);
+    files.push({key: source.key, blob: await response.blob()});
+  }
+  const archive = await createPs1Archive(files);
+  return {...launch, gameUrl: URL.createObjectURL(archive), archive};
+}
+
 function fetchFailure(error) {
   if (error?.name === 'AbortError') return {kind: 'abort', message: 'A verificação do arquivo foi cancelada ou excedeu o tempo limite.'};
   if (error instanceof TypeError) return {kind: 'network-or-cors', message: 'O navegador não concluiu a verificação (rede ou CORS).'};
