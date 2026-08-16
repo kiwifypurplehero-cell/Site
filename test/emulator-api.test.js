@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emulatorApi} from '../emulator-api.js';
+import {emulatorApi, parseB2Error} from '../emulator-api.js';
 
 const ps1Env = {B2_PS1_ACCESS_KEY_ID: 'test-id', B2_PS1_SECRET_ACCESS_KEY: 'test-secret'};
 
@@ -14,7 +14,52 @@ test('não expõe chaves internas no catálogo de emuladores', async () => {
 test('exige os secrets PS1 do Backblaze B2 para acessar a biblioteca', async () => {
   const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), {});
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), {error: 'Não foi possível acessar a biblioteca PS1.'});
+  assert.deepEqual(await response.json(), {error: 'Biblioteca temporariamente indisponível.'});
+});
+
+test('diagnóstico informa configuração sem revelar os valores das chaves', async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (request, init) => {
+    const url = new URL(String(request));
+    assert.equal(url.pathname, '/plumpgames-storage-ps1/');
+    assert.equal(url.search, '?list-type=2&max-keys=1&prefix=Jogos%2F');
+    assert.match(init.headers.get('Authorization'), /^AWS4-HMAC-SHA256 Credential=test-id\/\d{8}\/us-east-005\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[a-f0-9]{64}$/);
+    assert.equal(init.headers.get('x-amz-content-sha256'), 'UNSIGNED-PAYLOAD');
+    return new Response('<ListBucketResult/>');
+  };
+  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/diagnostics'), ps1Env);
+  const body = await response.json();
+  assert.deepEqual(body, {endpoint: 'https://s3.us-east-005.backblazeb2.com', bucket: 'plumpgames-storage-ps1', prefix: 'Jogos/', hasAccessKeyId: true, hasSecretAccessKey: true, status: 'ok'});
+  assert.doesNotMatch(JSON.stringify(body), /test-id|test-secret/);
+});
+
+for (const [status, code] of [[400, 'SignatureDoesNotMatch'], [403, 'AccessDenied'], [401, 'InvalidAccessKeyId']]) {
+  test(`extrai erro XML ${status} ${code} e mantém a resposta pública genérica`, async t => {
+    const originalFetch = globalThis.fetch;
+    const originalError = console.error;
+    const logs = [];
+    t.after(() => { globalThis.fetch = originalFetch; console.error = originalError; });
+    console.error = value => logs.push(String(value));
+    globalThis.fetch = async () => new Response(`<Error><Code>${code}</Code><Message>failure test-id test-secret</Message><RequestId>request-123</RequestId></Error>`, {status, statusText: 'B2 failure'});
+    const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), ps1Env);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {error: 'Biblioteca temporariamente indisponível.'});
+    const log = JSON.parse(logs.at(-1));
+    assert.equal(log.message, 'B2 listing failure');
+    assert.match(log.error, new RegExp(`${status} B2 failure ${code}`));
+    assert.doesNotMatch(logs.join('\n'), /test-id|test-secret|Authorization|Signature=/);
+  });
+}
+
+test('parseB2Error preserva metadados seguros do erro Backblaze', () => {
+  const response = new Response('', {status: 403, statusText: 'Forbidden', headers: {'x-amz-request-id': 'header-request-id'}});
+  const error = parseB2Error(response, '<Error><Code>AccessDenied</Code><Message>not authorized</Message></Error>');
+  assert.equal(error.status, 403);
+  assert.equal(error.statusText, 'Forbidden');
+  assert.equal(error.code, 'AccessDenied');
+  assert.equal(error.requestId, 'header-request-id');
+  assert.equal(error.message, 'Backblaze B2 respondeu 403 Forbidden AccessDenied: not authorized');
 });
 
 test('não aceita secrets PS2 no endpoint PS1', async () => {
