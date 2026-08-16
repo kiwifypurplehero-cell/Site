@@ -18,6 +18,26 @@ export function resolvePs1Launch(game) {
   return {bootUrl: ps1StreamUrl(game), format: game.format, dependencies, coverUrl: game.coverUrl || null};
 }
 
+export class Ps1LibraryError extends Error {
+  constructor(code, message) { super(message); this.name = 'Ps1LibraryError'; this.code = code; }
+}
+
+/** Resolve an opaque public game id through the library; storage keys never enter the page URL. */
+export async function fetchPs1Game(gameId, {fetchImpl = fetch} = {}) {
+  if (!gameId) throw new Ps1LibraryError('missing', 'Jogo não especificado');
+  let response;
+  try { response = await fetchImpl('/api/emulators/ps1/games'); }
+  catch { throw new Ps1LibraryError('unavailable', 'Biblioteca temporariamente indisponível'); }
+  if (!response?.ok) throw new Ps1LibraryError('unavailable', 'Biblioteca temporariamente indisponível');
+  let payload;
+  try { payload = await response.json(); }
+  catch { throw new Ps1LibraryError('unavailable', 'Biblioteca temporariamente indisponível'); }
+  if (!Array.isArray(payload?.games)) throw new Ps1LibraryError('unavailable', 'Biblioteca temporariamente indisponível');
+  const game = payload.games.find(item => item?.id === gameId);
+  if (!game) throw new Ps1LibraryError('not-found', 'Jogo não encontrado');
+  return {game, count: payload.games.length};
+}
+
 const encoder = new TextEncoder();
 
 function crc32Table() {

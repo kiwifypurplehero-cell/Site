@@ -100,10 +100,22 @@ test('scanner normaliza raiz, pastas, prioridade, capas e multidisc sem duplicar
   const multidisc = games.find(game => game.id === 'resident-evil-2');
   assert.match(multidisc.bootKey, /\.m3u$/); assert.equal(multidisc.files.length, 3);
   assert.equal(games.filter(game => game.name === 'Gran Turismo').length, 1);
+  assert.equal(games.find(game => game.name === 'Gran Turismo').id, 'gran-turismo');
   assert.ok(games.some(game => game.name === 'Final Fantasy (Edição Áurea)'));
   assert.ok(games.some(game => game.format === 'chd'));
   assert.equal(games.some(game => game.name === 'folder'), false);
   assert.equal(JSON.stringify(games).includes('segredo'), false);
+});
+
+test('ids com caracteres especiais são seguros e colisões não dependem da ordem da lista', () => {
+  const objects = [
+    {key: 'Jogos/Áção & Aventura!.iso', size: 1},
+    {key: 'Jogos/Ação @ Aventura.iso', size: 1}
+  ];
+  const first = normalizePs1Library(objects).map(game => [game.bootKey, game.id]).sort();
+  const reversed = normalizePs1Library([...objects].reverse()).map(game => [game.bootKey, game.id]).sort();
+  assert.deepEqual(first, reversed);
+  for (const [, id] of first) assert.match(id, /^[a-z0-9-]+$/);
 });
 
 test('listagem usa somente ListObjects e devolve jogos normalizados', async t => {

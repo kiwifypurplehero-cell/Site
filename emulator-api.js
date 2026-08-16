@@ -217,6 +217,12 @@ function chooseCover(objects, gameName) {
   })[0].key;
 }
 
+function stableIdSuffix(value) {
+  let hash = 2166136261;
+  for (const character of String(value).normalize('NFC')) { hash ^= character.codePointAt(0); hash = Math.imul(hash, 16777619); }
+  return (hash >>> 0).toString(36).slice(0, 7);
+}
+
 /** Normaliza exclusivamente metadados do ListObjects; nenhum conteúdo de ROM é lido. */
 export function normalizePs1Library(objects, prefix = PS1_DEFAULTS.prefix) {
   const rootFiles = [], folders = new Map();
@@ -246,14 +252,16 @@ export function normalizePs1Library(objects, prefix = PS1_DEFAULTS.prefix) {
     const boot = [...folderObjects].filter(object => PS1_BOOT_EXTENSIONS.has(object.extension)).sort((a, b) => PS1_BOOT_PRIORITY.indexOf(a.extension) - PS1_BOOT_PRIORITY.indexOf(b.extension) || a.key.localeCompare(b.key, 'pt-BR'))[0];
     if (boot) candidates.push({name, type: 'folder', objects: folderObjects, boot});
   }
-  const usedIds = new Map();
+  const idCounts = candidates.reduce((counts, candidate) => {
+    const base = ps1Slug(candidate.name); counts.set(base, (counts.get(base) || 0) + 1); return counts;
+  }, new Map());
   return candidates.map(candidate => {
-    const base = ps1Slug(candidate.name), count = (usedIds.get(base) || 0) + 1; usedIds.set(base, count);
+    const base = ps1Slug(candidate.name);
     const files = candidate.objects.filter(object => PS1_BOOT_EXTENSIONS.has(object.extension) || PS1_AUX_EXTENSIONS.has(object.extension)).sort((a, b) => a.key.localeCompare(b.key, 'pt-BR'));
     const hasBin = files.some(file => file.extension === 'bin');
     const format = candidate.boot.extension === 'cue' && hasBin ? 'cue+bin' : candidate.boot.extension;
     const coverKey = candidate.type === 'folder' ? chooseCover(candidate.objects, candidate.name) : null;
-    return {id: count === 1 ? base : `${base}-${count}`, name: candidate.name, type: candidate.type, format, bootKey: candidate.boot.key, key: candidate.boot.key, coverKey, coverUrl: coverKey ? `/api/emulators/ps1/cover/${encodeURIComponent(coverKey)}` : null, files: files.map(file => ({key: file.key, type: fileKind(file.extension), size: file.size})), size: files.reduce((total, file) => total + file.size, 0), lastModified: files.map(file => file.lastModified).filter(Boolean).sort().at(-1) || null};
+    return {id: idCounts.get(base) === 1 ? base : `${base}-${stableIdSuffix(candidate.boot.key)}`, name: candidate.name, type: candidate.type, format, bootKey: candidate.boot.key, key: candidate.boot.key, coverKey, coverUrl: coverKey ? `/api/emulators/ps1/cover/${encodeURIComponent(coverKey)}` : null, files: files.map(file => ({key: file.key, type: fileKind(file.extension), size: file.size})), size: files.reduce((total, file) => total + file.size, 0), lastModified: files.map(file => file.lastModified).filter(Boolean).sort().at(-1) || null};
   }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
