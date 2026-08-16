@@ -4,8 +4,7 @@ export const EMULATORS = Object.freeze([
     id: 'ps2',
     name: 'PlayStation 2',
     shortName: 'PS2',
-    description: 'Biblioteca de jogos PS2 armazenada de forma privada no Cloudflare R2.',
-    objectPrefix: 'emulators/ps2/games/',
+    description: 'Biblioteca de jogos PS2 armazenada de forma privada no Backblaze B2.',
     romExtensions: Object.freeze(['iso', 'bin', 'chd']),
     core: Object.freeze({status: 'pending', moduleUrl: '/cores/ps2/core.js', wasmUrl: '/cores/ps2/core.wasm'})
   })
