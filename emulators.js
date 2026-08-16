@@ -1,4 +1,5 @@
 import {findEmulator} from './emulator-registry.js';
+import {inspectPs1File, ps1StreamUrl} from './ps1-utils.js';
 
 const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'ps2']);
 const VIEW_TITLES = {
@@ -137,10 +138,6 @@ async function loadPs1Library() {
   return ps1LibraryPromise;
 }
 
-function ps1StreamUrl(game) {
-  return `/api/emulators/ps1/file/${game.key.split('/').map(encodeURIComponent).join('/')}`;
-}
-
 function setPs1Loading(message) {
   const loading = document.querySelector('#ps1-loading');
   PS1EmulatorState.loading = Boolean(message);
@@ -182,14 +179,6 @@ function stopPs1({showLibrary = true} = {}) {
   document.querySelector('#ps1-library').hidden = !showLibrary;
 }
 
-async function inspectPs1File(gameUrl, signal) {
-  const response = await fetch(gameUrl, {method: 'HEAD', signal});
-  setPs1Diagnostic('headStatus', `${response.status} ${response.statusText}`.trim());
-  setPs1Diagnostic('acceptRanges', response.headers.get('Accept-Ranges') || 'não informado');
-  setPs1Diagnostic('contentLength', response.headers.get('Content-Length') || 'não informado');
-  if (!response.ok) throw new Error(`O arquivo do jogo não está acessível (HTTP ${response.status}).`);
-}
-
 async function startPs1(game) {
   stopPs1({showLibrary: false});
   const attempt = ps1Attempt;
@@ -199,6 +188,8 @@ async function startPs1(game) {
   document.querySelector('#ps1-diagnostics').hidden = !new URL(location.href).searchParams.has('debug');
   setPs1Loading('Preparando emulador...');
   const gameUrl = ps1StreamUrl(game);
+  console.log('[PS1] key:', game.key);
+  console.log('[PS1] gameUrl:', gameUrl);
   window.EJS_player = '#ps1-emulator';
   window.EJS_core = document.querySelector('#ps1-core').value || 'psx';
   window.EJS_gameUrl = gameUrl;
@@ -220,7 +211,15 @@ async function startPs1(game) {
   updateLoaderState('Conectando ao arquivo...');
   const controller = new AbortController();
   const headTimeout = setTimeout(() => controller.abort(), 12000);
-  try { await inspectPs1File(gameUrl, controller.signal); }
+  try {
+    const inspection = await inspectPs1File(gameUrl, {signal: controller.signal});
+    const details = inspection.details || inspection.attempts.findLast?.(attempt => attempt.status);
+    setPs1Diagnostic('headStatus', details ? `${details.method} ${details.status} ${details.statusText}`.trim() : inspection.warning?.kind);
+    setPs1Diagnostic('acceptRanges', details?.acceptRanges || 'não informado');
+    setPs1Diagnostic('contentLength', details?.contentLength || 'não informado');
+    if (inspection.ok === false) throw new Error(`O arquivo do jogo respondeu com erro HTTP real (${inspection.details.status} ${inspection.details.statusText}).`.trim());
+    if (inspection.ok === null) console.warn('[PS1] verificação inconclusiva; o EmulatorJS tentará carregar o arquivo:', inspection.warning);
+  }
   catch (error) {
     if (attempt !== ps1Attempt) return;
     failPs1(new Error(error.name === 'AbortError' ? 'A conexão com o arquivo demorou demais. Tente novamente.' : error.message));

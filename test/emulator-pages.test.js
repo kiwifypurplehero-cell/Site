@@ -55,7 +55,7 @@ test('PS1 envia ISO ao pcsx_rearmed/HLE sem exigir BIOS nem pré-bloquear a exte
   assert.doesNotMatch(source, /window\.EJS_biosUrl = biosObjectUrl \|\| undefined/);
   assert.doesNotMatch(source, /coreExtensions\.includes|não anuncia suporte direto a ISO/);
   assert.match(registry, /coreExtensions: Object\.freeze\(\['iso', 'bin', 'cue', 'chd'/);
-  assert.match(source, /fetch\(gameUrl, \{method: 'HEAD'/);
+  assert.match(source, /inspectPs1File\(gameUrl/);
   assert.match(source, /window\.EJS_gameUrl = gameUrl/);
   for (const state of ['Preparando emulador', 'Conectando ao arquivo', 'Carregando jogo', 'Inicializando core', 'Executando']) assert.match(source, new RegExp(state));
   assert.match(html, /Automático\/HLE/);
