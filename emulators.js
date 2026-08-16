@@ -1,5 +1,5 @@
 import {findEmulator} from './emulator-registry.js';
-import {inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
+import {downloadPs1Archive, inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
 
 const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'ps2']);
 const VIEW_TITLES = {
@@ -21,6 +21,7 @@ let ps1LayoutMutationObserver;
 let ps1LayoutResizeObserver;
 let ps1HeadController;
 let ps1LoadingTimer;
+let ps1GameObjectUrl;
 
 function stopPs1LayoutDiagnostics() {
   ps1LayoutMutationObserver?.disconnect(); ps1LayoutMutationObserver = undefined;
@@ -226,6 +227,7 @@ function stopPs1({showLibrary = true} = {}) {
   clearTimeout(ps1Timeout);
   clearTimeout(ps1LoadingTimer);
   ps1HeadController?.abort(); ps1HeadController = undefined;
+  if (ps1GameObjectUrl) URL.revokeObjectURL(ps1GameObjectUrl); ps1GameObjectUrl = undefined;
   try { window.EJS_emulator?.gameManager?.saveState?.(); } catch {}
   try { window.EJS_emulator?.stop?.(); } catch {}
   document.querySelector('#ps1-emulator')?.replaceChildren();
@@ -251,7 +253,7 @@ async function startPs1(game) {
   setPs1Loading('Preparando emulador...');
   startPs1LayoutDiagnostics(attempt);
   const launch = resolvePs1Launch(game);
-  const gameUrl = launch.bootUrl;
+  let gameUrl = launch.bootUrl;
   const loadStarted = performance.now();
   let observedRequests = 0, observedBytes = 0;
   const updatePerformance = () => {
@@ -313,6 +315,24 @@ async function startPs1(game) {
     return;
   } finally { clearTimeout(headTimeout); if (ps1HeadController === controller) ps1HeadController = undefined; }
   if (attempt !== ps1Attempt) return;
+  if (launch.dependencies.length) {
+    try {
+      updateLoaderState('Montando CUE + BIN...');
+      const prepared = await downloadPs1Archive(game, {onProgress: (index, total, key) => {
+        const name = String(key).split('/').pop();
+        updateLoaderState(`Baixando ${name} (${index + 1}/${total})...`);
+      }});
+      if (attempt !== ps1Attempt) { URL.revokeObjectURL(prepared.gameUrl); return; }
+      gameUrl = prepared.gameUrl;
+      ps1GameObjectUrl = gameUrl;
+      window.EJS_gameUrl = gameUrl;
+      window.EJS_gameName = `${game.name}.zip`;
+      setPs1Diagnostic('gameUrl', `${launch.bootUrl} (CUE + BIN montado)`);
+    } catch (error) {
+      if (attempt === ps1Attempt) failPs1(error);
+      return;
+    }
+  }
   updateLoaderState('Carregando jogo...');
   const loader = document.createElement('script'); loader.src = `${EMULATORJS_DATA}loader.js`; loader.dataset.emulatorjsLoader = 'true';
   loader.onload = () => { if (attempt === ps1Attempt && PS1EmulatorState.loading) updateLoaderState('Inicializando core...'); };
