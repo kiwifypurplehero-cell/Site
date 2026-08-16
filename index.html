@@ -29,6 +29,7 @@
     <script src="play-utils.js" defer></script>
     <script src="script.js" defer></script>
     <script src="accessibility.js" defer></script>
+    <script type="module" src="emulators.js"></script>
   </head>
   <body>
     <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true"></div>
@@ -38,13 +39,14 @@
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
-        <a class="brand" href="#inicio" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
-        <div class="primary-nav"><a href="/" aria-current="page">Home</a><a href="/emulators.html">Emuladores</a></div>
+        <a class="brand" href="/?view=home" data-view-link="home" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
+        <div class="primary-nav"><a href="/?view=home" data-view-link="home" aria-current="page">Home</a><a href="/?view=emulators" data-view-link="emulators">Emuladores</a></div>
         <button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button>
       </nav>
     </header>
 
-    <main>
+    <main id="main-content">
+      <div id="home-view" data-app-view="home">
       <section class="section section--catalog container" id="jogos" aria-labelledby="games-title">
         <div class="section-heading reveal"><div><p class="eyebrow">Jogo em destaque</p><h2 id="games-title">Jogue do seu jeito</h2></div><p>Conheça jogos para navegador e escolha entre visitar o projeto ou baixar a versão mais recente diretamente do GitHub.</p></div>
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
@@ -69,9 +71,26 @@
       </div></div></section>
 
       <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
+      </div>
+
+      <section id="emulators-view" class="app-view emulators-page container" data-app-view="emulators" aria-labelledby="emulators-title" hidden>
+        <div class="emulators-hero"><p class="eyebrow">Biblioteca</p><h1 id="emulators-title">Emuladores</h1><p>Explore sistemas clássicos sem sair da página principal da PlumpGames.</p></div>
+        <div class="emulator-grid" aria-label="Sistemas disponíveis"><article class="emulator-card"><span class="emulator-badge">PS2</span><span class="emulator-status">Experimental</span><h2>PlayStation 2</h2><p>Consulte a biblioteca segura no Backblaze B2 e acompanhe a integração do núcleo de emulação.</p><button class="button button--primary" type="button" data-view-link="ps2">Abrir emulador</button></article></div>
+      </section>
+
+      <section id="ps2-view" class="app-view emulators-page container ps2-layout" data-app-view="ps2" aria-labelledby="ps2-title" hidden>
+        <div><button class="button button--ghost button--back" type="button" data-view-link="emulators">← Voltar</button></div>
+        <div class="emulators-hero"><p class="eyebrow">Emulador experimental</p><h1 id="ps2-title">PlayStation 2</h1><p>Biblioteca PS2 privada, entregue pelo backend seguro da PlumpGames.</p></div>
+        <p class="ps2-note"><strong>Status do núcleo: <span id="core-status">Experimental</span>.</strong> A biblioteca está conectada ao Backblaze B2; o núcleo WebAssembly segue em integração.</p>
+        <div class="ps2-workspace">
+          <section class="ps2-screen" aria-labelledby="selected-game-title"><div class="emulator-viewport"><span>PS2</span><p>A tela do emulador será exibida aqui.</p></div><h2 id="selected-game-title">Jogo selecionado</h2><p id="selected-game">Nenhum jogo selecionado.</p><div class="ps2-actions"><button id="start-emulator" class="button button--primary" type="button" disabled>Iniciar</button><button id="fullscreen-emulator" class="button button--ghost" type="button">Tela cheia</button></div></section>
+          <aside class="ps2-settings" aria-labelledby="settings-title"><h2 id="settings-title">Configurações</h2><label for="ps2-resolution">Resolução<select id="ps2-resolution"><option value="native">Nativa</option><option value="2x">2×</option><option value="3x">3×</option></select></label><label for="ps2-performance">Desempenho<select id="ps2-performance"><option value="balanced">Equilibrado</option><option value="performance">Desempenho</option><option value="quality">Qualidade</option></select></label><div class="ps2-controls"><h3>Controles</h3><p>Teclado, gamepad e PlumpGames Input Bridge são detectados pela interface.</p></div></aside>
+        </div>
+        <section aria-labelledby="ps2-games-title"><h2 id="ps2-games-title">Biblioteca PS2</h2><p id="games-status" class="games-message" role="status" aria-live="polite">Carregando jogos…</p><div id="rom-list" class="rom-list"></div></section>
+      </section>
     </main>
 
-    <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p><nav class="footer-primary-nav" aria-label="Navegação da PlumpGames"><a href="/" aria-current="page">Home</a><a href="/emulators.html">Emuladores</a></nav></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell" target="_blank" rel="noopener noreferrer">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
+    <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p><nav class="footer-primary-nav" aria-label="Navegação da PlumpGames"><a href="/?view=home" data-view-link="home" aria-current="page">Home</a><a href="/?view=emulators" data-view-link="emulators">Emuladores</a></nav></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
 
     <section id="plump-assistant-panel" class="assistant-panel" role="dialog" aria-labelledby="assistant-title" aria-describedby="assistant-subtitle" hidden>
       <header class="assistant-header"><div><h2 id="assistant-title">PJ Assistant</h2><p id="assistant-subtitle">Suporte PlumpGames</p></div><div class="assistant-header__actions"><button id="assistant-clear" type="button">Limpar conversa</button><button id="assistant-minimize" type="button" aria-label="Minimizar assistente">—</button><button id="assistant-close" type="button" aria-label="Fechar assistente">×</button></div></header>
