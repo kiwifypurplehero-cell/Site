@@ -8,7 +8,7 @@ const VIEW_TITLES = {
   ps2: 'PlayStation 2 — PlumpGames'
 };
 const appViewState = {currentView: 'home', homeScrollY: 0};
-export const PS1EmulatorState = {coreReady: false, selectedGame: null, running: false, loading: false, error: null};
+export const PS1EmulatorState = {libraryLoaded: false, selectedGame: null, coreReady: false, running: false, loading: false, error: null, biosMode: 'hle'};
 const EMULATORJS_DATA = 'https://cdn.emulatorjs.org/stable/data/';
 let ps1LibraryPromise;
 let biosObjectUrl;
@@ -115,7 +115,8 @@ async function loadPs1Library() {
     try {
       const response = await fetch('/api/emulators/ps1/games');
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || `A biblioteca respondeu ${response.status}.`);
+      if (!response.ok) throw new Error(`${payload.error || 'Não foi possível acessar a biblioteca PS1.'}${payload.diagnostic ? ` (${payload.diagnostic})` : ''}`);
+      PS1EmulatorState.libraryLoaded = true;
       status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo PS1 publicado ainda.';
       list.replaceChildren(...payload.games.map(game => {
         const card = document.createElement('article'); card.className = 'rom-card';
@@ -126,7 +127,8 @@ async function loadPs1Library() {
         play.addEventListener('click', () => startPs1(game)); details.append(title, metadata); card.append(details, play); return card;
       }));
     } catch (error) {
-      status.textContent = error.message || 'Biblioteca temporariamente indisponível.';
+      PS1EmulatorState.libraryLoaded = false;
+      status.textContent = error.message || 'Não foi possível acessar a biblioteca PS1.';
       ps1LibraryPromise = undefined;
     }
   })();
@@ -172,13 +174,20 @@ function startPs1(game) {
   const errorBox = document.querySelector('#ps1-error'); errorBox.hidden = true;
   document.querySelector('#ps1-retry').hidden = true;
   setPs1Loading('Preparando emulador...');
+  const emulator = findEmulator('ps1');
+  if (!emulator.coreExtensions.includes(game.format.toLowerCase())) {
+    failPs1(new Error('Este core não anuncia suporte direto a ISO neste setup. Converta o dump para CHD ou BIN+CUE; o arquivo original não será alterado.'));
+    panel.scrollIntoView({behavior: 'smooth', block: 'start'});
+    return;
+  }
   window.EJS_player = '#ps1-emulator';
   window.EJS_core = document.querySelector('#ps1-core').value || 'psx';
   window.EJS_gameUrl = ps1StreamUrl(game);
   window.EJS_pathtodata = EMULATORJS_DATA;
   window.EJS_startOnLoaded = true;
   window.EJS_gameName = game.name;
-  window.EJS_biosUrl = biosObjectUrl || undefined;
+  PS1EmulatorState.biosMode = document.querySelector('#ps1-bios-mode').value;
+  if (PS1EmulatorState.biosMode === 'custom' && biosObjectUrl) window.EJS_biosUrl = biosObjectUrl;
   window.EJS_onGameStart = () => {
     Object.assign(PS1EmulatorState, {coreReady: true, running: true, loading: false, error: null});
     setPs1Loading('');
@@ -203,7 +212,8 @@ document.querySelector('[data-ps1-close]')?.addEventListener('click', () => stop
 document.querySelector('#ps1-retry')?.addEventListener('click', () => PS1EmulatorState.selectedGame && startPs1(PS1EmulatorState.selectedGame));
 document.querySelector('#ps1-fullscreen')?.addEventListener('click', () => document.querySelector('#ps1-player-panel')?.requestFullscreen?.());
 document.querySelector('#ps1-restart')?.addEventListener('click', () => { try { window.EJS_emulator?.restart?.(); } catch (error) { failPs1(error); } });
-document.querySelector('#ps1-bios-file')?.addEventListener('change', event => { if (biosObjectUrl) URL.revokeObjectURL(biosObjectUrl); const file = event.target.files[0]; biosObjectUrl = file ? URL.createObjectURL(file) : undefined; document.querySelector('#ps1-bios-status').textContent = file ? `BIOS local selecionada: ${file.name}` : 'Nenhuma BIOS selecionada.'; });
+document.querySelector('#ps1-bios-mode')?.addEventListener('change', event => { PS1EmulatorState.biosMode = event.target.value; document.querySelector('#ps1-bios-file-label').hidden = event.target.value !== 'custom'; });
+document.querySelector('#ps1-bios-file')?.addEventListener('change', event => { if (biosObjectUrl) URL.revokeObjectURL(biosObjectUrl); const file = event.target.files[0]; biosObjectUrl = file ? URL.createObjectURL(file) : undefined; document.querySelector('#ps1-bios-status').textContent = file ? `BIOS local selecionada: ${file.name}` : 'Executando sem BIOS externa. Alguns jogos podem ter compatibilidade reduzida.'; });
 document.querySelector('#fullscreen-emulator')?.addEventListener('click', () => document.querySelector('.emulator-viewport')?.requestFullscreen?.());
 setView(requestedView(), {historyMode: 'replace'});
 
