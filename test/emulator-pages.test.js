@@ -43,3 +43,18 @@ test('PS2 mantém endpoint seguro e integração declarada com B2', async () => 
   assert.match(source, /fetch\('\/api\/emulators\/ps2\/games'\)/);
   assert.match(registry, /Backblaze B2/);
 });
+
+test('PS1 usa pcsx_rearmed/HLE sem exigir BIOS e trata ISO não anunciado pelo core', async () => {
+  const [html, source, registry] = await Promise.all([
+    readFile(new URL('../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
+    readFile(new URL('../emulator-registry.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(source, /EJS_core = document\.querySelector\('#ps1-core'\)\.value \|\| 'psx'/);
+  assert.match(source, /biosMode: 'hle'/);
+  assert.doesNotMatch(source, /window\.EJS_biosUrl = biosObjectUrl \|\| undefined/);
+  assert.match(source, /Converta o dump para CHD ou BIN\+CUE/);
+  assert.match(registry, /coreExtensions: Object\.freeze\(\['bin', 'cue', 'chd'/);
+  assert.match(html, /Automático\/HLE/);
+  assert.match(html, /Executando sem BIOS externa\. Alguns jogos podem ter compatibilidade reduzida\./);
+});

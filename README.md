@@ -112,9 +112,9 @@ O catálogo e o transporte das ROMs estão prontos, mas o botão **Preparar** in
 
 ### PlayStation 1 e EmulatorJS
 
-A view interna `?view=ps1` usa o **EmulatorJS estável** como frontend de emulação, carregado explicitamente de `https://cdn.emulatorjs.org/stable/data/`. O core padrão é `psx` (pcsx_rearmed); `mednafen_psx_hw` fica disponível como alternativa de compatibilidade. Esta dependência é distribuída sob a [GPL-3.0](https://github.com/EmulatorJS/EmulatorJS/blob/main/LICENSE). Nenhum arquivo de BIOS protegido é incluído: o visitante pode selecionar uma BIOS legalmente obtida, mantida somente como URL de objeto local durante a sessão.
+A view interna `?view=ps1` usa o **EmulatorJS estável** como frontend de emulação, carregado explicitamente de `https://cdn.emulatorjs.org/stable/data/`. O core fixo é `psx` (pcsx_rearmed). Esta dependência é distribuída sob a [GPL-3.0](https://github.com/EmulatorJS/EmulatorJS/blob/main/LICENSE). Nenhum arquivo de BIOS protegido é incluído: o visitante pode selecionar uma BIOS legalmente obtida, mantida somente como URL de objeto local durante a sessão.
 
-O PS1 é completamente separado do PS2. O Worker lista automaticamente `.iso`, `.bin`, `.chd` e `.cue` sob o prefixo configurado (por padrão `Jogos/`) do bucket `plumpgames-storage-ps1`. `GET /api/emulators/ps1/games` tem cache público de 60 segundos e `GET`/`HEAD /api/emulators/ps1/file/<key>` transmite o corpo do B2 sem `arrayBuffer()`, encaminhando `Range` e as respostas `206`, `Content-Range`, `Content-Length` e `Content-Type` do storage.
+O PS1 é completamente separado do PS2. O Worker lista automaticamente `.iso`, `.bin`, `.cue`, `.chd`, `.img`, `.mdf`, `.pbp`, `.ccd` e `.m3u` sob o prefixo configurado (por padrão `Jogos/`) do bucket `plumpgames-storage-ps1`. `GET /api/emulators/ps1/games` tem cache público de 60 segundos e `GET`/`HEAD /api/emulators/ps1/file/<key>` transmite o corpo do B2 sem `arrayBuffer()`, encaminhando `Range` e as respostas `206`, `Content-Range`, `Content-Length` e `Content-Type` do storage.
 
 Configure os segredos apenas no Cloudflare (nunca em `wrangler.jsonc`):
 
@@ -123,4 +123,8 @@ npx wrangler secret put B2_PS1_ACCESS_KEY_ID
 npx wrangler secret put B2_PS1_SECRET_ACCESS_KEY
 ```
 
-Use uma Application Key restrita à leitura/listagem do bucket PS1. As variáveis não secretas `B2_PS1_ENDPOINT`, `B2_PS1_BUCKET` e `B2_PS1_PREFIX` já estão declaradas. Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJS podem ser hospedados como assets próprios, desde que a GPL-3.0 e os avisos do projeto sejam preservados; o estado atual usa CDN e portanto requer conexão com esse host.
+Use uma Application Key restrita à leitura/listagem do bucket PS1. As variáveis não secretas `B2_PS1_ENDPOINT`, `B2_PS1_BUCKET` e `B2_PS1_PREFIX` já estão declaradas e apontam exclusivamente para `https://s3.us-east-005.backblazeb2.com`, `plumpgames-storage-ps1` e `Jogos/`. `PS1_DIAGNOSTIC_MODE=true` inclui uma causa técnica curta na resposta administrativa; deixe-a ausente em produção normal.
+
+O padrão **Automático/HLE** inicia `psx` (pcsx_rearmed) sem definir `EJS_biosUrl`. Uma BIOS local continua opcional e nunca é enviada ao servidor. O catálogo mostra os formatos encontrados, inclusive ISO, mas o metadata do pcsx_rearmed usado neste setup não anuncia ISO como extensão direta. Para um ISO, a interface informa que o dump deve ser convertido manualmente para CHD ou BIN+CUE em vez de fingir que o core iniciou.
+
+Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJS podem ser hospedados como assets próprios, desde que a GPL-3.0 e os avisos do projeto sejam preservados; o estado atual usa CDN e portanto requer conexão com esse host.

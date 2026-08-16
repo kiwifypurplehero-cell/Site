@@ -14,7 +14,21 @@ test('não expõe chaves internas no catálogo de emuladores', async () => {
 test('exige os secrets PS1 do Backblaze B2 para acessar a biblioteca', async () => {
   const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), {});
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), {error: 'Biblioteca de jogos não configurada.'});
+  assert.deepEqual(await response.json(), {error: 'Não foi possível acessar a biblioteca PS1.'});
+});
+
+test('não aceita secrets PS2 no endpoint PS1', async () => {
+  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/games'), {
+    B2_ACCESS_KEY_ID: 'ps2-id', B2_SECRET_ACCESS_KEY: 'ps2-secret'
+  });
+  assert.equal(response.status, 503);
+});
+
+test('bloqueia traversal e objetos fora de Jogos/', async () => {
+  for (const key of ['..%2Fsegredo.iso', 'Jogos%2F..%2Fsegredo.iso', 'ps1%2FJogos%2FGran%20Turismo.iso']) {
+    const response = await emulatorApi(new Request(`https://example.com/api/emulators/ps1/file/${key}`), ps1Env);
+    assert.equal(response.status, 404);
+  }
 });
 
 test('lista automaticamente apenas imagens PS1 aceitas com metadados amigáveis', async t => {

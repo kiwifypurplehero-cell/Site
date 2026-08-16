@@ -5,7 +5,8 @@ export const EMULATORS = Object.freeze([
     name: 'PlayStation 1',
     shortName: 'PS1',
     description: 'Biblioteca PlayStation executada no navegador com EmulatorJS.',
-    romExtensions: Object.freeze(['iso', 'bin', 'chd', 'cue']),
+    romExtensions: Object.freeze(['iso', 'bin', 'cue', 'chd', 'img', 'mdf', 'pbp', 'ccd', 'm3u']),
+    coreExtensions: Object.freeze(['bin', 'cue', 'chd', 'img', 'mdf', 'pbp', 'ccd', 'm3u']),
     core: Object.freeze({status: 'experimental', id: 'psx', engine: 'pcsx_rearmed'})
   }),
   Object.freeze({

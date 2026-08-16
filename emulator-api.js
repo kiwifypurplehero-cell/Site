@@ -10,6 +10,15 @@ const PS1_DEFAULTS = Object.freeze({
 });
 const encoder = new TextEncoder();
 
+class B2Error extends Error {
+  constructor(kind, status, code, message) {
+    super(message);
+    this.kind = kind;
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {status, headers: {'Content-Type': 'application/json; charset=utf-8', ...headers}});
 }
@@ -80,6 +89,17 @@ function decodeXml(value) {
   return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 }
 
+async function b2Failure(response) {
+  const body = await response.text();
+  const code = decodeXml(body.match(/<Code>([^<]*)<\/Code>/)?.[1] || 'UnknownError');
+  const message = decodeXml(body.match(/<Message>([^<]*)<\/Message>/)?.[1] || `HTTP ${response.status}`);
+  const kind = response.status === 401 || response.status === 403
+    ? (code === 'InvalidAccessKeyId' || code === 'SignatureDoesNotMatch' ? 'invalid_credentials' : 'bucket_inaccessible')
+    : 'bucket_inaccessible';
+  console.error('[PS1-B2] error', {status: response.status, code, message});
+  return new B2Error(kind, response.status, code, message);
+}
+
 async function listGames(env, emulator) {
   const config = b2Config(env, emulator.id);
   const prefix = config.prefix;
@@ -114,13 +134,16 @@ function validPs1Key(key, prefix, extensions) {
 }
 
 async function listPs1Games(config, emulator) {
+  console.log('[PS1-B2] listing bucket');
+  console.log(`[PS1-B2] bucket=${config.bucket}`);
+  console.log(`[PS1-B2] prefix=${config.prefix}`);
   const games = [];
   let continuationToken = '';
   do {
     const params = new URLSearchParams({'list-type': '2', prefix: config.prefix});
     if (continuationToken) params.set('continuation-token', continuationToken);
     const response = await signedB2Fetch(config, 'GET', '', params.toString());
-    if (!response.ok) throw new Error(`Backblaze B2 respondeu ${response.status}.`);
+    if (!response.ok) throw await b2Failure(response);
     const xml = await response.text();
     for (const content of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
       const key = decodeXml(content[1].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || '');
@@ -130,6 +153,14 @@ async function listPs1Games(config, emulator) {
     }
     continuationToken = decodeXml(xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] || '');
   } while (continuationToken);
+  console.log(`[PS1-B2] result count=${games.length}`);
+  if (!games.length) {
+    const probeParams = new URLSearchParams({'list-type': '2', 'max-keys': '1'});
+    const probe = await signedB2Fetch(config, 'GET', '', probeParams.toString());
+    if (!probe.ok) throw await b2Failure(probe);
+    const probeXml = await probe.text();
+    if (/<Contents>/.test(probeXml)) throw new B2Error('wrong_prefix', 404, 'PrefixNotFound', `Nenhum jogo encontrado no prefixo ${config.prefix}`);
+  }
   return games.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
@@ -159,14 +190,23 @@ function hasB2Config(env, emulatorId) {
 
 export async function emulatorApi(request, env, pathname = new URL(request.url).pathname) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({error: 'Método não permitido.'}, 405, {Allow: 'GET, HEAD'});
-  if (pathname === '/api/emulators') return json({emulators: EMULATORS.map(({romExtensions, ...item}) => item)}, 200, {'Cache-Control': PUBLIC_CACHE});
+  if (pathname === '/api/emulators') return json({emulators: EMULATORS.map(({romExtensions, coreExtensions, ...item}) => item)}, 200, {'Cache-Control': PUBLIC_CACHE});
   const gamesMatch = pathname.match(/^\/api\/emulators\/([^/]+)\/games$/);
   if (gamesMatch) {
     const emulator = findEmulator(gamesMatch[1]);
     if (!emulator) return json({error: 'Emulador não encontrado.'}, 404);
-    if (!hasB2Config(env, emulator.id)) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
+    if (!hasB2Config(env, emulator.id)) {
+      const payload = {error: emulator.id === 'ps1' ? 'Não foi possível acessar a biblioteca PS1.' : 'Biblioteca de jogos não configurada.'};
+      if (emulator.id === 'ps1' && String(env.PS1_DIAGNOSTIC_MODE).toLowerCase() === 'true') payload.diagnostic = 'credentials_not_configured';
+      return json(payload, 503);
+    }
     try { return json({emulator: emulator.id, games: await listGames(env, emulator)}, 200, {'Cache-Control': PUBLIC_CACHE}); }
-    catch (error) { console.error('B2 listing failure', error); return json({error: 'Biblioteca temporariamente indisponível.'}, 503); }
+    catch (error) {
+      if (emulator.id !== 'ps1') console.error('B2 listing failure', error);
+      const payload = {error: emulator.id === 'ps1' ? 'Não foi possível acessar a biblioteca PS1.' : 'Biblioteca temporariamente indisponível.'};
+      if (emulator.id === 'ps1' && String(env.PS1_DIAGNOSTIC_MODE).toLowerCase() === 'true') payload.diagnostic = error.kind || 'request_failed';
+      return json(payload, 503);
+    }
   }
   const ps1FileMatch = pathname.match(/^\/api\/emulators\/ps1\/file\/(.+)$/);
   if (ps1FileMatch) {
