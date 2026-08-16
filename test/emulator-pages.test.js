@@ -61,3 +61,20 @@ test('PS1 envia ISO ao pcsx_rearmed/HLE sem exigir BIOS nem pré-bloquear a exte
   assert.match(html, /Automático\/HLE/);
   assert.match(html, /Executando sem BIOS externa\. Alguns jogos podem ter compatibilidade reduzida\./);
 });
+
+test('PS1 mantém EmulatorJS em uma área 4:3 limitada e desmonta uma instância antes de recriar', async () => {
+  const [html, source, styles] = await Promise.all([
+    readFile(new URL('../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
+    readFile(new URL('../style.css', import.meta.url), 'utf8')
+  ]);
+  assert.match(html, /class="ps1-emulator-shell"/);
+  assert.match(styles, /\.ps1-emulator-shell\{[^}]*aspect-ratio:4\/3[^}]*overflow:hidden/);
+  assert.match(styles, /\.ps1-player canvas[^}]*height:100%!important[^}]*max-height:100%!important/);
+  assert.match(styles, /\.ps1-overlay\[hidden\],\.ps1-error\[hidden\]\{display:none\}/);
+  assert.doesNotMatch(styles, /#ps1-emulator\{[^}]*min-height/);
+  assert.match(source, /instance: null/);
+  assert.match(source, /PS1EmulatorState\.instance \|\| PS1EmulatorState\.loading/);
+  assert.match(source, /ps1LayoutResizeObserver\?\.disconnect/);
+  assert.match(source, /scrollHeight: document\.documentElement\.scrollHeight/);
+});
