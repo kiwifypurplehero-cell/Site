@@ -97,11 +97,11 @@ test('lista automaticamente apenas imagens PS1 aceitas com metadados amigáveis'
   ]);
 });
 
-test('encaminha Range ao B2 e transmite a resposta parcial sem buffer', async t => {
+test('amplia Range pequeno para bloco alinhado e devolve 206 correto', async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (_request, init) => {
-    assert.equal(init.headers.get('Range'), 'bytes=0-1048575');
+    assert.equal(init.headers.get('Range'), 'bytes=0-4194303');
     return new Response(new Uint8Array([1, 2, 3]), {status: 206, headers: {'Content-Range': 'bytes 0-2/123456789', 'Content-Length': '3', 'Content-Type': 'application/octet-stream'}});
   };
   const request = new Request('https://example.com/api/emulators/ps1/file/Jogos/Gran%20Turismo.iso', {headers: {Range: 'bytes=0-1048575'}});
@@ -110,5 +110,46 @@ test('encaminha Range ao B2 e transmite a resposta parcial sem buffer', async t 
   assert.equal(response.headers.get('accept-ranges'), 'bytes');
   assert.equal(response.headers.get('content-range'), 'bytes 0-2/123456789');
   assert.equal(response.headers.get('content-length'), '3');
+  assert.equal(response.headers.get('x-ps1-cache'), 'MISS');
+  assert.equal(response.headers.get('x-ps1-block-size'), '4194304');
   assert.ok(response.body instanceof ReadableStream);
+});
+
+test('cache segmentado reutiliza bloco sem novo download do B2', async t => {
+  const originalFetch = globalThis.fetch;
+  const originalCaches = globalThis.caches;
+  const entries = new Map();
+  globalThis.caches = {default: {
+    async match(request) { return entries.get(request.url)?.clone(); },
+    async put(request, response) { entries.set(request.url, response.clone()); }
+  }};
+  let backendRequests = 0;
+  globalThis.fetch = async (_request, init) => {
+    backendRequests += 1;
+    assert.equal(init.headers.get('Range'), 'bytes=0-4194303');
+    return new Response(new Uint8Array(2048), {status: 206, headers: {'Content-Range': 'bytes 0-2047/679619808', 'Content-Length': '2048'}});
+  };
+  t.after(() => { globalThis.fetch = originalFetch; globalThis.caches = originalCaches; });
+  const request = () => new Request('https://example.com/api/emulators/ps1/file/Jogos/Gran%20Turismo.iso', {headers: {Range: 'bytes=0-1023'}});
+  const first = await emulatorApi(request(), ps1Env);
+  const second = await emulatorApi(request(), ps1Env);
+  assert.equal(first.status, 206);
+  assert.equal(first.headers.get('x-ps1-cache'), 'MISS');
+  assert.equal(second.headers.get('x-ps1-cache'), 'HIT');
+  assert.equal(second.headers.get('content-range'), 'bytes 0-1023/679619808');
+  assert.equal(backendRequests, 1);
+});
+
+test('signed URL SigV4 é restrita ao jogo e expira em dez minutos', async () => {
+  const response = await emulatorApi(new Request('https://example.com/api/emulators/ps1/signed-url?game=Jogos%2FGran%20Turismo.iso'), ps1Env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const payload = await response.json();
+  const url = new URL(payload.url);
+  assert.equal(url.pathname, '/plumpgames-storage-ps1/Jogos/Gran%20Turismo.iso');
+  assert.equal(url.searchParams.get('X-Amz-Expires'), '600');
+  assert.equal(url.searchParams.get('X-Amz-SignedHeaders'), 'host');
+  assert.match(url.searchParams.get('X-Amz-Signature'), /^[a-f0-9]{64}$/);
+  assert.equal(payload.method, 'GET');
+  assert.equal(JSON.stringify(payload).includes('test-secret'), false);
 });

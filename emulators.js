@@ -16,6 +16,7 @@ let biosObjectUrl;
 let libraryPromise;
 let ps1Attempt = 0;
 let ps1Timeout;
+let ps1PerformanceObserver;
 
 function requestedView() {
   const view = new URL(location.href).searchParams.get('view') || 'home';
@@ -174,6 +175,7 @@ function stopPs1({showLibrary = true} = {}) {
   document.querySelector('#ps1-emulator')?.replaceChildren();
   document.querySelectorAll('script[data-emulatorjs-loader]').forEach(node => node.remove());
   clearEmulatorGlobals();
+  ps1PerformanceObserver?.disconnect(); ps1PerformanceObserver = undefined;
   Object.assign(PS1EmulatorState, {coreReady: false, selectedGame: null, running: false, loading: false, error: null});
   document.querySelector('#ps1-player-panel').hidden = true;
   document.querySelector('#ps1-library').hidden = !showLibrary;
@@ -188,6 +190,25 @@ async function startPs1(game) {
   document.querySelector('#ps1-diagnostics').hidden = !new URL(location.href).searchParams.has('debug');
   setPs1Loading('Preparando emulador...');
   const gameUrl = ps1StreamUrl(game);
+  const loadStarted = performance.now();
+  let observedRequests = 0, observedBytes = 0;
+  const updatePerformance = () => {
+    setPs1Diagnostic('requests', String(observedRequests));
+    setPs1Diagnostic('bytes', formatBytes(observedBytes));
+    const seconds = (performance.now() - loadStarted) / 1000;
+    setPs1Diagnostic('speed', observedBytes && seconds ? `${formatBytes(observedBytes / seconds)}/s` : 'aguardando dados');
+  };
+  if ('PerformanceObserver' in window) {
+    ps1PerformanceObserver = new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) if (entry.name.includes(gameUrl)) {
+        observedRequests += 1;
+        observedBytes += entry.transferSize || entry.encodedBodySize || 0;
+        updatePerformance();
+      }
+    });
+    ps1PerformanceObserver.observe({type: 'resource', buffered: true});
+  }
+  updatePerformance();
   console.log('[PS1] key:', game.key);
   console.log('[PS1] gameUrl:', gameUrl);
   window.EJS_player = '#ps1-emulator';
@@ -205,6 +226,8 @@ async function startPs1(game) {
     if (attempt !== ps1Attempt) return;
     Object.assign(PS1EmulatorState, {coreReady: true, running: true, loading: false, error: null});
     clearTimeout(ps1Timeout);
+    setPs1Diagnostic('coreStart', `${((performance.now() - loadStarted) / 1000).toFixed(1)} s`);
+    updatePerformance();
     updateLoaderState('Executando...');
     setTimeout(() => { if (attempt === ps1Attempt && PS1EmulatorState.running) setPs1Loading(''); }, 900);
   };

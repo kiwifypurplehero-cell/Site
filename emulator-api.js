@@ -9,6 +9,11 @@ const PS1_DEFAULTS = Object.freeze({
   prefix: 'Jogos/'
 });
 const encoder = new TextEncoder();
+const PS1_BLOCK_SIZE = 4 * 1024 * 1024;
+const PS1_BLOCK_TTL = 86400;
+const PS1_SIGNED_URL_TTL = 600;
+const PS1_MAX_RANGE = 16 * 1024 * 1024;
+const ps1RequestHistory = new Map();
 
 class B2Error extends Error {
   constructor(kind, status, code, message) {
@@ -97,6 +102,33 @@ async function signedB2Fetch(config, method, key = '', queryParameters = [], req
   headers.set('Authorization', `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${scope}, SignedHeaders=${signedHeaderNames.join(';')}, Signature=${signature}`);
   headers.delete('host');
   return fetch(url, {method, headers});
+}
+
+async function presignedB2Url(config, key, expires = PS1_SIGNED_URL_TTL) {
+  const endpoint = new URL(config.endpoint);
+  const region = endpoint.hostname.match(/^s3\.([^.]+)\.backblazeb2\.com$/)?.[1];
+  if (!region || !config.bucket || !config.accessKeyId || !config.secretAccessKey) throw new Error('Backblaze B2 não configurado.');
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const date = amzDate.slice(0, 8);
+  const scope = `${date}/${region}/s3/aws4_request`;
+  const pathname = `/${awsEncode(config.bucket)}/${encodePath(key)}`;
+  const parameters = [
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${config.accessKeyId}/${scope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', String(expires)],
+    ['X-Amz-SignedHeaders', 'host']
+  ];
+  const query = canonicalQuery(parameters);
+  const canonicalRequest = ['GET', pathname, query, `host:${endpoint.host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, hex(await sha256(canonicalRequest))].join('\n');
+  const dateKey = await hmac(encoder.encode(`AWS4${config.secretAccessKey}`), date);
+  const regionKey = await hmac(dateKey, region);
+  const serviceKey = await hmac(regionKey, 's3');
+  const signingKey = await hmac(serviceKey, 'aws4_request');
+  parameters.push(['X-Amz-Signature', hex(await hmac(signingKey, stringToSign))]);
+  return new URL(`${pathname}?${canonicalQuery(parameters)}`, endpoint).href;
 }
 
 function decodeXml(value) {
@@ -202,6 +234,90 @@ function b2Response(response, request) {
   return new Response(request.method === 'HEAD' ? null : response.body, {status: response.status, headers});
 }
 
+function parseSingleRange(value) {
+  const match = /^bytes=(\d+)-(\d+)$/.exec(value || '');
+  if (!match) return null;
+  const start = Number(match[1]), end = Number(match[2]);
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end ? {start, end} : null;
+}
+
+function ps1Debug(env, data) {
+  if (String(env.PS1_STREAM_DEBUG).toLowerCase() !== 'true') return;
+  console.log(`[PS1-STREAM] ${JSON.stringify(data)}`);
+}
+
+function beginPs1Trace(env, key, request) {
+  if (String(env.PS1_STREAM_DEBUG).toLowerCase() !== 'true') return () => {};
+  const range = parseSingleRange(request.headers.get('Range'));
+  const state = ps1RequestHistory.get(key) || {active: 0, requests: 0, recent: []};
+  const duplicate = Boolean(range && state.recent.some(item => item.start === range.start && item.end === range.end));
+  const overlapping = Boolean(range && state.recent.some(item => item.start <= range.end && range.start <= item.end));
+  const sequential = Boolean(range && state.recent.at(-1)?.end + 1 === range.start);
+  state.active += 1; state.requests += 1;
+  if (range) state.recent.push(range);
+  state.recent = state.recent.slice(-32);
+  ps1RequestHistory.set(key, state);
+  ps1Debug(env, {event: 'start', method: request.method, range: request.headers.get('Range'), request: state.requests, duplicate, overlapping, sequential, parallel: state.active});
+  return data => {
+    state.active = Math.max(0, state.active - 1);
+    ps1Debug(env, {event: 'response', ...data, parallel: state.active});
+    if (ps1RequestHistory.size > 100) ps1RequestHistory.delete(ps1RequestHistory.keys().next().value);
+  };
+}
+
+function cacheStorage() {
+  return globalThis.caches?.default || null;
+}
+
+function blockCacheKey(request, key, start) {
+  const digest = encodeURIComponent(key);
+  return new Request(`${new URL(request.url).origin}/.internal/ps1-block/${digest}/${start}`);
+}
+
+async function fetchPs1Block(config, request, key, start, cache, env) {
+  const cacheKey = blockCacheKey(request, key, start);
+  const cached = cache && await cache.match(cacheKey);
+  if (cached) return {response: cached, cacheStatus: 'HIT'};
+  const end = start + PS1_BLOCK_SIZE - 1;
+  const response = await signedB2Fetch(config, 'GET', key, [], {Range: `bytes=${start}-${end}`});
+  if (response.status !== 206) return {response, cacheStatus: 'BYPASS'};
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', `public, max-age=${PS1_BLOCK_TTL}`);
+  const stored = new Response(response.body, {status: 200, headers});
+  if (cache) await cache.put(cacheKey, stored.clone());
+  ps1Debug(env, {method: 'GET', key, backendRange: `bytes=${start}-${end}`, status: response.status, cache: 'MISS'});
+  return {response: stored, cacheStatus: 'MISS'};
+}
+
+async function cachedPs1Range(config, request, key, range, env, ctx) {
+  const requestedBytes = range.end - range.start + 1;
+  if (requestedBytes > PS1_MAX_RANGE) return null;
+  const firstBlock = Math.floor(range.start / PS1_BLOCK_SIZE) * PS1_BLOCK_SIZE;
+  const lastBlock = Math.floor(range.end / PS1_BLOCK_SIZE) * PS1_BLOCK_SIZE;
+  if (firstBlock !== lastBlock) return null;
+  const started = Date.now();
+  const cache = cacheStorage();
+  const result = await fetchPs1Block(config, request, key, firstBlock, cache, env);
+  if (result.response.status >= 400) return b2Response(result.response, request);
+  const buffer = await result.response.arrayBuffer();
+  const offset = range.start - firstBlock;
+  if (offset >= buffer.byteLength) return null;
+  const length = Math.min(requestedBytes, buffer.byteLength - offset);
+  const total = Number(result.response.headers.get('Content-Range')?.split('/')[1]) || '*';
+  const headers = new Headers(result.response.headers);
+  headers.set('Content-Length', String(length));
+  headers.set('Content-Range', `bytes ${range.start}-${range.start + length - 1}/${total}`);
+  headers.set('Accept-Ranges', 'bytes');
+  headers.set('Cache-Control', 'private, max-age=3600');
+  headers.set('X-PS1-Cache', result.cacheStatus);
+  headers.set('X-PS1-Block-Size', String(PS1_BLOCK_SIZE));
+  headers.set('Server-Timing', `ps1;dur=${Date.now() - started};desc="${result.cacheStatus}"`);
+  const nextStart = firstBlock + PS1_BLOCK_SIZE;
+  if (ctx?.waitUntil && range.end > firstBlock + PS1_BLOCK_SIZE * 0.75) ctx.waitUntil(fetchPs1Block(config, request, key, nextStart, cache, env).then(() => undefined).catch(() => undefined));
+  ps1Debug(env, {method: request.method, range: request.headers.get('Range'), status: 206, bytes: length, duration: Date.now() - started, cache: result.cacheStatus});
+  return new Response(buffer.slice(offset, offset + length), {status: 206, headers});
+}
+
 function hasB2Config(env, emulatorId) {
   const config = b2Config(env, emulatorId);
   return Boolean(config.endpoint && config.bucket && config.accessKeyId && config.secretAccessKey);
@@ -217,7 +333,7 @@ function safeEndpoint(endpoint) {
   try { return new URL(endpoint).origin; } catch { return 'invalid_endpoint'; }
 }
 
-export async function emulatorApi(request, env, pathname = new URL(request.url).pathname) {
+export async function emulatorApi(request, env, pathname = new URL(request.url).pathname, ctx) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({error: 'Método não permitido.'}, 405, {Allow: 'GET, HEAD'});
   if (pathname === '/api/emulators') return json({emulators: EMULATORS.map(({romExtensions, coreExtensions, ...item}) => item)}, 200, {'Cache-Control': PUBLIC_CACHE});
   if (pathname === '/api/emulators/ps1/diagnostics') {
@@ -232,6 +348,14 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
       safeB2Log(config, error);
       return json({...diagnostic, status: 'error', code: error instanceof B2Error ? error.code : 'RequestFailed'}, 503);
     }
+  }
+  if (pathname === '/api/emulators/ps1/signed-url') {
+    const config = b2Config(env, 'ps1');
+    const key = new URL(request.url).searchParams.get('game') || '';
+    const emulator = findEmulator('ps1');
+    if (!hasB2Config(env, 'ps1')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
+    if (!validPs1Key(key, config.prefix, emulator.romExtensions)) return json({error: 'Arquivo não encontrado.'}, 404);
+    return json({url: await presignedB2Url(config, key), expiresIn: PS1_SIGNED_URL_TTL, method: 'GET'}, 200, {'Cache-Control': 'no-store'});
   }
   const gamesMatch = pathname.match(/^\/api\/emulators\/([^/]+)\/games$/);
   if (gamesMatch) {
@@ -259,12 +383,21 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
     const config = b2Config(env, 'ps1');
     if (!hasB2Config(env, 'ps1')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
     if (!validPs1Key(key, config.prefix, emulator.romExtensions)) return json({error: 'Arquivo não encontrado.'}, 404);
+    const finishTrace = beginPs1Trace(env, key, request);
     const headers = request.headers.has('Range') ? {Range: request.headers.get('Range')} : {};
     try {
+      const range = parseSingleRange(headers.Range);
+      if (request.method === 'GET' && range) {
+        const cached = await cachedPs1Range(config, request, key, range, env, ctx);
+        if (cached) { finishTrace({status: cached.status, bytes: Number(cached.headers.get('Content-Length')) || null, cache: cached.headers.get('X-PS1-Cache') || 'BYPASS'}); return cached; }
+      }
+      const started = Date.now();
       const response = await signedB2Fetch(config, request.method, key, [], headers);
       if (response.status === 404) return json({error: 'Arquivo não encontrado.'}, 404);
+      ps1Debug(env, {method: request.method, range: headers.Range || null, status: response.status, bytes: Number(response.headers.get('Content-Length')) || null, duration: Date.now() - started, cache: 'BYPASS'});
+      finishTrace({status: response.status, bytes: Number(response.headers.get('Content-Length')) || null, ttfb: Date.now() - started, cache: 'BYPASS'});
       return b2Response(response, request);
-    } catch (error) { console.error('B2 stream failure', error); return json({error: 'Arquivo temporariamente indisponível.'}, 503); }
+    } catch (error) { finishTrace({status: 503, cache: 'ERROR'}); console.error('B2 stream failure', error); return json({error: 'Arquivo temporariamente indisponível.'}, 503); }
   }
   const romMatch = pathname.match(/^\/api\/emulators\/([^/]+)\/games\/([^/]+)\/rom$/);
   if (!romMatch) return null;

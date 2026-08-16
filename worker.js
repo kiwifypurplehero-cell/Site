@@ -121,10 +121,10 @@ async function support(request,env) {
     return reply?json({reply,model:SUPPORT_MODEL}):json({error:'Resposta indisponível.'},503);
   } catch(error) { console.error('Workers AI failure',error); return json({error:'Suporte inteligente indisponível.'},503); }
 }
-export default {async fetch(request,env){
+export default {async fetch(request,env,ctx){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
-  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname))||json({error:'Endpoint não encontrado.'},404);
+  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
   const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
   if(emulatorPages.has(url.pathname))return env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
   let response=await env.ASSETS.fetch(request);
