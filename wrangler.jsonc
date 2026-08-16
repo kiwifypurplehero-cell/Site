@@ -17,12 +17,11 @@
   "ai": {
     "binding": "AI"
   },
-  "r2_buckets": [
-    {
-      "binding": "GAME_ROMS",
-      "bucket_name": "plumpgames-roms"
-    }
-  ],
+  "vars": {
+    "B2_ENDPOINT": "https://s3.us-east-005.backblazeb2.com",
+    "B2_BUCKET": "plumpgames-storage-ps2",
+    "B2_PS2_PREFIX": "ps2/jogos/"
+  },
   "d1_databases": [
     {
       "binding": "DB",

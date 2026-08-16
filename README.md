@@ -64,14 +64,14 @@ Para desenvolvimento local, use `npx wrangler d1 migrations apply plumpgames-aut
 
 ## Home, Emuladores e biblioteca PS2
 
-A navegação principal separa **Home** (catálogo de jogos web/comunidade) de **Emuladores**. A página `emulators.html` lê o registro declarativo em `emulator-registry.js`; portanto, um novo sistema entra na arquitetura como outra definição (identificador, formatos, prefixo R2 e URLs do núcleo), sem duplicar a interface. O mesmo registro é importado pelo Worker para validar rotas e nunca aceitar um prefixo fornecido pelo visitante.
+A navegação principal separa **Home** (catálogo de jogos web/comunidade) de **Emuladores**. A página `emulators.html` lê o registro declarativo em `emulator-registry.js`; portanto, um novo sistema entra na arquitetura como outra definição (identificador, formatos e URLs do núcleo), sem duplicar a interface. O mesmo registro é importado pelo Worker para validar rotas.
 
-A biblioteca PS2 usa o binding privado R2 `GAME_ROMS`. Crie o bucket indicado em `wrangler.jsonc` e publique cada ROM nesta convenção:
+A biblioteca PS2 usa a API S3 privada do Backblaze B2. No bucket `plumpgames-storage-ps2`, publique cada ROM nesta convenção:
 
 ```text
-emulators/ps2/games/<slug>/game.iso
-emulators/ps2/games/<slug>/game.bin
-emulators/ps2/games/<slug>/game.chd
+ps2/jogos/<slug>/game.iso
+ps2/jogos/<slug>/game.bin
+ps2/jogos/<slug>/game.chd
 ```
 
 O `<slug>` deve conter letras minúsculas, números e hífens. `GET /api/emulators/ps2/games` lista o prefixo e detecta esses objetos automaticamente; arquivos fora da convenção são ignorados. O nome inicial é derivado do slug. ROMs não fazem parte do Git e o bucket não deve ser público.
@@ -81,16 +81,23 @@ O `<slug>` deve conter letras minúsculas, números e hífens. `GET /api/emulato
 | Método | Endpoint | Função |
 | --- | --- | --- |
 | `GET`/`HEAD` | `/api/emulators` | Sistemas suportados e estado do núcleo |
-| `GET`/`HEAD` | `/api/emulators/:id/games` | Jogos detectados no R2 |
+| `GET`/`HEAD` | `/api/emulators/:id/games` | Jogos detectados no Backblaze B2 |
 | `GET`/`HEAD` | `/api/emulators/:id/games/:slug/rom` | Streaming privado da ROM |
 
-O endpoint de ROM encaminha o cabeçalho HTTP `Range` ao R2. O bucket devolve somente o intervalo solicitado e o Worker responde `206 Partial Content`, `Accept-Ranges: bytes`, `Content-Range` e `Content-Length`. Isso permite que um núcleo WebAssembly leia setores sob demanda, sem baixar a imagem inteira antes de iniciar. Sem `Range`, a resposta é `200`; `HEAD` retorna apenas metadados.
+O endpoint de ROM encaminha o cabeçalho HTTP `Range` ao Backblaze B2. O bucket devolve somente o intervalo solicitado e o Worker responde `206 Partial Content`, `Accept-Ranges: bytes`, `Content-Range` e `Content-Length`. Isso permite que um núcleo WebAssembly leia setores sob demanda, sem baixar a imagem inteira antes de iniciar. Sem `Range`, a resposta é `200`; `HEAD` retorna apenas metadados.
 
-### Configuração Cloudflare e secrets
+### Configuração do Backblaze B2 e secrets
 
-O R2 é um **binding**, não um secret. Crie manualmente o bucket `plumpgames-roms` (`npx wrangler r2 bucket create plumpgames-roms`) e envie ROMs autorizadas pelo painel ou Wrangler. O binding `GAME_ROMS` já está declarado em `wrangler.jsonc` e é usado exclusivamente em `emulator-api.js` para listar, consultar e transmitir objetos.
+O endpoint S3, o nome do bucket e o prefixo são configurações não secretas declaradas em `wrangler.jsonc`. `emulator-api.js` assina no Worker as operações privadas de listagem, consulta e transmissão com AWS Signature Version 4.
 
-Esta implementação **não requer nenhum secret novo**. Não configure chaves R2 no frontend: Workers acessam R2 pelo binding. O binding `AI` continua sendo usado em `worker.js` pelo PJ Assistant e `DB` pelo catálogo comunitário. Se futuramente houver upload administrativo por API, crie um secret (por exemplo, `ROM_ADMIN_TOKEN` via `wrangler secret put`) e use-o somente no Worker; esse endpoint deliberadamente não existe nesta versão.
+Configure as credenciais somente como secrets do Worker, nunca no frontend ou em arquivos versionados:
+
+```sh
+npx wrangler secret put B2_ACCESS_KEY_ID
+npx wrangler secret put B2_SECRET_ACCESS_KEY
+```
+
+O binding `AI` continua sendo usado em `worker.js` pelo PJ Assistant e `DB` pelo catálogo comunitário.
 
 ### Pendente: núcleo PS2 WebAssembly real
 
