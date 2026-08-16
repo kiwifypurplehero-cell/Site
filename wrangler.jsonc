@@ -10,6 +10,8 @@
       "/api/*",
       "/emulators",
       "/emulators/",
+      "/emulators/ps1",
+      "/emulators/ps1/",
       "/emulators/ps2",
       "/emulators/ps2/"
     ]
@@ -18,6 +20,9 @@
     "binding": "AI"
   },
   "vars": {
+    "B2_PS1_ENDPOINT": "https://s3.us-east-005.backblazeb2.com",
+    "B2_PS1_BUCKET": "plumpgames-storage-ps1",
+    "B2_PS1_PREFIX": "Jogos/",
     "B2_ENDPOINT": "https://s3.us-east-005.backblazeb2.com",
     "B2_BUCKET": "plumpgames-storage-ps2",
     "B2_PS2_PREFIX": "ps2/jogos/"

@@ -1,6 +1,14 @@
 /** Catálogo declarativo compartilhado pelo frontend e pelo Worker. */
 export const EMULATORS = Object.freeze([
   Object.freeze({
+    id: 'ps1',
+    name: 'PlayStation 1',
+    shortName: 'PS1',
+    description: 'Biblioteca PlayStation executada no navegador com EmulatorJS.',
+    romExtensions: Object.freeze(['iso', 'bin', 'chd', 'cue']),
+    core: Object.freeze({status: 'experimental', id: 'psx', engine: 'pcsx_rearmed'})
+  }),
+  Object.freeze({
     id: 'ps2',
     name: 'PlayStation 2',
     shortName: 'PS2',

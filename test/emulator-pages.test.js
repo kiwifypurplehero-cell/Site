@@ -18,8 +18,9 @@ test('home contém as três views e navegação interna', async () => {
   const response = await request('/');
   assert.equal(response.status, 200);
   const html = await response.text();
-  for (const view of ['home', 'emulators', 'ps2']) assert.match(html, new RegExp(`data-app-view="${view}"`));
+  for (const view of ['home', 'emulators', 'ps1', 'ps2']) assert.match(html, new RegExp(`data-app-view="${view}"`));
   assert.match(html, /data-view-link="emulators"/);
+  assert.match(html, /data-view-link="ps1">Abrir emulador/);
   assert.match(html, /data-view-link="ps2">Abrir emulador/);
   assert.match(html, /data-view-link="emulators">← Voltar/);
   assert.doesNotMatch(html, /target="_blank"|href="\/emulators\.html"|href="\/emulators\/ps2\/"/);
