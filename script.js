@@ -317,7 +317,7 @@ function getGitHubPagesUrl(repo) {
 function openGamePage(game) {
   const playPageUrl = buildPlayPageUrl(game, location.href);
   if (!playPageUrl) return;
-  window.open(playPageUrl, '_blank', 'noopener,noreferrer');
+  location.assign(playPageUrl);
 }
 
 function loadGamesCache() {
@@ -375,7 +375,7 @@ function detailItem(label, value, relative = false) {
 function safeLink(label, url, primary = false) {
   if (!isSafeHttpsUrl(url, 'github.com')) return null;
   const link = element('a', `button button--small ${primary ? 'button--primary' : 'button--ghost'}`, label);
-  link.href=url; link.target='_blank'; link.rel='noopener noreferrer';
+  link.href=url;
   return link;
 }
 
