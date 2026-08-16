@@ -44,7 +44,7 @@ test('PS2 mantém endpoint seguro e integração declarada com B2', async () => 
   assert.match(registry, /Backblaze B2/);
 });
 
-test('PS1 usa pcsx_rearmed/HLE sem exigir BIOS e trata ISO não anunciado pelo core', async () => {
+test('PS1 envia ISO ao pcsx_rearmed/HLE sem exigir BIOS nem pré-bloquear a extensão', async () => {
   const [html, source, registry] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
@@ -53,8 +53,11 @@ test('PS1 usa pcsx_rearmed/HLE sem exigir BIOS e trata ISO não anunciado pelo c
   assert.match(source, /EJS_core = document\.querySelector\('#ps1-core'\)\.value \|\| 'psx'/);
   assert.match(source, /biosMode: 'hle'/);
   assert.doesNotMatch(source, /window\.EJS_biosUrl = biosObjectUrl \|\| undefined/);
-  assert.match(source, /Converta o dump para CHD ou BIN\+CUE/);
-  assert.match(registry, /coreExtensions: Object\.freeze\(\['bin', 'cue', 'chd'/);
+  assert.doesNotMatch(source, /coreExtensions\.includes|não anuncia suporte direto a ISO/);
+  assert.match(registry, /coreExtensions: Object\.freeze\(\['iso', 'bin', 'cue', 'chd'/);
+  assert.match(source, /fetch\(gameUrl, \{method: 'HEAD'/);
+  assert.match(source, /window\.EJS_gameUrl = gameUrl/);
+  for (const state of ['Preparando emulador', 'Conectando ao arquivo', 'Carregando jogo', 'Inicializando core', 'Executando']) assert.match(source, new RegExp(state));
   assert.match(html, /Automático\/HLE/);
   assert.match(html, /Executando sem BIOS externa\. Alguns jogos podem ter compatibilidade reduzida\./);
 });

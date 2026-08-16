@@ -125,6 +125,8 @@ npx wrangler secret put B2_PS1_SECRET_ACCESS_KEY
 
 Use uma Application Key restrita à leitura/listagem do bucket PS1. As variáveis não secretas `B2_PS1_ENDPOINT`, `B2_PS1_BUCKET` e `B2_PS1_PREFIX` já estão declaradas e apontam exclusivamente para `https://s3.us-east-005.backblazeb2.com`, `plumpgames-storage-ps1` e `Jogos/`. `PS1_DIAGNOSTIC_MODE=true` inclui uma causa técnica curta na resposta administrativa; deixe-a ausente em produção normal.
 
-O padrão **Automático/HLE** inicia `psx` (pcsx_rearmed) sem definir `EJS_biosUrl`. Uma BIOS local continua opcional e nunca é enviada ao servidor. O catálogo mostra os formatos encontrados, inclusive ISO, mas o metadata do pcsx_rearmed usado neste setup não anuncia ISO como extensão direta. Para um ISO, a interface informa que o dump deve ser convertido manualmente para CHD ou BIN+CUE em vez de fingir que o core iniciou.
+O padrão **Automático/HLE** inicia `psx` (pcsx_rearmed) sem definir `EJS_biosUrl`. Uma BIOS local continua opcional e nunca é enviada ao servidor. ISO e os demais formatos do catálogo são entregues ao core sem bloqueio preventivo por extensão; somente uma falha real de acesso ou a ausência do callback de início produz erro recuperável.
+
+Antes de carregar o core, a view faz somente um `HEAD` no endpoint seguro para exibir disponibilidade e metadados no diagnóstico (`?view=ps1&debug=1`). O endpoint suporta Range, mas o loader do EmulatorJS controla a leitura do jogo: esta integração não afirma que o pcsx_rearmed inicia progressivamente. Ele pode baixar o arquivo completo diretamente para a memória WebAssembly e exibe o progresso nativo, sem um `arrayBuffer()` ou uma segunda cópia criada pelo código da PlumpGames.
 
 Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJS podem ser hospedados como assets próprios, desde que a GPL-3.0 e os avisos do projeto sejam preservados; o estado atual usa CDN e portanto requer conexão com esse host.
