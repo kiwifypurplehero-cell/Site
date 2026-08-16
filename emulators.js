@@ -183,7 +183,11 @@ async function loadPs1Library({refresh = false} = {}) {
         const title = document.createElement('strong'); title.textContent = game.name;
         const metadata = document.createElement('small'); metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`;
         const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar';
-        play.addEventListener('click', () => startPs1(game)); details.append(title, metadata); card.append(cover, details, play); return card;
+        play.addEventListener('click', () => {
+          const url = new URL('/play/ps1/', location.origin);
+          url.searchParams.set('game', game.id);
+          window.open(url.href, '_blank');
+        }); details.append(title, metadata); card.append(cover, details, play); return card;
       }));
     } catch (error) {
       PS1EmulatorState.libraryLoaded = false;

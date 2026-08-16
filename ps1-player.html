@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#05060a">
+  <title>PlayStation 1 — PlumpGames</title>
+  <link rel="stylesheet" href="/ps1-player.css">
+  <script type="module" src="/ps1-player.js"></script>
+</head>
+<body>
+  <header id="toolbar"><a href="/?view=ps1">← Voltar para PlumpGames</a><strong id="game-name">PlayStation 1</strong><button id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings">⚙</button></header>
+  <main id="player-shell">
+    <div id="ps1-emulator"></div>
+    <div id="loading" role="status"><span></span><b>Preparando emulador…</b></div>
+    <section id="error" hidden><b>Não foi possível iniciar o jogo.</b><p></p><button id="retry" type="button">Tentar novamente</button></section>
+    <button id="fullscreen-prompt" type="button">Jogar em tela cheia</button>
+  </main>
+  <aside id="settings" hidden>
+    <label>Perfil de desempenho<select id="profile"><option value="auto">Automático</option><option value="quality">Qualidade</option><option value="balanced">Equilibrado</option><option value="maximum">Desempenho máximo</option></select></label>
+    <label>Frameskip<select id="frameskip"><option value="auto">Automático</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+    <label>Áudio<select id="audio"><option value="balanced">Equilibrado</option><option value="low">Baixa latência</option><option value="stable">Estável</option></select></label>
+    <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">Diagnóstico</button>
+    <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p>
+    <dl id="diagnostics" hidden></dl>
+  </aside>
+</body>
+</html>

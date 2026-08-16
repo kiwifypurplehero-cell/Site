@@ -32,7 +32,8 @@ test('controlador troca views via estado e preserva History API', async () => {
   assert.match(source, /function setView\(view/);
   assert.match(source, /history\.pushState/);
   assert.match(source, /addEventListener\('popstate'/);
-  assert.doesNotMatch(source, /window\.open|location\.href\s*=/);
+  assert.doesNotMatch(source, /location\.href\s*=/);
+  assert.match(source, /window\.open\(url\.href, '_blank'\)/);
 });
 
 test('PS2 mantém endpoint seguro e integração declarada com B2', async () => {
