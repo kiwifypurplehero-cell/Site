@@ -18,7 +18,7 @@
       <h1 id="loading-game">PlayStation 1</h1>
       <b id="loading-phase">Preparando emulador</b>
       <div id="progress-track" role="progressbar" aria-label="Progresso do carregamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress-bar"></i></div>
-      <strong id="loading-percent">0%</strong>
+      <strong id="loading-percent">0%</strong><small id="files-progress">Arquivos: 0%</small><small id="initialization-progress">Inicialização: 0%</small><dl id="initialization-details" hidden></dl>
       <div id="loading-details" hidden><span id="loading-bytes"></span><span id="loading-speed"></span><span id="loading-eta"></span></div>
       <div id="initializing" hidden><span class="spinner"></span><span id="initializing-text">Inicializando PCSX-ReARMed…</span></div>
       <button id="cancel" type="button">Cancelar</button>
@@ -31,7 +31,7 @@
       <label>Perfil de desempenho<select id="profile"><option value="auto">Automático</option><option value="quality">Qualidade</option><option value="balanced">Equilibrado</option><option value="maximum">Desempenho máximo</option><option value="compatible">Compatível</option></select></label>
       <label>Frameskip<select id="frameskip"><option value="auto">Automático</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
       <label>Áudio<select id="audio"><option value="balanced">Equilibrado</option><option value="low">Baixa latência</option><option value="stable">Estável</option></select></label>
-      <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">FPS/diagnóstico</button>
+      <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">FPS/diagnóstico</button><label><input id="details-toggle" type="checkbox"> Mostrar detalhes de inicialização</label>
       <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p><dl id="diagnostics" hidden></dl>
     </aside>
   </main>

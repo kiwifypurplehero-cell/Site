@@ -1,4 +1,8 @@
 /** Catálogo declarativo compartilhado pelo frontend e pelo Worker. */
+import {LOADING_PROFILES} from './emulator-loading-manager.js';
+
+export function registerEmulator(definition){return Object.freeze({...definition,loadingProfile:Object.freeze(definition.loadingProfile||LOADING_PROFILES[definition.id]||LOADING_PROFILES.default)});}
+
 export const EMULATORS = Object.freeze([
   Object.freeze({
     id: 'ps1',
@@ -9,7 +13,7 @@ export const EMULATORS = Object.freeze([
     // Candidate formats are passed to the core rather than used as a client-side gate.
     coreExtensions: Object.freeze(['iso', 'bin', 'cue', 'chd', 'img', 'mdf', 'pbp', 'ccd', 'm3u']),
     core: Object.freeze({status: 'experimental', id: 'psx', engine: 'pcsx_rearmed'}),
-    storage: Object.freeze({prefix: 'Jogos/'})
+    storage: Object.freeze({prefix: 'Jogos/'}), loadingProfile:LOADING_PROFILES.ps1
   }),
   Object.freeze({
     id: 'gbc',
@@ -19,7 +23,7 @@ export const EMULATORS = Object.freeze([
     romExtensions: Object.freeze(['gbc', 'gb']),
     coreExtensions: Object.freeze(['gbc', 'gb']),
     core: Object.freeze({status: 'stable', id: 'gb', engine: 'gambatte'}),
-    storage: Object.freeze({prefix: 'Jogos-GBC/'})
+    storage: Object.freeze({prefix: 'Jogos-GBC/'}), loadingProfile:LOADING_PROFILES.gbc
   }),
   Object.freeze({
     id: 'ps2',
