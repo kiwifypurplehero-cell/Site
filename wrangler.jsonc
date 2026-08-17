@@ -6,6 +6,7 @@
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
+    "html_handling": "none",
     "run_worker_first": [
       "/api/*",
       "/emulators",
@@ -14,6 +15,7 @@
       "/emulators/ps1/",
       "/gbc-player",
       "/gbc-player/",
+      "/gbc-player.html",
       "/play/ps1",
       "/play/ps1/",
       "/emulators/ps2",

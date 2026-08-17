@@ -125,7 +125,7 @@ async function loadGbcLibrary({refresh = false} = {}) {
         const cover = game.coverUrl ? document.createElement('img') : document.createElement('div'); cover.className = 'ps1-rom-cover';
         if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; } else cover.textContent = 'G';
         const details = document.createElement('div'), title = document.createElement('strong'), metadata = document.createElement('small'); title.textContent = game.name; metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`; details.append(title, metadata);
-        const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar'; play.onclick = () => { const url = new URL('/gbc-player', location.origin); url.searchParams.set('game', game.id); window.open(url.href, '_blank'); };
+        const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar'; play.onclick = () => { const url = new URL('/gbc-player.html', location.origin); url.searchParams.set('game', game.id); window.open(url.href, '_blank'); };
         card.append(cover, details, play); return card;
       }));
     } catch (error) { status.textContent = error.message; gbcLibraryPromise = undefined; }

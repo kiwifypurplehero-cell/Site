@@ -125,7 +125,31 @@ export default {async fetch(request,env,ctx){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
   if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
-  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/gbc-player','/gbc-player.html'],['/gbc-player/','/gbc-player.html'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
+  const gbcDebug=url.searchParams.get('debug')==='1';
+  if(url.pathname==='/gbc-player'||url.pathname==='/gbc-player/') {
+    const target=new URL('/gbc-player.html',url); target.search=url.search;
+    if(gbcDebug) {
+      console.info('[GBC-ROUTE] request path',url.pathname);
+      console.info('[GBC-ROUTE] query',url.search);
+      console.info('[GBC-ROUTE] redirect target',target.pathname+target.search);
+      console.info('[GBC-ROUTE] response',302);
+    }
+    if(target.href===url.href) {
+      if(gbcDebug)console.warn('[GBC-ROUTE] response','blocked self redirect');
+      return json({error:'Redirecionamento inválido.'},500);
+    }
+    return Response.redirect(target,302);
+  }
+  if(url.pathname==='/gbc-player.html') {
+    if(gbcDebug) {
+      console.info('[GBC-ROUTE] request path',url.pathname);
+      console.info('[GBC-ROUTE] query',url.search);
+    }
+    const response=await env.ASSETS.fetch(new Request(new URL('/gbc-player.html',url),request));
+    if(gbcDebug)console.info('[GBC-ROUTE] response',response.status);
+    return response;
+  }
+  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
   if(emulatorPages.has(url.pathname)) {
     const asset=await env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
     if(!url.pathname.startsWith('/play/ps1')&&!url.pathname.startsWith('/ps1-player')) return asset;

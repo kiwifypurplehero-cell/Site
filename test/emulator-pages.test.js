@@ -26,12 +26,28 @@ test('home contém as três views e navegação interna', async () => {
   assert.doesNotMatch(html, /target="_blank"|href="\/emulators\.html"|href="\/emulators\/ps2\/"/);
 });
 
-test('GBC abre player dedicado em nova aba e suporta refresh da rota', async () => {
-  const [html, source, player] = await Promise.all([request('/').then(r => r.text()), readFile(new URL('../emulators.js', import.meta.url), 'utf8'), request('/gbc-player?game=pokemon').then(r => r.text())]);
+test('GBC abre a rota canônica diretamente e ela responde sem redirect', async () => {
+  const [html, source, response] = await Promise.all([request('/').then(r => r.text()), readFile(new URL('../emulators.js', import.meta.url), 'utf8'), request('/gbc-player.html?game=pokemon')]);
   assert.match(html, /data-view-link="gbc">Abrir emulador/);
-  assert.match(source, /new URL\('\/gbc-player'/);
+  assert.match(source, /new URL\('\/gbc-player\.html'/);
   assert.match(source, /window\.open\(url\.href, '_blank'\)/);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('location'), null);
+  const player = await response.text();
   assert.match(player, /id="gbc-player-shell"/);
+});
+
+test('variações GBC fazem no máximo um redirect para a rota canônica', async () => {
+  for (const path of ['/gbc-player', '/gbc-player/', '/gbc-player?game=abc']) {
+    const response=await request(path);
+    assert.equal(response.status,302);
+    const target=new URL(response.headers.get('location'));
+    assert.equal(target.pathname,'/gbc-player.html');
+    assert.notEqual(target.href,`https://local.test${path}`);
+    const finalResponse=await request(`${target.pathname}${target.search}`);
+    assert.equal(finalResponse.status,200);
+    assert.equal(finalResponse.headers.get('location'),null);
+  }
 });
 
 test('controlador troca views via estado e preserva History API', async () => {
