@@ -13,6 +13,8 @@ const PS1_DEFAULTS = Object.freeze({
   bucket: 'plumpgames-storage-ps1',
   prefix: 'Jogos/'
 });
+const GBC_DEFAULTS = Object.freeze({prefix: 'Jogos-GBC/'});
+const GBC_BOOT_EXTENSIONS = new Set(['gbc', 'gb']);
 const encoder = new TextEncoder();
 const PS1_BLOCK_SIZE = 4 * 1024 * 1024;
 const PS1_BLOCK_TTL = 86400;
@@ -74,6 +76,13 @@ function b2Config(env, emulatorId) {
     prefix: env.B2_PS1_PREFIX || PS1_DEFAULTS.prefix,
     accessKeyId: env.B2_PS1_ACCESS_KEY_ID,
     secretAccessKey: env.B2_PS1_SECRET_ACCESS_KEY
+  };
+  if (emulatorId === 'gbc') return {
+    endpoint: env.B2_GBC_ENDPOINT,
+    bucket: env.B2_GBC_BUCKET,
+    prefix: env.B2_GBC_PREFIX || GBC_DEFAULTS.prefix,
+    accessKeyId: env.B2_GBC_ACCESS_KEY_ID,
+    secretAccessKey: env.B2_GBC_SECRET_ACCESS_KEY
   };
   return {endpoint: env.B2_ENDPOINT, bucket: env.B2_BUCKET, prefix: env.B2_PS2_PREFIX || DEFAULT_PREFIX, accessKeyId: env.B2_ACCESS_KEY_ID, secretAccessKey: env.B2_SECRET_ACCESS_KEY};
 }
@@ -162,6 +171,7 @@ async function listGames(env, emulator) {
   const config = b2Config(env, emulator.id);
   const prefix = config.prefix;
   if (emulator.id === 'ps1') return listPs1Games(config, emulator);
+  if (emulator.id === 'gbc') return listGbcGames(config);
   const response = await signedB2Fetch(config, 'GET', '', [['list-type', '2'], ['prefix', prefix]]);
   if (!response.ok) throw new Error(`Backblaze B2 respondeu ${response.status}.`);
   const xml = await response.text();
@@ -176,6 +186,41 @@ async function listGames(env, emulator) {
     if (!games.has(match[1])) games.set(match[1], {slug: match[1], title: titleFromSlug(match[1]), format: match[2].toUpperCase(), size, updatedAt});
   }
   return [...games.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+}
+
+export function normalizeGbcLibrary(objects, prefix = GBC_DEFAULTS.prefix) {
+  const groups = new Map();
+  for (const source of objects) {
+    if (!safeObjectKey(source?.key, prefix)) continue;
+    const extension = extensionOf(source.key);
+    if (!GBC_BOOT_EXTENSIONS.has(extension) && !PS1_COVER_EXTENSIONS.has(extension)) continue;
+    const relative = source.key.slice(prefix.length), parts = relative.split('/');
+    const group = parts.length > 1 ? parts[0] : relative.replace(/\.[^.]+$/, '');
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({key: source.key, extension, size: Number(source.size) || 0, lastModified: source.lastModified || null});
+  }
+  const games = [];
+  for (const [name, files] of groups) {
+    const roms = files.filter(file => GBC_BOOT_EXTENSIONS.has(file.extension)).sort((a, b) => a.key.localeCompare(b.key, 'pt-BR'));
+    if (!roms.length) continue;
+    const boot = roms[0], coverKey = files.some(file => file.key.slice(prefix.length).includes('/')) ? chooseCover(files, name) : null;
+    games.push({id: `${ps1Slug(name)}-${stableIdSuffix(boot.key)}`, name: friendlyName(name), format: boot.extension, size: boot.size, bootKey: boot.key, key: boot.key, coverKey, coverUrl: coverKey ? `/api/emulators/gbc/cover/${encodeURIComponent(coverKey)}` : null, files: [{key: boot.key, type: 'rom', size: boot.size}], lastModified: boot.lastModified});
+  }
+  return games.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+async function listGbcGames(config) {
+  const objects = []; let continuationToken = '';
+  do {
+    const params = [['list-type', '2'], ['prefix', config.prefix]];
+    if (continuationToken) params.push(['continuation-token', continuationToken]);
+    const response = await signedB2Fetch(config, 'GET', '', params);
+    if (!response.ok) throw await b2Failure(response);
+    const xml = await response.text();
+    for (const content of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) objects.push({key: decodeXml(content[1].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || ''), size: Number(content[1].match(/<Size>(\d+)<\/Size>/)?.[1] || 0), lastModified: content[1].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1] || null});
+    continuationToken = decodeXml(xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] || '');
+  } while (continuationToken);
+  return normalizeGbcLibrary(objects, config.prefix);
 }
 
 function friendlyName(filename) {
@@ -479,6 +524,22 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
       headers.set('X-Content-Type-Options', 'nosniff');
       return new Response(request.method === 'HEAD' ? null : response.body, {status: response.status, headers});
     } catch (error) { console.error('B2 cover failure', error); return json({error: 'Capa temporariamente indisponível.'}, 503); }
+  }
+  const gbcAssetMatch = pathname.match(/^\/api\/emulators\/gbc\/(file|cover)\/(.+)$/);
+  if (gbcAssetMatch) {
+    let key; try { key = decodeURIComponent(gbcAssetMatch[2]); } catch { return json({error: 'Arquivo inválido.'}, 400); }
+    const config = b2Config(env, 'gbc'), extension = extensionOf(key), isCover = gbcAssetMatch[1] === 'cover';
+    if (!hasB2Config(env, 'gbc')) return json({error: 'Biblioteca de jogos não configurada.'}, 503);
+    if (!safeObjectKey(key, config.prefix) || !(isCover ? PS1_COVER_EXTENSIONS : GBC_BOOT_EXTENSIONS).has(extension)) return json({error: 'Arquivo não encontrado.'}, 404);
+    try {
+      const headers = request.headers.has('Range') ? {Range: request.headers.get('Range')} : {};
+      const response = await signedB2Fetch(config, request.method, key, [], headers);
+      if (response.status === 404) return json({error: 'Arquivo não encontrado.'}, 404);
+      const result = b2Response(response, request);
+      if (!isCover) return result;
+      const coverHeaders = new Headers(result.headers); coverHeaders.set('Content-Type', {jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp'}[extension]); coverHeaders.set('Cache-Control', PS1_COVER_CACHE); coverHeaders.set('X-Content-Type-Options', 'nosniff');
+      return new Response(request.method === 'HEAD' ? null : result.body, {status: result.status, headers: coverHeaders});
+    } catch (error) { console.error('GBC B2 file failure', error); return json({error: 'Arquivo temporariamente indisponível.'}, 503); }
   }
   const ps1FileMatch = pathname.match(/^\/api\/emulators\/ps1\/file\/(.+)$/);
   if (ps1FileMatch) {

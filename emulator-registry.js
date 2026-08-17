@@ -8,7 +8,18 @@ export const EMULATORS = Object.freeze([
     romExtensions: Object.freeze(['iso', 'bin', 'cue', 'chd', 'img', 'mdf', 'pbp', 'ccd', 'm3u']),
     // Candidate formats are passed to the core rather than used as a client-side gate.
     coreExtensions: Object.freeze(['iso', 'bin', 'cue', 'chd', 'img', 'mdf', 'pbp', 'ccd', 'm3u']),
-    core: Object.freeze({status: 'experimental', id: 'psx', engine: 'pcsx_rearmed'})
+    core: Object.freeze({status: 'experimental', id: 'psx', engine: 'pcsx_rearmed'}),
+    storage: Object.freeze({prefix: 'Jogos/'})
+  }),
+  Object.freeze({
+    id: 'gbc',
+    name: 'Game Boy Color',
+    shortName: 'GBC',
+    description: 'Biblioteca Game Boy e Game Boy Color executada no navegador.',
+    romExtensions: Object.freeze(['gbc', 'gb']),
+    coreExtensions: Object.freeze(['gbc', 'gb']),
+    core: Object.freeze({status: 'stable', id: 'gb', engine: 'gambatte'}),
+    storage: Object.freeze({prefix: 'Jogos-GBC/'})
   }),
   Object.freeze({
     id: 'ps2',
