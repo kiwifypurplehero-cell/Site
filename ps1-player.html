@@ -10,9 +10,10 @@
   <script type="module" src="/ps1-player.js"></script>
 </head>
 <body>
-  <header id="toolbar"><a id="back" href="/?view=ps1">← Voltar para PlumpGames</a><strong id="game-name">PlayStation 1</strong><button id="settings-toggle" type="button" aria-expanded="false" aria-controls="settings">⚙</button></header>
-  <main id="player-shell">
+  <header id="toolbar"><a id="back" href="/?view=ps1">← Voltar para PlumpGames</a><strong id="game-name">PlayStation 1</strong></header>
+  <main id="ps1-player-shell">
     <div id="ps1-emulator"></div>
+    <button id="settings-toggle" type="button" aria-label="Configurações" aria-expanded="false" aria-controls="settings">⚙</button>
     <section id="loading" role="status" aria-live="polite">
       <h1 id="loading-game">PlayStation 1</h1>
       <b id="loading-phase">Preparando emulador</b>
@@ -22,16 +23,17 @@
       <div id="initializing" hidden><span class="spinner"></span><span id="initializing-text">Inicializando PCSX-ReARMed…</span></div>
       <button id="cancel" type="button">Cancelar</button>
     </section>
-    <section id="error" hidden><b>Não foi possível iniciar o jogo.</b><p></p><button id="retry" type="button">Tentar novamente</button></section>
-    <button id="fullscreen-prompt" type="button">Jogar em tela cheia</button>
+    <section id="error" hidden><b>Não foi possível iniciar o jogo.</b><p></p><div class="error-actions"><button id="compatibility" type="button">Tentar modo compatível</button><button id="retry" type="button">Tentar novamente</button><button id="error-back" type="button">Voltar</button></div></section>
+    <button id="fullscreen-prompt" type="button" hidden>Entrar em tela cheia e iniciar</button>
+    <div id="settings-backdrop" hidden></div>
+    <aside id="settings" hidden role="dialog" aria-label="Configurações do emulador">
+      <button id="settings-close" type="button" aria-label="Fechar configurações">×</button>
+      <label>Perfil de desempenho<select id="profile"><option value="auto">Automático</option><option value="quality">Qualidade</option><option value="balanced">Equilibrado</option><option value="maximum">Desempenho máximo</option><option value="compatible">Compatível</option></select></label>
+      <label>Frameskip<select id="frameskip"><option value="auto">Automático</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+      <label>Áudio<select id="audio"><option value="balanced">Equilibrado</option><option value="low">Baixa latência</option><option value="stable">Estável</option></select></label>
+      <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">FPS/diagnóstico</button>
+      <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p><dl id="diagnostics" hidden></dl>
+    </aside>
   </main>
-  <aside id="settings" hidden>
-    <label>Perfil de desempenho<select id="profile"><option value="auto">Automático</option><option value="quality">Qualidade</option><option value="balanced">Equilibrado</option><option value="maximum">Desempenho máximo</option></select></label>
-    <label>Frameskip<select id="frameskip"><option value="auto">Automático</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
-    <label>Áudio<select id="audio"><option value="balanced">Equilibrado</option><option value="low">Baixa latência</option><option value="stable">Estável</option></select></label>
-    <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">Diagnóstico</button>
-    <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p>
-    <dl id="diagnostics" hidden></dl>
-  </aside>
 </body>
 </html>

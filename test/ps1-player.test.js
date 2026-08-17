@@ -43,18 +43,36 @@ test('player PS1 preserva BIN+CUE, core leve e defaults seguros', () => {
   assert.match(source, /downloadPs1Content/);
   assert.match(source, /EJS_core:'psx'/);
   assert.match(source, /EJS_threads:false/);
-  assert.match(source, /pcsx_rearmed_drc: 'enabled'/);
+  assert.match(source, /pcsx_rearmed_drc:\s*'enabled'/);
   assert.match(source, /pcsx_rearmed_duping_enable/);
-  assert.match(source, /pcsx_rearmed_neon_enhancement_enable: 'disabled'/);
+  assert.match(source, /pcsx_rearmed_neon_enhancement_enable:\s*'disabled'/);
 });
 
 test('loading dedicado usa estado real, cancelamento e só some no início do jogo', () => {
   const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
   const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
   assert.match(source, /export const ps1LoadState/); assert.match(source, /new AbortController\(\)/);
-  assert.match(source, /window\.EJS_onGameStart=.*\$\('#loading'\)\.hidden=true/);
+  assert.match(source, /function noteFrame\(\).*\$\('#loading'\)\.hidden=true/);
   assert.match(source, /setTimeout\(renderLoadState,150\)/);
   assert.match(html, /id="progress-track"/); assert.match(html, /id="loading-bytes"/); assert.match(html, /id="cancel"/);
+});
+
+test('estados de boot, primeiro frame e fallback não confundem download com execução', () => {
+  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  for (const phase of ['preparing','network_check','downloading','download_complete','core_loading','content_mounting','booting','running','error']) assert.match(source, new RegExp(`'${phase}'`));
+  assert.match(source, /drawArrays/); assert.match(source, /drawElements/);
+  assert.match(source, /BLACK_SCREEN_TIMEOUT/); assert.match(source, /NO_FIRST_FRAME/);
+  assert.match(source, /compatibilityRetried=true/); assert.match(source, /keepContent:true/);
+});
+
+test('fullscreen automático é exclusivo de mobile e shell contém configurações overlay', () => {
+  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../ps1-player.css', import.meta.url), 'utf8');
+  assert.match(source, /pointer: coarse/); assert.match(source, /maxTouchPoints/); assert.match(source, /requestPlayerFullscreen/);
+  assert.match(source, /fullscreenchange/); assert.match(source, /fullscreenerror/); assert.match(source, /orientationchange/);
+  assert.match(html, /id="ps1-player-shell"[\s\S]*id="settings-toggle"[\s\S]*id="settings"/);
+  assert.match(html, /Entrar em tela cheia e iniciar/); assert.match(css, /100dvh/); assert.match(css, /safe-area-inset-top/);
 });
 
 test('página dedicada não carrega scripts gerais da PlumpGames', () => {
