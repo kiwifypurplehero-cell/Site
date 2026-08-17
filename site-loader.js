@@ -1,21 +1,48 @@
+const MINIMUM_VISIBLE_TIME = 3000;
+const MAXIMUM_BOOT_TIME = 18000;
+const FADE_TIME = 280;
+
 const overlay = document.querySelector('#site-loader');
 const bar = overlay?.querySelector('.site-loader__bar');
+const track = overlay?.querySelector('[role="progressbar"]');
 const percentLabel = overlay?.querySelector('[data-loader-percent]');
-const stageLabel = overlay?.querySelector('[data-loader-stage]');
 const errorArea = overlay?.querySelector('[data-loader-error]');
-const startedAt = performance.now();
+const overlayStart = performance.now();
 const debug = new URL(location.href).searchParams.get('debug') === '1';
-let progress = 0;
+let state = 'boot';
+let realProgress = 5;
+let visualProgress = 5;
+let animationFrame;
+let safetyTimer;
 let emulatorModule;
 
-function update(value, stage) {
-  progress = Math.max(progress, Math.min(100, value));
-  if (bar) bar.style.width = `${progress}%`;
-  if (percentLabel) percentLabel.textContent = `${progress}%`;
-  if (stageLabel) stageLabel.textContent = stage;
+function setState(nextState) {
+  state = nextState;
+  if (overlay) overlay.dataset.state = nextState;
 }
 
-function waitFor(target, successEvent = 'load', timeout = 8000) {
+function renderProgress(value) {
+  visualProgress = Math.max(visualProgress, Math.min(100, Math.round(value)));
+  if (bar) bar.style.width = `${visualProgress}%`;
+  if (percentLabel) percentLabel.textContent = `${visualProgress}%`;
+  track?.setAttribute('aria-valuenow', String(visualProgress));
+}
+
+function reachMilestone(value) {
+  realProgress = Math.max(realProgress, Math.min(99, value));
+  renderProgress(realProgress);
+}
+
+function interpolateProgress() {
+  if (state !== 'loading') return;
+  const elapsedRatio = Math.min(1, (performance.now() - overlayStart) / MINIMUM_VISIBLE_TIME);
+  // Real milestones are authoritative; interpolation only fills the remaining visual time.
+  const interpolated = realProgress + (99 - realProgress) * elapsedRatio * 0.72;
+  renderProgress(Math.min(99, interpolated));
+  animationFrame = requestAnimationFrame(interpolateProgress);
+}
+
+function waitForEvent(target, successEvent = 'load', timeout = 8000) {
   return new Promise(resolve => {
     let timer;
     const done = result => { clearTimeout(timer); resolve(result); };
@@ -25,11 +52,15 @@ function waitFor(target, successEvent = 'load', timeout = 8000) {
   });
 }
 
+function waitForMainScript() {
+  if (window.__PLUMPGAMES_MAIN_READY__) return Promise.resolve();
+  return new Promise(resolve => document.addEventListener('plumpgames:critical-ready', resolve, {once: true}));
+}
+
 async function loadEmulators(view) {
   emulatorModule ||= import('./emulators.js');
   const module = await emulatorModule;
-  if (view) module.setView(view);
-  return module;
+  if (view) module.setView(view, {historyMode: 'replace'});
 }
 
 function requestedView() {
@@ -37,68 +68,89 @@ function requestedView() {
   return ['home', 'emulators', 'ps1', 'gbc', 'ps2'].includes(view) ? view : 'home';
 }
 
-// Keep emulator code and its registry off the initial Home request path.
+// Internal navigation remains instant and only lazily downloads emulator code.
 document.addEventListener('click', event => {
   const control = event.target.closest('[data-view-link]');
-  if (!control || emulatorModule) return;
-  const view = control.dataset.viewLink;
-  if (view === 'home') return;
+  const view = control?.dataset.viewLink;
+  if (!control || view === 'home' || emulatorModule) return;
   event.preventDefault();
   loadEmulators(view).catch(error => console.error('Falha ao abrir a área de emuladores.', error));
 });
 
+function cleanup() {
+  cancelAnimationFrame(animationFrame);
+  clearTimeout(safetyTimer);
+  document.body.classList.remove('loading-active');
+  // These properties are class-owned during boot; removing them guarantees the first gesture is free.
+  document.body.style.removeProperty('overflow-y');
+  document.body.style.removeProperty('touch-action');
+  document.body.style.removeProperty('pointer-events');
+  setState('hidden');
+  overlay?.remove();
+}
+
+function showSafetyFallback(error) {
+  if (state === 'hidden') return;
+  console.error('Falha crítica no bootstrap.', error);
+  cancelAnimationFrame(animationFrame);
+  setState('ready');
+  document.body.classList.remove('loading-active');
+  overlay?.classList.add('has-error');
+  if (!errorArea) return;
+  errorArea.hidden = false;
+  errorArea.replaceChildren(document.createTextNode('Não foi possível carregar completamente a PlumpGames.'));
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.textContent = 'Recarregar';
+  reload.addEventListener('click', () => location.reload());
+  errorArea.append(reload);
+}
+
 function reportPerformance() {
   if (!debug) return;
-  const resources = performance.getEntriesByType('resource');
-  const paints = Object.fromEntries(performance.getEntriesByType('paint').map(entry => [entry.name, Math.round(entry.startTime)]));
   console.info('[PLUMPGAMES PERFORMANCE]', {
-    domContentLoaded: Math.round(performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd || 0),
-    load: Math.round(performance.getEntriesByType('navigation')[0]?.loadEventEnd || 0),
-    firstContentfulPaint: paints['first-contentful-paint'],
-    overlayRemoved: Math.round(performance.now() - startedAt),
-    requests: resources.length,
-    transferredBytes: resources.reduce((sum, entry) => sum + (entry.transferSize || 0), 0),
-    scripts: resources.filter(entry => entry.initiatorType === 'script').map(entry => entry.name),
-    images: resources.filter(entry => entry.initiatorType === 'img').map(entry => entry.name)
+    overlayRemoved: Math.round(performance.now() - overlayStart),
+    requests: performance.getEntriesByType('resource').length
   });
-  if ('PerformanceObserver' in window) {
-    try { new PerformanceObserver(list => list.getEntries().forEach(entry => console.warn('[LONG TASK]', Math.round(entry.duration), 'ms'))).observe({type: 'longtask', buffered: true}); } catch {}
-    try { new PerformanceObserver(list => { const entries = list.getEntries(); if (entries.length) console.info('[LCP]', Math.round(entries.at(-1).startTime), 'ms'); }).observe({type: 'largest-contentful-paint', buffered: true}); } catch {}
-  }
 }
 
 async function bootstrap() {
-  update(10, 'Carregando CSS e JavaScript principal');
-  if (document.readyState === 'loading') await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, {once: true}));
+  setState('loading');
+  renderProgress(5);
+  animationFrame = requestAnimationFrame(interpolateProgress);
+  safetyTimer = setTimeout(() => showSafetyFallback(new Error('Tempo máximo de bootstrap excedido.')), MAXIMUM_BOOT_TIME);
+
+  if (document.readyState === 'loading') {
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, {once: true}));
+  }
+  reachMilestone(20);
+
+  await waitForMainScript();
+  reachMilestone(35);
+
   const style = document.querySelector('[data-critical-style]');
-  const cssReady = !style || style.sheet || await waitFor(style);
-  if (!cssReady) console.warn('CSS principal não confirmou o carregamento dentro do limite.');
-  update(40, 'Carregando assets essenciais');
-
+  const cssReady = !style || style.sheet || await waitForEvent(style);
+  if (!cssReady) console.warn('CSS principal não confirmou o carregamento; o bootstrap continuará.');
   const criticalImages = [...document.querySelectorAll('img[data-critical-image]')];
-  const imageResults = await Promise.all(criticalImages.map(image => image.complete ? image.naturalWidth > 0 : waitFor(image)));
-  if (imageResults.includes(false)) console.warn('Um asset visual secundário não pôde ser carregado.');
-  if (document.fonts?.ready) await Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 3000))]);
-  update(70, 'Inicializando interface');
+  const results = await Promise.all(criticalImages.map(image => image.complete ? image.naturalWidth > 0 : waitForEvent(image)));
+  if (results.includes(false)) console.warn('Um asset não crítico não pôde ser carregado; o bootstrap continuará.');
+  reachMilestone(55);
 
-  if (requestedView() !== 'home') await loadEmulators();
-  update(90, 'Preparando primeira view');
+  const view = requestedView();
+  if (view !== 'home') await loadEmulators(view);
+  reachMilestone(75);
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  update(100, 'Pronto');
+  reachMilestone(90);
+
+  const remaining = Math.max(0, MINIMUM_VISIBLE_TIME - (performance.now() - overlayStart));
+  await new Promise(resolve => setTimeout(resolve, remaining));
+  setState('ready');
+  cancelAnimationFrame(animationFrame);
+  renderProgress(100);
   overlay?.classList.add('is-complete');
-  setTimeout(() => { overlay?.remove(); reportPerformance(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220);
+  setTimeout(() => { cleanup(); reportPerformance(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : FADE_TIME);
 }
 
-bootstrap().catch(error => {
-  console.error('Falha crítica no bootstrap.', error);
-  update(progress, 'Não foi possível iniciar');
-  if (errorArea) {
-    errorArea.hidden = false;
-    errorArea.replaceChildren(document.createTextNode('A aplicação não pôde ser iniciada. '));
-    const reload = document.createElement('button');
-    reload.type = 'button'; reload.textContent = 'Recarregar'; reload.onclick = () => location.reload();
-    errorArea.append(reload);
-  }
-});
+bootstrap().catch(showSafetyFallback);
 
-if (debug) document.addEventListener('pointerdown', event => console.debug('[TOQUE INICIAL]', document.elementFromPoint(event.clientX, event.clientY), event.composedPath()), {once: true, capture: true, passive: true});
+if (debug) document.addEventListener('pointerdown', event => console.debug('[TOQUE INICIAL]', document.elementFromPoint(event.clientX, event.clientY)), {once: true, capture: true, passive: true});
