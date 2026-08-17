@@ -81,3 +81,23 @@ test('ISO usa uma única transferência GET e respeita AbortSignal', async () =>
   const controller=new AbortController();controller.abort();
   await assert.rejects(downloadPs1Content(game,{signal:controller.signal,fetchImpl:async(_url,{signal})=>{if(signal.aborted)throw new DOMException('Aborted','AbortError');}}),{name:'AbortError'});
 });
+
+test('preflight aceita Range 206 e retry é limitado sem duplicar download bem-sucedido', async () => {
+  let heads=0, ranges=0, downloads=0;
+  const game={bootKey:'Gran Turismo.iso',format:'iso',files:[{key:'Gran Turismo.iso'}]};
+  const result=await downloadPs1Content(game,{attempts:3,fetchImpl:async(_url,init={})=>{
+    if(init.method==='HEAD'){heads++;return new Response(null,{status:503});}
+    if(init.headers?.Range){ranges++;if(ranges===1)return new Response(null,{status:503});return new Response(new Uint8Array([0]),{status:206,headers:{'Content-Range':'bytes 0-0/4','Accept-Ranges':'bytes'}});}
+    downloads++;return new Response(new Uint8Array(4),{headers:{'Content-Length':'4'}});
+  }});
+  assert.equal(heads,2); assert.equal(ranges,2); assert.equal(downloads,1); assert.equal(result.totalBytes,4); URL.revokeObjectURL(result.gameUrl);
+});
+
+test('distingue HTTP 404 e offline real', async () => {
+  const game={bootKey:'missing.iso',format:'iso',files:[{key:'missing.iso'}]};
+  await assert.rejects(downloadPs1Content(game,{fetchImpl:async(_url,init={})=>init.method==='HEAD'?new Response(null,{status:404}):new Response(null,{status:404})}),{code:'HTTP_404',status:404});
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+  Object.defineProperty(globalThis,'navigator',{value:{onLine:false},configurable:true});
+  await assert.rejects(downloadPs1Content(game,{fetchImpl:async()=>{throw new TypeError('Failed to fetch');}}),{code:'OFFLINE'});
+  if(descriptor)Object.defineProperty(globalThis,'navigator',descriptor);else delete globalThis.navigator;
+});

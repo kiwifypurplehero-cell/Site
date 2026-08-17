@@ -113,15 +113,67 @@ function responseSize(response) {
   return /^\d+$/.test(value || '') ? Number(value) : null;
 }
 
-async function discoverSize(source, fetchImpl, signal) {
-  const head = await fetchImpl(source.url, {method: 'HEAD', signal});
-  if (!head.ok) return null;
-  return responseSize(head);
+export class Ps1NetworkError extends Error {
+  constructor(code, message, details = {}) { super(message); this.name = 'Ps1NetworkError'; this.code = code; Object.assign(this, details); }
 }
 
-async function downloadBlob(source, {fetchImpl, signal, onChunk}) {
-  const response = await fetchImpl(source.url, {signal});
-  if (!response.ok) throw new Error(`Não foi possível baixar ${decodePs1Key(source.key).split('/').pop()} (HTTP ${response.status}).`);
+const sleep = (milliseconds, signal) => new Promise((resolve, reject) => {
+  const timer = setTimeout(resolve, milliseconds);
+  signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason || new DOMException('Aborted', 'AbortError')); }, {once: true});
+});
+
+function httpError(response, source) {
+  const status = response.status;
+  const expired = status === 401 || (status === 403 && /(?:X-Amz-(?:Expires|Date|Credential)|token|signature)/i.test(source.url));
+  const code = expired ? 'SIGNED_URL_EXPIRED' : `HTTP_${status}`;
+  const messages = {401: 'A autorização do arquivo expirou.', 403: 'O acesso ao arquivo foi recusado.', 404: 'O arquivo do jogo não foi encontrado.'};
+  return new Ps1NetworkError(code, messages[status] || (status >= 500 ? 'O servidor de arquivos está temporariamente indisponível.' : `Falha HTTP ${status} ao baixar o jogo.`), {status});
+}
+
+async function timedFetch(fetchImpl, url, init, timeoutMs) {
+  const timeout = new AbortController();
+  const onAbort = () => timeout.abort(init.signal?.reason);
+  if (init.signal?.aborted) onAbort();
+  init.signal?.addEventListener('abort', onAbort, {once: true});
+  const timer = setTimeout(() => timeout.abort(new Ps1NetworkError('NETWORK_TIMEOUT', 'A conexão demorou demais. Tente novamente.')), timeoutMs);
+  try { return await fetchImpl(url, {...init, signal: timeout.signal}); }
+  catch (error) {
+    if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    if (timeout.signal.aborted) throw timeout.signal.reason;
+    if (error?.name === 'AbortError') throw error;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Ps1NetworkError('OFFLINE', 'Este dispositivo está sem conexão com a internet.');
+    if (error instanceof TypeError) throw new Ps1NetworkError('CORS_OR_NETWORK', 'O navegador bloqueou ou perdeu a conexão com o servidor de arquivos.');
+    throw new Ps1NetworkError('BACKEND_FAILURE', 'O serviço de arquivos (Backblaze/Worker) não respondeu corretamente.');
+  } finally { clearTimeout(timer); init.signal?.removeEventListener('abort', onAbort); }
+}
+
+async function withRetries(operation, {signal, attempts = 3, onRetry} = {}) {
+  let last;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try { return await operation(attempt); } catch (error) {
+      last = error;
+      if (error?.name === 'AbortError' || error?.status === 404 || (error?.status >= 400 && error?.status < 500 && error.code !== 'SIGNED_URL_EXPIRED') || attempt === attempts - 1) throw error;
+      await onRetry?.(error, attempt + 1);
+      await sleep(400 * (2 ** attempt), signal);
+    }
+  }
+  throw last;
+}
+
+async function preflight(source, fetchImpl, signal, timeoutMs) {
+  let head;
+  try { head = await timedFetch(fetchImpl, source.url, {method: 'HEAD', signal}, timeoutMs); } catch (error) { if (error?.name === 'AbortError' || error?.code === 'OFFLINE' || error?.code === 'NETWORK_TIMEOUT') throw error; }
+  if (head && (head.status === 200 || head.status === 206)) return responseSize(head);
+  const range = await timedFetch(fetchImpl, source.url, {method: 'GET', headers: {Range: 'bytes=0-0'}, signal}, timeoutMs);
+  if (range.status !== 200 && range.status !== 206) throw httpError(range, source);
+  if (range.status === 200 && !range.headers.get('Accept-Ranges')) source.rangeUnsupported = true;
+  await range.body?.cancel?.().catch(() => {});
+  return responseSize(range);
+}
+
+async function downloadBlob(source, {fetchImpl, signal, onChunk, timeoutMs}) {
+  const response = await timedFetch(fetchImpl, source.url, {signal}, timeoutMs);
+  if (!response.ok) throw httpError(response, source);
   const total = responseSize(response);
   if (!response.body?.getReader) {
     const blob = await response.blob(); onChunk?.(blob.size, total || blob.size, source.key);
@@ -139,22 +191,27 @@ async function downloadBlob(source, {fetchImpl, signal, onChunk}) {
 }
 
 /** Download every boot file once and expose the resulting Blob URL to EmulatorJS. */
-export async function downloadPs1Content(game, {fetchImpl = fetch, signal, onMetadata, onProgress} = {}) {
+export async function downloadPs1Content(game, {fetchImpl = fetch, signal, onMetadata, onProgress, onRetry, refreshSource, attempts = 3, timeoutMs = 20000} = {}) {
   const launch = resolvePs1Launch(game);
   const sources = [{key: game.bootKey || game.key, url: launch.bootUrl}, ...launch.dependencies];
-  const sizes = await Promise.all(sources.map(source => discoverSize(source, fetchImpl, signal).catch(error => {
-    if (error?.name === 'AbortError') throw error;
-    return null;
-  })));
+  const sizes = await Promise.all(sources.map(source => withRetries(() => preflight(source, fetchImpl, signal, timeoutMs), {signal, attempts, onRetry: async (error, attempt) => {
+    if (error.code === 'SIGNED_URL_EXPIRED' && refreshSource) source.url = await refreshSource(source);
+    onRetry?.({error, attempt, key: source.key});
+  }})));
   const knownTotal = sizes.every(Number.isFinite) ? sizes.reduce((sum, size) => sum + size, 0) : null;
   onMetadata?.({totalBytes: knownTotal, files: sources.map((source, index) => ({...source, size: sizes[index]}))});
   const files = [];
   let loadedBytes = 0;
   for (let index = 0; index < sources.length; index += 1) {
     const source = sources[index];
-    const blob = await downloadBlob(source, {fetchImpl, signal, onChunk(bytes, responseTotal, key) {
-      loadedBytes += bytes;
+    let attemptLoaded = 0;
+    const blob = await withRetries(() => downloadBlob(source, {fetchImpl, signal, timeoutMs, onChunk(bytes, responseTotal, key) {
+      loadedBytes += bytes; attemptLoaded += bytes;
       onProgress?.({loadedBytes, totalBytes: knownTotal, currentFile: key, fileTotal: sizes[index] || responseTotal});
+    }}), {signal, attempts, onRetry: async (error, attempt) => {
+      loadedBytes -= attemptLoaded; attemptLoaded = 0;
+      if (error.code === 'SIGNED_URL_EXPIRED' && refreshSource) source.url = await refreshSource(source);
+      onRetry?.({error, attempt, key: source.key});
     }});
     files.push({key: source.key, blob});
   }
