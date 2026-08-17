@@ -18,12 +18,20 @@ test('home contém as três views e navegação interna', async () => {
   const response = await request('/');
   assert.equal(response.status, 200);
   const html = await response.text();
-  for (const view of ['home', 'emulators', 'ps1', 'ps2']) assert.match(html, new RegExp(`data-app-view="${view}"`));
+  for (const view of ['home', 'emulators', 'ps1', 'gbc', 'ps2']) assert.match(html, new RegExp(`data-app-view="${view}"`));
   assert.match(html, /data-view-link="emulators"/);
   assert.match(html, /data-view-link="ps1">Abrir emulador/);
   assert.match(html, /data-view-link="ps2">Abrir emulador/);
   assert.match(html, /data-view-link="emulators">← Voltar/);
   assert.doesNotMatch(html, /target="_blank"|href="\/emulators\.html"|href="\/emulators\/ps2\/"/);
+});
+
+test('GBC abre player dedicado em nova aba e suporta refresh da rota', async () => {
+  const [html, source, player] = await Promise.all([request('/').then(r => r.text()), readFile(new URL('../emulators.js', import.meta.url), 'utf8'), request('/gbc-player?game=pokemon').then(r => r.text())]);
+  assert.match(html, /data-view-link="gbc">Abrir emulador/);
+  assert.match(source, /new URL\('\/gbc-player'/);
+  assert.match(source, /window\.open\(url\.href, '_blank'\)/);
+  assert.match(player, /id="gbc-player-shell"/);
 });
 
 test('controlador troca views via estado e preserva History API', async () => {

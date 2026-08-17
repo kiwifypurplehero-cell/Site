@@ -1,17 +1,19 @@
 import {findEmulator} from './emulator-registry.js';
 import {downloadPs1Archive, inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
 
-const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'ps2']);
+const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'gbc', 'ps2']);
 const VIEW_TITLES = {
   home: 'PlumpGames — Jogos gratuitos e projetos independentes',
   emulators: 'Emuladores — PlumpGames',
   ps1: 'PlayStation 1 — PlumpGames',
+  gbc: 'Game Boy Color — PlumpGames',
   ps2: 'PlayStation 2 — PlumpGames'
 };
 const appViewState = {currentView: 'home', homeScrollY: 0};
 export const PS1EmulatorState = {libraryLoaded: false, selectedGame: null, instance: null, coreReady: false, running: false, loading: false, error: null, biosMode: 'hle'};
 const EMULATORJS_DATA = 'https://cdn.emulatorjs.org/stable/data/';
 let ps1LibraryPromise;
+let gbcLibraryPromise;
 let biosObjectUrl;
 let libraryPromise;
 let ps1Attempt = 0;
@@ -91,7 +93,7 @@ export function setView(view, {historyMode = 'push'} = {}) {
     section.setAttribute('aria-hidden', String(!active));
   });
   document.querySelectorAll('[data-view-link]').forEach(control => {
-    const active = control.dataset.viewLink === view || ((view === 'ps2' || view === 'ps1') && control.dataset.viewLink === 'emulators');
+    const active = control.dataset.viewLink === view || ((view === 'ps2' || view === 'ps1' || view === 'gbc') && control.dataset.viewLink === 'emulators');
     if (active) control.setAttribute('aria-current', 'page');
     else control.removeAttribute('aria-current');
   });
@@ -103,7 +105,32 @@ export function setView(view, {historyMode = 'push'} = {}) {
 
   if (view === 'ps2') loadLibrary();
   if (view === 'ps1') loadPs1Library();
+  if (view === 'gbc') loadGbcLibrary();
   requestAnimationFrame(() => scrollTo({top: view === 'home' ? appViewState.homeScrollY : 0, behavior: 'auto'}));
+}
+
+async function loadGbcLibrary({refresh = false} = {}) {
+  if (refresh) gbcLibraryPromise = undefined;
+  if (gbcLibraryPromise) return gbcLibraryPromise;
+  const status = document.querySelector('#gbc-games-status'), list = document.querySelector('#gbc-rom-list');
+  if (!status || !list) return;
+  status.textContent = 'Carregando biblioteca GBC...';
+  gbcLibraryPromise = (async () => {
+    try {
+      const response = await fetch(`/api/emulators/gbc/games${refresh ? '?refresh=1' : ''}`, {cache: refresh ? 'no-store' : 'default'}), payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível acessar a biblioteca GBC.');
+      status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo GBC publicado ainda.';
+      list.replaceChildren(...payload.games.map(game => {
+        const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
+        const cover = game.coverUrl ? document.createElement('img') : document.createElement('div'); cover.className = 'ps1-rom-cover';
+        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; } else cover.textContent = 'G';
+        const details = document.createElement('div'), title = document.createElement('strong'), metadata = document.createElement('small'); title.textContent = game.name; metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`; details.append(title, metadata);
+        const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar'; play.onclick = () => { const url = new URL('/gbc-player', location.origin); url.searchParams.set('game', game.id); window.open(url.href, '_blank'); };
+        card.append(cover, details, play); return card;
+      }));
+    } catch (error) { status.textContent = error.message; gbcLibraryPromise = undefined; }
+  })();
+  return gbcLibraryPromise;
 }
 
 async function loadLibrary() {
@@ -356,6 +383,7 @@ window.addEventListener('popstate', () => setView(requestedView(), {historyMode:
 document.querySelector('[data-ps1-back]')?.addEventListener('click', () => { stopPs1(); setView('emulators'); });
 document.querySelectorAll('[data-ps1-close]').forEach(control => control.addEventListener('click', () => stopPs1()));
 document.querySelector('#ps1-refresh-library')?.addEventListener('click', () => loadPs1Library({refresh: true}));
+document.querySelector('#gbc-refresh-library')?.addEventListener('click', () => loadGbcLibrary({refresh: true}));
 document.querySelector('#ps1-retry')?.addEventListener('click', () => PS1EmulatorState.selectedGame && startPs1(PS1EmulatorState.selectedGame));
 document.querySelector('#ps1-fullscreen')?.addEventListener('click', () => document.querySelector('#ps1-player-panel')?.requestFullscreen?.());
 document.querySelector('#ps1-restart')?.addEventListener('click', () => { try { window.EJS_emulator?.restart?.(); } catch (error) { failPs1(error); } });

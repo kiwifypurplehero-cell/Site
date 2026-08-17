@@ -1,14 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emulatorApi, normalizePs1Library, parseB2Error} from '../emulator-api.js';
+import {emulatorApi, normalizeGbcLibrary, normalizePs1Library, parseB2Error} from '../emulator-api.js';
 
 const ps1Env = {B2_PS1_ACCESS_KEY_ID: 'test-id', B2_PS1_SECRET_ACCESS_KEY: 'test-secret'};
 
 test('não expõe chaves internas no catálogo de emuladores', async () => {
   const response = await emulatorApi(new Request('https://example.com/api/emulators'), {});
   const payload = await response.json();
-  assert.deepEqual(payload.emulators.map(item => item.id), ['ps1', 'ps2']);
+  assert.deepEqual(payload.emulators.map(item => item.id), ['ps1', 'gbc', 'ps2']);
   assert.equal(payload.emulators[0].romExtensions, undefined);
+});
+
+test('GBC normaliza ROMs na raiz e pasta com capa sem misturar PS1', () => {
+  const games = normalizeGbcLibrary([
+    {key: 'Jogos-GBC/Pokemon Crystal.gbc', size: 2048},
+    {key: 'Jogos-GBC/Pokemon Gold/Pokemon Gold.gb', size: 1024},
+    {key: 'Jogos-GBC/Pokemon Gold/cover.jpg', size: 50},
+    {key: 'Jogos-GBC/loose.png', size: 10},
+    {key: 'Jogos/Gran Turismo.iso', size: 999},
+    {key: 'Jogos-GBC/x/../secret.gbc', size: 1}
+  ]);
+  assert.equal(games.length, 2);
+  assert.equal(games.find(game => game.name === 'Pokemon Crystal').format, 'gbc');
+  assert.equal(games.find(game => game.name === 'Pokemon Gold').format, 'gb');
+  assert.equal(games.find(game => game.name === 'Pokemon Gold').coverKey, 'Jogos-GBC/Pokemon Gold/cover.jpg');
+  assert.doesNotMatch(JSON.stringify(games), /Gran Turismo|loose\.png|secret/);
+});
+
+test('endpoints de arquivo bloqueiam acesso cruzado entre PS1 e GBC', async () => {
+  const gbcEnv = {B2_GBC_ENDPOINT: 'https://s3.us-east-005.backblazeb2.com', B2_GBC_BUCKET: 'gbc-test', B2_GBC_ACCESS_KEY_ID: 'gbc-id', B2_GBC_SECRET_ACCESS_KEY: 'gbc-secret'};
+  assert.equal((await emulatorApi(new Request('https://example.com/api/emulators/gbc/file/Jogos%2FGran%20Turismo.iso'), gbcEnv)).status, 404);
+  assert.equal((await emulatorApi(new Request('https://example.com/api/emulators/ps1/file/Jogos-GBC%2FPokemon.gbc'), ps1Env)).status, 404);
+  assert.equal((await emulatorApi(new Request('https://example.com/api/emulators/gbc/file/Jogos-GBC%2F..%2Fsecret.gbc'), gbcEnv)).status, 404);
 });
 
 test('exige os secrets PS1 do Backblaze B2 para acessar a biblioteca', async () => {
