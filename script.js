@@ -168,15 +168,15 @@ function renderWallpapers() {
 let panelCloseTimer = 0;
 function openPanel() {
   const panel=$('#gx-side-panel'); clearTimeout(panelCloseTimer); lastFocus=document.activeElement;
-  panel.hidden=false; $('#gx-panel-backdrop').hidden=false; lockPageScroll('menu');
+  panel.hidden=false; panel.inert=false; $('#gx-panel-backdrop').hidden=false; lockPageScroll('menu');
   requestAnimationFrame(()=>panel.classList.add('is-open'));
   $('#gx-menu-button').setAttribute('aria-expanded','true'); document.body.classList.add('panel-open'); $('#gx-panel-close').focus();
 }
 function closePanel({restoreFocus=true}={}) {
   const panel=$('#gx-side-panel');
   if (panel.hidden && !document.body.classList.contains('panel-open')) { unlockPageScroll('menu'); return; }
-  panel.classList.remove('is-open'); $('#gx-menu-button').setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open'); unlockPageScroll('menu');
-  clearTimeout(panelCloseTimer); panelCloseTimer=setTimeout(()=>{ panel.hidden=true; $('#gx-panel-backdrop').hidden=true; },220);
+  panel.classList.remove('is-open'); panel.inert=true; $('#gx-panel-backdrop').hidden=true; $('#gx-menu-button').setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open'); unlockPageScroll('menu');
+  clearTimeout(panelCloseTimer); panelCloseTimer=setTimeout(()=>{ panel.hidden=true; },220);
   if (restoreFocus) $('#gx-menu-button').focus();
 }
 function togglePanel() { $('#gx-side-panel').hidden ? openPanel() : closePanel(); }
@@ -619,3 +619,5 @@ $('#assistant-form').addEventListener('submit',event=>{event.preventDefault();se
 $('#assistant-input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAssistantMessage(event.currentTarget.value);}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#plump-assistant-panel').hidden)hideAssistant();});
 resetAssistant();
+window.__PLUMPGAMES_MAIN_READY__=true;
+document.dispatchEvent(new CustomEvent('plumpgames:critical-ready'));
