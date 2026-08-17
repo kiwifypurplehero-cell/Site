@@ -85,6 +85,7 @@ function viewUrl(view) {
 export function setView(view, {historyMode = 'push'} = {}) {
   if (!VALID_VIEWS.has(view)) view = 'home';
   const previousView = appViewState.currentView;
+  document.dispatchEvent(new CustomEvent('plumpgames:before-view-change', {detail: {previousView, view}}));
   if (previousView === 'home' && view !== 'home') appViewState.homeScrollY = scrollY;
 
   document.querySelectorAll('[data-app-view]').forEach(section => {
@@ -123,7 +124,7 @@ async function loadGbcLibrary({refresh = false} = {}) {
       list.replaceChildren(...payload.games.map(game => {
         const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
         const cover = game.coverUrl ? document.createElement('img') : document.createElement('div'); cover.className = 'ps1-rom-cover';
-        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; } else cover.textContent = 'G';
+        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; cover.decoding = 'async'; } else cover.textContent = 'G';
         const details = document.createElement('div'), title = document.createElement('strong'), metadata = document.createElement('small'); title.textContent = game.name; metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`; details.append(title, metadata);
         const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar'; play.onclick = () => { const url = new URL('/gbc-player.html', location.origin); url.searchParams.set('game', game.id); window.open(url.href, '_blank'); };
         card.append(cover, details, play); return card;
@@ -204,7 +205,7 @@ async function loadPs1Library({refresh = false} = {}) {
         const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
         const cover = game.coverUrl ? document.createElement('img') : document.createElement('div');
         cover.className = 'ps1-rom-cover';
-        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; }
+        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; cover.decoding = 'async'; }
         else { cover.textContent = 'P'; cover.setAttribute('aria-label', 'Capa padrão da PlumpGames'); }
         const details = document.createElement('div');
         const title = document.createElement('strong'); title.textContent = game.name;
