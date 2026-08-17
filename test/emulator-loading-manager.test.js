@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {EmulatorLoadingManager,LOADING_PHASES,INITIALIZATION_STEPS} from '../emulator-loading-manager.js';
+const root={querySelector(){return null;}};
+test('fases públicas e etapas técnicas são centralizadas',()=>{for(const phase of ['preparing','network','downloading','download_complete','loading_runtime','loading_core','creating_canvas','mounting_content','starting_core','waiting_first_frame','running','error'])assert.ok(LOADING_PHASES.includes(phase));assert.equal(INITIALIZATION_STEPS.core_loaded.progress,55);});
+test('total é monotônico e só chega a 100 no primeiro frame',()=>{const loading=new EmulatorLoadingManager({profile:'gbc',root});loading.setPhase('network').setDownloadProgress(100);const downloaded=loading.snapshot().totalProgress;loading.completeStep('core_loaded');const core=loading.snapshot().totalProgress;assert.ok(core>=downloaded);assert.ok(core<100);loading.completeStep('waiting_first_frame');assert.ok(loading.snapshot().totalProgress<100);loading.markFirstFrame();assert.equal(loading.snapshot().totalProgress,100);});
+test('progresso de inicialização só avança ao concluir eventos reais',()=>{const loading=new EmulatorLoadingManager({root});loading.completeStep('loader_loaded');assert.equal(loading.snapshot().initializationProgress,25);loading.completeStep('core_loaded');assert.equal(loading.snapshot().initializationProgress,55);});
