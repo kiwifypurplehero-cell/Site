@@ -25,13 +25,17 @@
     <script type="application/ld+json">
       {"@context":"https://schema.org","@type":"WebSite","name":"PlumpGames","url":"https://site.kiwifypurplehero.workers.dev/","description":"Jogos gratuitos e projetos independentes de Matheus Plump.","inLanguage":"pt-BR","author":{"@type":"Person","name":"Matheus Plump"}}
     </script>
-    <link rel="stylesheet" href="style.css">
+    <style>
+      #site-loader{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;color:#f5f6ff;background:#050611;font-family:Inter,ui-sans-serif,system-ui,sans-serif;transition:opacity .2s ease}#site-loader.is-complete{opacity:0;pointer-events:none}#site-loader[hidden]{display:none}.site-loader__card{width:min(440px,100%);text-align:center}.site-loader__mark{display:grid;place-items:center;width:68px;aspect-ratio:1;margin:0 auto 14px;border-radius:20px;background:linear-gradient(135deg,#8b5cf6,#4776ff);font-size:2rem;font-weight:950;box-shadow:0 0 32px #7055ed66}.site-loader__name{margin:0 0 20px;font-size:clamp(1.5rem,6vw,2.25rem)}.site-loader__track{height:10px;overflow:hidden;border-radius:999px;background:#ffffff18}.site-loader__bar{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8b5cf6,#38d9f5);transition:width .18s ease}.site-loader__meta{display:flex;justify-content:space-between;gap:12px;margin-top:10px;color:#b8bfdc;font-size:.82rem}.site-loader__error{margin-top:18px;color:#fb7185}.site-loader__error button{margin-top:8px;padding:9px 16px;border:1px solid #ffffff33;border-radius:9px;color:inherit;background:#ffffff0d}@media(prefers-reduced-motion:reduce){#site-loader,.site-loader__bar{transition:none}}
+    </style>
+    <link rel="stylesheet" href="style.css" data-critical-style>
+    <script type="module" src="site-loader.js"></script>
     <script src="play-utils.js" defer></script>
     <script src="script.js" defer></script>
     <script src="accessibility.js" defer></script>
-    <script type="module" src="emulators.js"></script>
   </head>
   <body>
+    <div id="site-loader" role="status" aria-live="polite" aria-label="Carregando PlumpGames"><div class="site-loader__card"><div class="site-loader__mark" aria-hidden="true">P</div><h1 class="site-loader__name">PlumpGames</h1><div class="site-loader__track"><div class="site-loader__bar"></div></div><div class="site-loader__meta"><span data-loader-stage>Preparando aplicação</span><strong data-loader-percent>0%</strong></div><div class="site-loader__error" data-loader-error hidden></div></div></div>
     <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true"></div>
     <div class="wallpaper-overlay" aria-hidden="true"></div>
     <div class="ambient-glow ambient-glow--one" aria-hidden="true"></div>

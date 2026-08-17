@@ -46,6 +46,17 @@ function unlockPageScroll(reason) {
   document.documentElement.style.overflow = savedPageScrollState.htmlOverflow;
   savedPageScrollState = null;
 }
+function closeTransientUiForNavigation() {
+  closePanel({restoreFocus:false});
+  document.querySelector('#site-modal')?.setAttribute('hidden', '');
+  document.querySelector('#community-dialog')?.setAttribute('hidden', '');
+  document.body.classList.remove('modal-open', 'panel-open');
+  pageScrollLocks.clear();
+  document.body.style.overflow = savedPageScrollState?.bodyOverflow || '';
+  document.documentElement.style.overflow = savedPageScrollState?.htmlOverflow || '';
+  savedPageScrollState = null;
+}
+document.addEventListener('plumpgames:before-view-change', closeTransientUiForNavigation);
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
