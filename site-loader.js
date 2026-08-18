@@ -6,12 +6,11 @@ const overlay = document.querySelector('#site-loader');
 const bar = overlay?.querySelector('.site-loader__bar');
 const track = overlay?.querySelector('[role="progressbar"]');
 const percentLabel = overlay?.querySelector('[data-loader-percent]');
-const errorArea = overlay?.querySelector('[data-loader-error]');
 const overlayStart = performance.now();
 const debug = new URL(location.href).searchParams.get('debug') === '1';
 let state = 'boot';
-let realProgress = 5;
-let visualProgress = 5;
+let realProgress = 10;
+let visualProgress = 10;
 let animationFrame;
 let safetyTimer;
 let emulatorModule;
@@ -85,25 +84,16 @@ function cleanup() {
   document.body.style.removeProperty('overflow-y');
   document.body.style.removeProperty('touch-action');
   document.body.style.removeProperty('pointer-events');
+  document.documentElement.style.removeProperty('overflow');
+  document.documentElement.style.removeProperty('touch-action');
   setState('hidden');
   overlay?.remove();
 }
 
 function showSafetyFallback(error) {
   if (state === 'hidden') return;
+  // Never release the page as ready when its critical bootstrap did not finish.
   console.error('Falha crítica no bootstrap.', error);
-  cancelAnimationFrame(animationFrame);
-  setState('ready');
-  document.body.classList.remove('loading-active');
-  overlay?.classList.add('has-error');
-  if (!errorArea) return;
-  errorArea.hidden = false;
-  errorArea.replaceChildren(document.createTextNode('Não foi possível carregar completamente a PlumpGames.'));
-  const reload = document.createElement('button');
-  reload.type = 'button';
-  reload.textContent = 'Recarregar';
-  reload.addEventListener('click', () => location.reload());
-  errorArea.append(reload);
 }
 
 function reportPerformance() {
@@ -116,7 +106,7 @@ function reportPerformance() {
 
 async function bootstrap() {
   setState('loading');
-  renderProgress(5);
+  renderProgress(10);
   animationFrame = requestAnimationFrame(interpolateProgress);
   safetyTimer = setTimeout(() => showSafetyFallback(new Error('Tempo máximo de bootstrap excedido.')), MAXIMUM_BOOT_TIME);
 
@@ -126,7 +116,7 @@ async function bootstrap() {
   reachMilestone(20);
 
   await waitForMainScript();
-  reachMilestone(35);
+  reachMilestone(30);
 
   const style = document.querySelector('[data-critical-style]');
   const cssReady = !style || style.sheet || await waitForEvent(style);
@@ -134,13 +124,14 @@ async function bootstrap() {
   const criticalImages = [...document.querySelectorAll('img[data-critical-image]')];
   const results = await Promise.all(criticalImages.map(image => image.complete ? image.naturalWidth > 0 : waitForEvent(image)));
   if (results.includes(false)) console.warn('Um asset não crítico não pôde ser carregado; o bootstrap continuará.');
-  reachMilestone(55);
+  reachMilestone(50);
 
   const view = requestedView();
   if (view !== 'home') await loadEmulators(view);
-  reachMilestone(75);
+  reachMilestone(70);
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   reachMilestone(90);
+  window.siteCriticalReady = true;
 
   const remaining = Math.max(0, MINIMUM_VISIBLE_TIME - (performance.now() - overlayStart));
   await new Promise(resolve => setTimeout(resolve, remaining));
