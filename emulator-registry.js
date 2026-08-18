@@ -26,12 +26,14 @@ export const EMULATORS = Object.freeze([
     storage: Object.freeze({prefix: 'Jogos-GBC/'}), loadingProfile:LOADING_PROFILES.gbc
   }),
   Object.freeze({
-    id: 'ps2',
-    name: 'PlayStation 2',
-    shortName: 'PS2',
-    description: 'Biblioteca de jogos PS2 armazenada de forma privada no Backblaze B2.',
-    romExtensions: Object.freeze(['iso', 'bin', 'chd']),
-    core: Object.freeze({status: 'pending', moduleUrl: '/cores/ps2/core.js', wasmUrl: '/cores/ps2/core.wasm'})
+    id: 'gba',
+    name: 'Game Boy Advance',
+    shortName: 'GBA',
+    description: 'Biblioteca portátil de Game Boy Advance otimizada para celular.',
+    romExtensions: Object.freeze(['gba']),
+    coreExtensions: Object.freeze(['gba']),
+    core: Object.freeze({status: 'experimental', id: 'gba', engine: 'mGBA'}),
+    storage: Object.freeze({prefix: 'Jogos-GBA/'})
   })
 ]);
 

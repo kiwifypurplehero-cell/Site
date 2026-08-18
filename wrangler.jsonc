@@ -17,6 +17,9 @@
       "/gbc-player",
       "/gbc-player/",
       "/gbc-player.html",
+      "/gba-player",
+      "/gba-player/",
+      "/gba-player.html",
       "/play/ps1",
       "/play/ps1/",
       "/emulators/ps2",
@@ -33,6 +36,7 @@
     "B2_GBC_ENDPOINT": "https://s3.us-east-005.backblazeb2.com",
     "B2_GBC_BUCKET": "plumpgames-storage-ps1",
     "B2_GBC_PREFIX": "Jogos-GBC/",
+    "B2_GBA_PREFIX": "Jogos-GBA/",
     "B2_ENDPOINT": "https://s3.us-east-005.backblazeb2.com",
     "B2_BUCKET": "plumpgames-storage-ps2",
     "B2_PS2_PREFIX": "ps2/jogos/"
