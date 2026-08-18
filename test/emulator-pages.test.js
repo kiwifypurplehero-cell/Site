@@ -18,10 +18,11 @@ test('home contém as três views e navegação interna', async () => {
   const response = await request('/');
   assert.equal(response.status, 200);
   const html = await response.text();
-  for (const view of ['home', 'emulators', 'ps1', 'gbc', 'ps2']) assert.match(html, new RegExp(`data-app-view="${view}"`));
+  for (const view of ['home', 'emulators', 'ps1', 'gbc', 'gba']) assert.match(html, new RegExp(`data-app-view="${view}"`));
   assert.match(html, /data-view-link="emulators"/);
   assert.match(html, /data-view-link="ps1">Abrir emulador/);
-  assert.match(html, /data-view-link="ps2">Abrir emulador/);
+  assert.match(html, /data-view-link="gba">Abrir emulador/);
+  assert.doesNotMatch(html, /data-view-link="ps2"/);
   assert.match(html, /data-view-link="emulators">← Voltar/);
   assert.doesNotMatch(html, /target="_blank"|href="\/emulators\.html"|href="\/emulators\/ps2\/"/);
 });
@@ -60,13 +61,12 @@ test('controlador troca views via estado e preserva History API', async () => {
   assert.match(source, /window\.open\(url\.href, '_blank'\)/);
 });
 
-test('PS2 mantém endpoint seguro e integração declarada com B2', async () => {
-  const [source, registry] = await Promise.all([
-    readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
-    readFile(new URL('../emulator-registry.js', import.meta.url), 'utf8')
-  ]);
-  assert.match(source, /fetch\('\/api\/emulators\/ps2\/games'\)/);
-  assert.match(registry, /Backblaze B2/);
+test('PS2 fica indisponível e GBA usa core mGBA declarado', async () => {
+  const [worker,registry,html]=await Promise.all(['worker.js','emulator-registry.js','index.html'].map(file=>readFile(new URL(`../${file}`,import.meta.url),'utf8')));
+  assert.match(worker,/Emulador temporariamente indisponível/);
+  assert.match(registry,/id: 'gba'[\s\S]*id: 'gba', engine: 'mGBA'/);
+  assert.doesNotMatch(registry,/id: 'ps2'/);
+  assert.doesNotMatch(html,/data-view-link="ps2"/);
 });
 
 test('PS1 envia ISO ao pcsx_rearmed/HLE sem exigir BIOS nem pré-bloquear a extensão', async () => {

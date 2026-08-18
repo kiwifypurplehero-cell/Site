@@ -149,7 +149,12 @@ export default {async fetch(request,env,ctx){
     if(gbcDebug)console.info('[GBC-ROUTE] response',response.status);
     return response;
   }
-  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html'],['/emulators/ps2','/emulator-ps2.html'],['/emulators/ps2/','/emulator-ps2.html']]);
+  if(url.pathname==='/gba-player'||url.pathname==='/gba-player/') {
+    const target=new URL('/gba-player.html',url); target.search=url.search;
+    return Response.redirect(target,302);
+  }
+  if(url.pathname==='/emulators/ps2'||url.pathname==='/emulators/ps2/')return json({error:'Emulador temporariamente indisponível.'},404);
+  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html']]);
   if(emulatorPages.has(url.pathname)) {
     const asset=await env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
     if(!url.pathname.startsWith('/play/ps1')&&!url.pathname.startsWith('/ps1-player')) return asset;

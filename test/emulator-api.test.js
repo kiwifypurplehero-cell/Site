@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emulatorApi, normalizeGbcLibrary, normalizePs1Library, parseB2Error} from '../emulator-api.js';
+import {emulatorApi, normalizeGbaLibrary, normalizeGbcLibrary, normalizePs1Library, parseB2Error} from '../emulator-api.js';
 
 const ps1Env = {B2_PS1_ACCESS_KEY_ID: 'test-id', B2_PS1_SECRET_ACCESS_KEY: 'test-secret'};
 
 test('não expõe chaves internas no catálogo de emuladores', async () => {
   const response = await emulatorApi(new Request('https://example.com/api/emulators'), {});
   const payload = await response.json();
-  assert.deepEqual(payload.emulators.map(item => item.id), ['ps1', 'gbc', 'ps2']);
+  assert.deepEqual(payload.emulators.map(item => item.id), ['ps1', 'gbc', 'gba']);
   assert.equal(payload.emulators[0].romExtensions, undefined);
 });
 
@@ -220,4 +220,14 @@ test('signed URL SigV4 é restrita ao jogo e expira em dez minutos', async () =>
   assert.match(url.searchParams.get('X-Amz-Signature'), /^[a-f0-9]{64}$/);
   assert.equal(payload.method, 'GET');
   assert.equal(JSON.stringify(payload).includes('test-secret'), false);
+});
+
+
+test('GBA normaliza raiz e subpasta com capa e ID seguro', () => {
+  const games=normalizeGbaLibrary([{key:'Jogos-GBA/Pokémon Emerald (BR).gba',size:32},{key:'Jogos-GBA/Metroid Fusion/Metroid Fusion.gba',size:64,lastModified:'2026-01-01'},{key:'Jogos-GBA/Metroid Fusion/capa.webp',size:2},{key:'Jogos-GBC/Outro.gba',size:1}]);
+  assert.equal(games.length,2);
+  const metroid=games.find(game=>game.name==='Metroid Fusion');
+  assert.equal(metroid.bootKey,'Jogos-GBA/Metroid Fusion/Metroid Fusion.gba');
+  assert.equal(metroid.coverKey,'Jogos-GBA/Metroid Fusion/capa.webp');
+  assert.match(metroid.id,/^[a-z0-9-]+$/);
 });
