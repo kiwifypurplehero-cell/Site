@@ -3,7 +3,7 @@ import {EmulatorViewportManager} from './emulator-viewport.js';
 const DATA='https://cdn.emulatorjs.org/4.2.3/data/', $=selector=>document.querySelector(selector), gameId=new URLSearchParams(location.search).get('game')||'', shell=$('#gbc-player-shell');
 let game,controller,romBlob,objectUrl,loader,disposeFrames,token=0,bootRequested=false,firstFrame=false,compatible=false;
 const loading=new EmulatorLoadingManager({profile:'gbc'}),mobile=()=>matchMedia('(pointer:coarse)').matches&&navigator.maxTouchPoints>0;
-const viewport=new EmulatorViewportManager({shell,container:$('#gbc-emulator'),nativeWidth:160,nativeHeight:144}).start();
+const viewport=new EmulatorViewportManager({shell,container:$('#gbc-emulator'),nativeWidth:160,nativeHeight:144,debug:new URLSearchParams(location.search).has('debugViewport')}).start();
 const log=(message,details)=>details===undefined?console.info(`[GBC-BOOT] ${message}`):console.info(`[GBC-BOOT] ${message}`,details);
 function errorText(error){return error?.detail||({runtime_available:'Runtime não carregou',loader_loaded:'Loader não carregou',core_loaded:'Core não carregou',canvas_created:'WebGL não inicializou',content_mounted:'Conteúdo não foi montado',first_frame:'Primeiro frame não apareceu'}[error?.code])||error?.message||String(error);}
 function fail(error,current=token){if(current!==token||error?.name==='AbortError')return;loading.fail(error);$('#loading').hidden=true;$('#error').hidden=false;$('#error p').textContent=`Não foi possível concluir a inicialização do emulador. ${errorText(error)}.`;log(error.code||'BOOT_FAILED',{message:error.message});}
