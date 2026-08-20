@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#05060a">
   <title>PlayStation 1 — PlumpGames</title>
   <link rel="stylesheet" href="/ps1-player.css">
+  <link rel="stylesheet" href="/emulator-controls.css">
   <script type="module" src="/ps1-player.js"></script>
 </head>
 <body>
@@ -32,7 +33,7 @@
       <label>Frameskip<select id="frameskip"><option value="auto">Automático</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
       <label>Áudio<select id="audio"><option value="balanced">Equilibrado</option><option value="low">Baixa latência</option><option value="stable">Estável</option></select></label>
       <button id="fullscreen" type="button">Tela cheia</button><button id="restart" type="button">Reiniciar</button><button id="diagnostics-toggle" type="button">FPS/diagnóstico</button><label><input id="details-toggle" type="checkbox"> Mostrar detalhes de inicialização</label>
-      <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p><dl id="diagnostics" hidden></dl>
+      <p class="bios-note">BIOS HLE pode apresentar menor compatibilidade.</p><dl id="diagnostics" hidden></dl><div id="controls-settings"></div>
     </aside>
   </main>
 </body>
