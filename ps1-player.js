@@ -8,7 +8,7 @@ export const PS1_PHASES=['preparing','network_check','downloading','download_com
 export const ps1LoadState={phase:'preparing',loadedBytes:0,totalBytes:0,percent:0,speedBps:0,etaSeconds:null,currentFile:null,error:null};
 const shell=$('#ps1-player-shell');
 const loading=new EmulatorLoadingManager({profile:'ps1'});
-const viewport=new EmulatorViewportManager({shell,container:$('#ps1-emulator')}).start();
+const viewport=new EmulatorViewportManager({shell,container:$('#ps1-emulator'),debug:query.has('debugViewport')}).start();
 const isMobile=()=>matchMedia('(pointer: coarse)').matches&&(navigator.maxTouchPoints>0||'ontouchstart'in window)&&Math.min(innerWidth,innerHeight)<=900;
 const capabilities={logicalProcessors:navigator.hardwareConcurrency||'indisponível',deviceMemory:navigator.deviceMemory||'indisponível',crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined',webAssembly:typeof WebAssembly!=='undefined',webgl2:Boolean(document.createElement('canvas').getContext('webgl2'))};
 const deviceProfile=(()=>{const cpu=navigator.hardwareConcurrency||4,ram=navigator.deviceMemory||4;return cpu<=4||ram<=4?'low':cpu>=8&&ram>=6?'high':'medium';})();
