@@ -1,5 +1,5 @@
 import {findEmulator} from './emulator-registry.js';
-import {downloadPs1Archive, inspectPs1File, resolvePs1Launch} from './ps1-utils.js';
+import {fetchEmulatorLibrary, refreshLibraryButton, renderLibraryIncrementally} from './emulator-library.js';
 
 const VALID_VIEWS = new Set(['home', 'emulators', 'ps1', 'gbc', 'gba']);
 const VIEW_TITLES = {
@@ -12,9 +12,6 @@ const VIEW_TITLES = {
 const appViewState = {currentView: 'home', homeScrollY: 0};
 export const PS1EmulatorState = {libraryLoaded: false, selectedGame: null, instance: null, coreReady: false, running: false, loading: false, error: null, biosMode: 'hle'};
 const EMULATORJS_DATA = 'https://cdn.emulatorjs.org/stable/data/';
-let ps1LibraryPromise;
-let gbcLibraryPromise;
-let gbaLibraryPromise;
 let biosObjectUrl;
 let libraryPromise;
 let ps1Attempt = 0;
@@ -111,43 +108,35 @@ export function setView(view, {historyMode = 'push'} = {}) {
   requestAnimationFrame(() => scrollTo({top: view === 'home' ? appViewState.homeScrollY : 0, behavior: 'auto'}));
 }
 
-async function loadGbcLibrary({refresh = false} = {}) {
-  if (refresh) gbcLibraryPromise = undefined;
-  if (gbcLibraryPromise) return gbcLibraryPromise;
-  const status = document.querySelector('#gbc-games-status'), list = document.querySelector('#gbc-rom-list');
-  if (!status || !list) return;
-  status.textContent = 'Carregando biblioteca GBC...';
-  gbcLibraryPromise = (async () => {
-    try {
-      const response = await fetch(`/api/emulators/gbc/games${refresh ? '?refresh=1' : ''}`, {cache: refresh ? 'no-store' : 'default'}), payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'Não foi possível acessar a biblioteca GBC.');
-      status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo GBC publicado ainda.';
-      list.replaceChildren(...payload.games.map(game => {
-        const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
-        const cover = game.coverUrl ? document.createElement('img') : document.createElement('div'); cover.className = 'ps1-rom-cover';
-        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; cover.decoding = 'async'; } else cover.textContent = 'G';
-        const details = document.createElement('div'), title = document.createElement('strong'), metadata = document.createElement('small'); title.textContent = game.name; metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`; details.append(title, metadata);
-        const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar'; play.onclick = () => { const url = new URL('/gbc-player.html', location.origin); url.searchParams.set('game', game.id); window.open(url.href, '_blank'); };
-        card.append(cover, details, play); return card;
-      }));
-    } catch (error) { status.textContent = error.message; gbcLibraryPromise = undefined; }
-  })();
-  return gbcLibraryPromise;
+function createPortableCard(system, game) {
+  const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
+  const cover = game.coverUrl ? document.createElement('img') : document.createElement('div'); cover.className = 'ps1-rom-cover';
+  if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; cover.decoding = 'async'; }
+  else { cover.textContent = system === 'gbc' ? 'G' : 'A'; cover.setAttribute('aria-label', `Capa padrão ${system.toUpperCase()}`); }
+  const details = document.createElement('div'), title = document.createElement('strong'), metadata = document.createElement('small');
+  title.textContent = game.name; metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`; details.append(title, metadata);
+  const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar';
+  play.dataset.playSystem = system; play.dataset.gameId = game.id;
+  card.append(cover, details, play); return card;
 }
 
-async function loadGbaLibrary({refresh = false} = {}) {
-  if (refresh) gbaLibraryPromise = undefined;
-  if (gbaLibraryPromise) return gbaLibraryPromise;
-  const status=document.querySelector('#gba-games-status'),list=document.querySelector('#gba-rom-list');
-  if(!status||!list)return;
-  status.textContent='Carregando biblioteca GBA...';
-  gbaLibraryPromise=(async()=>{try{
-    const response=await fetch(`/api/emulators/gba/games${refresh?'?refresh=1':''}`,{cache:refresh?'no-store':'default'}),payload=await response.json();
-    if(!response.ok)throw new Error(payload.error||'Não foi possível acessar a biblioteca GBA.');
-    status.textContent=payload.games.length?`${payload.games.length} jogo(s) encontrado(s).`:'Nenhum jogo GBA publicado ainda.';
-    list.replaceChildren(...payload.games.map(game=>{const card=document.createElement('article');card.className='rom-card ps1-rom-card';const cover=game.coverUrl?document.createElement('img'):document.createElement('div');cover.className='ps1-rom-cover';if(game.coverUrl){cover.src=game.coverUrl;cover.alt=`Capa de ${game.name}`;cover.loading='lazy';}else{cover.textContent='G';cover.setAttribute('aria-label','Capa padrão GBA');}const details=document.createElement('div'),title=document.createElement('strong'),metadata=document.createElement('small');title.textContent=game.name;metadata.textContent=`GBA · ${formatBytes(game.size)}`;details.append(title,metadata);const play=document.createElement('button');play.className='button button--play';play.type='button';play.textContent='Jogar';play.onclick=()=>{const url=new URL('/gba-player',location.origin);url.searchParams.set('game',game.id);window.open(url.href,'_blank','noopener');};card.append(cover,details,play);return card;}));
-  }catch(error){status.textContent=error.message;gbaLibraryPromise=undefined;}})();return gbaLibraryPromise;
+async function loadPortableLibrary(system, {forceRefresh = false} = {}) {
+  const status = document.querySelector(`#${system}-games-status`), list = document.querySelector(`#${system}-rom-list`);
+  if (!status || !list) return;
+  if (!forceRefresh && list.childElementCount) return;
+  if (!forceRefresh) status.textContent = `Carregando biblioteca ${system.toUpperCase()}...`;
+  try {
+    const payload = await fetchEmulatorLibrary(system, {forceRefresh});
+    await renderLibraryIncrementally(list, payload.games, game => createPortableCard(system, game));
+    status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : `Nenhum jogo ${system.toUpperCase()} publicado ainda.`;
+    return payload;
+  } catch (error) {
+    status.textContent = forceRefresh ? 'Não foi possível atualizar a biblioteca.' : error.message;
+    throw error;
+  }
 }
+const loadGbcLibrary = options => loadPortableLibrary('gbc', options);
+const loadGbaLibrary = options => loadPortableLibrary('gba', options);
 
 async function loadLibrary() {
   if (libraryPromise) return libraryPromise;
@@ -202,43 +191,22 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 ** exponent).toLocaleString('pt-BR', {maximumFractionDigits: 1})} ${units[exponent - 1]}`;
 }
 
-async function loadPs1Library({refresh = false} = {}) {
-  if (refresh) ps1LibraryPromise = undefined;
-  if (ps1LibraryPromise) return ps1LibraryPromise;
-  const status = document.querySelector('#ps1-games-status');
-  const list = document.querySelector('#ps1-rom-list');
+async function loadPs1Library({forceRefresh = false} = {}) {
+  const status = document.querySelector('#ps1-games-status'), list = document.querySelector('#ps1-rom-list');
   if (!status || !list) return;
-  status.textContent = 'Carregando biblioteca PS1...';
-  ps1LibraryPromise = (async () => {
-    try {
-      const response = await fetch(`/api/emulators/ps1/games${refresh ? '?refresh=1' : ''}`, {cache: refresh ? 'no-store' : 'default'});
-      const payload = await response.json();
-      if (!response.ok) throw new Error(`${payload.error || 'Não foi possível acessar a biblioteca PS1.'}${payload.diagnostic ? ` (${payload.diagnostic})` : ''}`);
-      PS1EmulatorState.libraryLoaded = true;
-      status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo PS1 publicado ainda.';
-      list.replaceChildren(...payload.games.map(game => {
-        const card = document.createElement('article'); card.className = 'rom-card ps1-rom-card';
-        const cover = game.coverUrl ? document.createElement('img') : document.createElement('div');
-        cover.className = 'ps1-rom-cover';
-        if (game.coverUrl) { cover.src = game.coverUrl; cover.alt = `Capa de ${game.name}`; cover.loading = 'lazy'; cover.decoding = 'async'; }
-        else { cover.textContent = 'P'; cover.setAttribute('aria-label', 'Capa padrão da PlumpGames'); }
-        const details = document.createElement('div');
-        const title = document.createElement('strong'); title.textContent = game.name;
-        const metadata = document.createElement('small'); metadata.textContent = `${game.format.toUpperCase()} · ${formatBytes(game.size)}`;
-        const play = document.createElement('button'); play.className = 'button button--play'; play.type = 'button'; play.textContent = 'Jogar';
-        play.addEventListener('click', () => {
-          const url = new URL('/ps1-player', location.origin);
-          url.searchParams.set('game', game.id);
-          window.open(url.href, '_blank');
-        }); details.append(title, metadata); card.append(cover, details, play); return card;
-      }));
-    } catch (error) {
-      PS1EmulatorState.libraryLoaded = false;
-      status.textContent = error.message || 'Não foi possível acessar a biblioteca PS1.';
-      ps1LibraryPromise = undefined;
-    }
-  })();
-  return ps1LibraryPromise;
+  if (!forceRefresh && list.childElementCount) return;
+  if (!forceRefresh) status.textContent = 'Carregando biblioteca PS1...';
+  try {
+    const payload = await fetchEmulatorLibrary('ps1', {forceRefresh});
+    await renderLibraryIncrementally(list, payload.games, game => createPortableCard('ps1', game));
+    PS1EmulatorState.libraryLoaded = true;
+    status.textContent = payload.games.length ? `${payload.games.length} jogo(s) encontrado(s).` : 'Nenhum jogo PS1 publicado ainda.';
+    return payload;
+  } catch (error) {
+    PS1EmulatorState.libraryLoaded = false;
+    status.textContent = forceRefresh ? 'Não foi possível atualizar a biblioteca.' : error.message;
+    throw error;
+  }
 }
 
 function setPs1Loading(message) {
@@ -299,6 +267,7 @@ async function startPs1(game) {
   document.querySelector('#ps1-diagnostics').hidden = !new URL(location.href).searchParams.has('debug');
   setPs1Loading('Preparando emulador...');
   startPs1LayoutDiagnostics(attempt);
+  const {downloadPs1Archive, inspectPs1File, resolvePs1Launch} = await import('./ps1-utils.js');
   const launch = resolvePs1Launch(game);
   let gameUrl = launch.bootUrl;
   const loadStarted = performance.now();
@@ -398,9 +367,18 @@ document.addEventListener('click', event => {
 window.addEventListener('popstate', () => setView(requestedView(), {historyMode: 'none'}));
 document.querySelector('[data-ps1-back]')?.addEventListener('click', () => { stopPs1(); setView('emulators'); });
 document.querySelectorAll('[data-ps1-close]').forEach(control => control.addEventListener('click', () => stopPs1()));
-document.querySelector('#ps1-refresh-library')?.addEventListener('click', () => loadPs1Library({refresh: true}));
-document.querySelector('#gbc-refresh-library')?.addEventListener('click', () => loadGbcLibrary({refresh: true}));
-document.querySelector('#gba-refresh-library')?.addEventListener('click', () => loadGbaLibrary({refresh: true}));
+for (const system of ['ps1', 'gbc', 'gba']) {
+  const button = document.querySelector(`#${system}-refresh-library`);
+  const loaders = {ps1: loadPs1Library, gbc: loadGbcLibrary, gba: loadGbaLibrary};
+  button?.addEventListener('click', () => refreshLibraryButton(system, button, loaders[system]).catch(() => {}));
+}
+document.addEventListener('click', event => {
+  const play = event.target.closest('[data-play-system]');
+  if (!play) return;
+  const url = new URL(`/${play.dataset.playSystem}-player`, location.origin);
+  url.searchParams.set('game', play.dataset.gameId);
+  window.open(url.href, '_blank', 'noopener');
+});
 document.querySelector('#ps1-retry')?.addEventListener('click', () => PS1EmulatorState.selectedGame && startPs1(PS1EmulatorState.selectedGame));
 document.querySelector('#ps1-fullscreen')?.addEventListener('click', () => document.querySelector('#ps1-player-panel')?.requestFullscreen?.());
 document.querySelector('#ps1-restart')?.addEventListener('click', () => { try { window.EJS_emulator?.restart?.(); } catch (error) { failPs1(error); } });

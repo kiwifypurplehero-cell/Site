@@ -1,6 +1,6 @@
 import {EMULATORS, findEmulator} from './emulator-registry.js';
 
-const PUBLIC_CACHE = 'public, max-age=60, stale-while-revalidate=300';
+const PUBLIC_CACHE = 'public, max-age=60, s-maxage=60, stale-while-revalidate=30';
 const PS1_COVER_CACHE = 'public, max-age=86400, stale-while-revalidate=604800';
 const PS1_BOOT_PRIORITY = Object.freeze(['m3u', 'cue', 'chd', 'pbp', 'ccd', 'img', 'iso', 'bin']);
 const PS1_BOOT_EXTENSIONS = new Set(PS1_BOOT_PRIORITY);
@@ -540,8 +540,20 @@ export async function emulatorApi(request, env, pathname = new URL(request.url).
       return json(payload, 503);
     }
     try {
-      const refresh = new URL(request.url).searchParams.get('refresh') === '1';
-      return json({emulator: emulator.id, games: await listGames(env, emulator)}, 200, {'Cache-Control': refresh ? 'no-store' : PUBLIC_CACHE});
+      const started = Date.now();
+      const refresh = new URL(request.url).searchParams.has('refresh');
+      console.log(`[LIBRARY] loading system=${emulator.id}`);
+      console.log(`[LIBRARY] cache=${refresh ? 'bypass' : 'eligible'} forceRefresh=${refresh}`);
+      const games = await listGames(env, emulator);
+      const versionInput = games.map(game => `${game.id || game.slug}:${game.size}:${game.lastModified || ''}`).join('|');
+      const libraryVersion = hex(await sha256(versionInput)).slice(0, 16);
+      const lastModified = games.map(game => game.lastModified).filter(Boolean).sort().at(-1) || null;
+      console.log(`[LIBRARY] objects=${games.length} duration=${Date.now() - started}ms`);
+      return json({emulator: emulator.id, games, libraryVersion, lastModified}, 200, {
+        'Cache-Control': refresh ? 'no-store, no-cache, must-revalidate' : PUBLIC_CACHE,
+        ETag: `"${libraryVersion}"`,
+        Vary: 'Accept-Encoding'
+      });
     }
     catch (error) {
       if (emulator.id === 'ps1') safeB2Log(b2Config(env, 'ps1'), error);

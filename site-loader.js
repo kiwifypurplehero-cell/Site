@@ -1,4 +1,5 @@
-const MINIMUM_VISIBLE_TIME = 3000;
+// The loader protects only critical bootstrap; libraries and emulator cores are lazy.
+const MINIMUM_VISIBLE_TIME = 350;
 const MAXIMUM_BOOT_TIME = 18000;
 const FADE_TIME = 280;
 
@@ -14,6 +15,19 @@ let visualProgress = 10;
 let animationFrame;
 let safetyTimer;
 let emulatorModule;
+const debugMetrics = {fcp: null, lcp: null, longTasks: 0, longTaskTime: 0};
+
+if (debug && 'PerformanceObserver' in window) {
+  for (const type of ['paint', 'largest-contentful-paint', 'longtask']) try {
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        if (entry.name === 'first-contentful-paint') debugMetrics.fcp = Math.round(entry.startTime);
+        if (type === 'largest-contentful-paint') debugMetrics.lcp = Math.round(entry.startTime);
+        if (type === 'longtask') { debugMetrics.longTasks += 1; debugMetrics.longTaskTime += Math.round(entry.duration); }
+      }
+    }).observe({type, buffered: true});
+  } catch {}
+}
 
 function setState(nextState) {
   state = nextState;
@@ -64,7 +78,7 @@ async function loadEmulators(view) {
 
 function requestedView() {
   const view = new URL(location.href).searchParams.get('view') || 'home';
-  return ['home', 'emulators', 'ps1', 'gbc', 'ps2'].includes(view) ? view : 'home';
+  return ['home', 'emulators', 'ps1', 'gbc', 'gba', 'ps2'].includes(view) ? view : 'home';
 }
 
 // Internal navigation remains instant and only lazily downloads emulator code.
@@ -98,9 +112,13 @@ function showSafetyFallback(error) {
 
 function reportPerformance() {
   if (!debug) return;
+  const resources = performance.getEntriesByType('resource');
   console.info('[PLUMPGAMES PERFORMANCE]', {
-    overlayRemoved: Math.round(performance.now() - overlayStart),
-    requests: performance.getEntriesByType('resource').length
+    bootstrap: Math.round(performance.now() - overlayStart),
+    firstUsableView: Math.round(performance.now()),
+    requests: resources.length,
+    transferredBytes: resources.reduce((sum, entry) => sum + (entry.transferSize || 0), 0),
+    ...debugMetrics
   });
 }
 

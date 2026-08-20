@@ -30,8 +30,8 @@ test('home contém as três views e navegação interna', async () => {
 test('GBC abre a rota canônica diretamente e ela responde sem redirect', async () => {
   const [html, source, response] = await Promise.all([request('/').then(r => r.text()), readFile(new URL('../emulators.js', import.meta.url), 'utf8'), request('/gbc-player.html?game=pokemon')]);
   assert.match(html, /data-view-link="gbc">Abrir emulador/);
-  assert.match(source, /new URL\('\/gbc-player\.html'/);
-  assert.match(source, /window\.open\(url\.href, '_blank'\)/);
+  assert.match(source, /new URL\(`\/\$\{play\.dataset\.playSystem\}-player`/);
+  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('location'), null);
   const player = await response.text();
@@ -58,7 +58,7 @@ test('controlador troca views via estado e preserva History API', async () => {
   assert.match(source, /history\.pushState/);
   assert.match(source, /addEventListener\('popstate'/);
   assert.doesNotMatch(source, /location\.href\s*=/);
-  assert.match(source, /window\.open\(url\.href, '_blank'\)/);
+  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
 });
 
 test('PS2 fica indisponível e GBA usa core mGBA declarado', async () => {

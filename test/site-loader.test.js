@@ -6,7 +6,7 @@ const loader = await readFile(new URL('../site-loader.js', import.meta.url), 'ut
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
 test('loader global tem mínimo e progresso real limitado', () => {
-  assert.match(loader, /MINIMUM_VISIBLE_TIME = 3000/);
+  assert.match(loader, /MINIMUM_VISIBLE_TIME = 350/);
   assert.match(loader, /Math\.max\(0, MINIMUM_VISIBLE_TIME -/);
   assert.match(loader, /Math\.min\(99, interpolated\)/);
   assert.match(loader, /renderProgress\(100\)/);

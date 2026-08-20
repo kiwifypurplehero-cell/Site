@@ -8,5 +8,17 @@
   Content-Type: application/wasm
   Cache-Control: public, max-age=31536000, immutable
 
+/*.js
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/*.css
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/*.png
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/*.webp
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
 /assets/*
   Cache-Control: public, max-age=86400, must-revalidate

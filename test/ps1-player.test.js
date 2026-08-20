@@ -5,9 +5,9 @@ import {fetchPs1Game, resolvePs1Launch} from '../ps1-utils.js';
 
 test('biblioteca abre o player PS1 dedicado em nova aba por gesto direto', () => {
   const source = fs.readFileSync(new URL('../emulators.js', import.meta.url), 'utf8');
-  assert.match(source, /new URL\('\/ps1-player', location\.origin\)/);
-  assert.match(source, /searchParams\.set\('game', game\.id\)/);
-  assert.match(source, /window\.open\(url\.href, '_blank'\)/);
+  assert.match(source, /new URL\(`\/\$\{play\.dataset\.playSystem\}-player`/);
+  assert.match(source, /searchParams\.set\('game', play\.dataset\.gameId\)/);
+  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
 });
 
 test('player consulta novamente a API por id em refresh ou acesso direto', async () => {
