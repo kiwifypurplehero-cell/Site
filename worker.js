@@ -13,6 +13,9 @@ const COMMUNITY_BODY_BYTES = 12_000;
 const COMMUNITY_TYPES = new Set(['html','windows','linux','android','other']);
 const COMMUNITY_FIELDS = new Set(['name','creator','githubUrl','playUrl','gameType','description','platform','coverUrl','confirmed']);
 const PLAY_HOSTS = new Set(['itch.io','gamejolt.com','github.io']);
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GAME_ID_RE=/^[a-z0-9][a-z0-9:._-]{2,159}$/i;
+const PLAYER_COOKIE='plumpgames_guest';
 
 const SYSTEM_PROMPT = `Você é PJ Assistant, assistente oficial de suporte da PlumpGames.
 Seu objetivo principal é ajudar visitantes a utilizar o site, acessar jogos, solucionar problemas simples e entender os recursos da PlumpGames.
@@ -23,6 +26,47 @@ O site possui menu de três barras, catálogo detalhado ou compacto, atualizaç�
 
 function json(data,status=200,headers={}) {
   return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers}});
+}
+function cookieValue(request,name){const match=request.headers.get('Cookie')?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));return match?decodeURIComponent(match[1]):'';}
+function playerIdentity(request){const local=request.headers.get('X-PlumpGames-Player')||'',cookie=cookieValue(request,PLAYER_COOKIE);if(UUID_RE.test(local)&&local!==cookie)return {id:local,setCookie:true};return UUID_RE.test(cookie)?{id:cookie,setCookie:false}:{id:crypto.randomUUID(),setCookie:true};}
+function withPlayerCookie(response,identity){if(!identity.setCookie)return response;const headers=new Headers(response.headers);headers.append('Set-Cookie',`${PLAYER_COOKIE}=${identity.id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`);return new Response(response.body,{status:response.status,statusText:response.statusText,headers});}
+async function playerJson(request,env,handler){if(!env.DB)return json({error:'Histórico temporariamente indisponível.'},503);const identity=playerIdentity(request);try{return withPlayerCookie(await handler(identity.id),identity);}catch(error){console.error('D1 playtime failure',error);return withPlayerCookie(json({error:'Histórico temporariamente indisponível.'},503),identity);}}
+async function bodyJson(request){if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json'))return null;if(Number(request.headers.get('Content-Length')||0)>4000)return null;try{return await request.json();}catch{return null;}}
+function validGame(game){return game&&GAME_ID_RE.test(game.gameId)&&typeof game.title==='string'&&game.title.trim().length<=120&&typeof game.system==='string'&&game.system.trim().length<=40&&['git','web','emulator'].includes(game.source)&&typeof game.sourceKey==='string'&&game.sourceKey.length<=160&&(!game.cover||typeof game.cover==='string'&&game.cover.length<=500);}
+async function playerApi(request,env,path){
+  return playerJson(request,env,async playerId=>{
+    const now=new Date().toISOString();
+    if(request.method==='POST'&&path==='/api/player/session/start'){
+      const p=await bodyJson(request);if(!p||!UUID_RE.test(p.sessionId)||!validGame(p.game))return json({error:'Sessão ou jogo inválido.'},400);
+      const existing=await env.DB.prepare('SELECT id FROM play_sessions WHERE id=? AND player_id=?').bind(p.sessionId,playerId).first();if(existing)return json({ok:true,sessionId:p.sessionId,duplicate:true});
+      await env.DB.batch([
+        env.DB.prepare('INSERT INTO players(id,created_at,last_seen_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen_at=excluded.last_seen_at').bind(playerId,now,now),
+        env.DB.prepare('INSERT INTO games(id,system,title,source,source_key,cover_url) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET system=excluded.system,title=excluded.title,cover_url=excluded.cover_url').bind(p.game.gameId,p.game.system.trim(),p.game.title.trim(),p.game.source,p.game.sourceKey,p.game.cover||''),
+        env.DB.prepare('INSERT OR IGNORE INTO play_sessions(id,player_id,game_id,started_at,last_heartbeat_at) VALUES(?,?,?,?,?)').bind(p.sessionId,playerId,p.game.gameId,now,now),
+        env.DB.prepare('INSERT INTO play_stats(player_id,game_id,total_seconds,sessions,last_played_at) VALUES(?,?,0,1,?) ON CONFLICT(player_id,game_id) DO UPDATE SET sessions=sessions+1,last_played_at=excluded.last_played_at').bind(playerId,p.game.gameId,now)
+      ]);return json({ok:true,sessionId:p.sessionId},201);
+    }
+    if(request.method==='POST'&&(path==='/api/player/session/heartbeat'||path==='/api/player/session/end')){
+      const p=await bodyJson(request);if(!p||!UUID_RE.test(p.sessionId)||!Number.isInteger(p.sequence)||p.sequence<1||p.sequence>1000000)return json({error:'Atualização inválida.'},400);
+      const seconds=p.activeSeconds??0;if(!Number.isInteger(seconds)||seconds<0||seconds>60)return json({error:'Duração inválida (máximo 60 segundos).'},400);
+      const session=await env.DB.prepare('SELECT game_id,last_sequence,ended_at FROM play_sessions WHERE id=? AND player_id=?').bind(p.sessionId,playerId).first();
+      if(!session)return json({error:'Sessão não encontrada.'},404);if(p.sequence<=session.last_sequence)return json({ok:true,duplicate:true});if(session.ended_at)return json({ok:true,ended:true});
+      const accepted=await env.DB.prepare(`UPDATE play_sessions SET active_seconds=active_seconds+?,last_sequence=?,last_heartbeat_at=?,ended_at=${path.endsWith('end')?'?':'ended_at'} WHERE id=? AND player_id=? AND last_sequence<?`).bind(...(path.endsWith('end')?[seconds,p.sequence,now,now,p.sessionId,playerId,p.sequence]:[seconds,p.sequence,now,p.sessionId,playerId,p.sequence])).run();
+      if(!accepted.meta?.changes)return json({ok:true,duplicate:true});
+      await env.DB.batch([
+        env.DB.prepare('UPDATE play_stats SET total_seconds=total_seconds+?,last_played_at=? WHERE player_id=? AND game_id=?').bind(seconds,now,playerId,session.game_id),
+        env.DB.prepare('UPDATE players SET last_seen_at=? WHERE id=?').bind(now,playerId)
+      ]);return json({ok:true,acceptedSeconds:seconds});
+    }
+    if(request.method==='GET'&&['/api/player/stats','/api/player/games','/api/player/top-games','/api/player/export'].includes(path)){
+      const rows=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system,g.source,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.sessions,s.last_played_at AS lastPlayedAt FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.player_id=? ORDER BY s.total_seconds DESC,g.title LIMIT 500').bind(playerId).all()).results||[];
+      if(path==='/api/player/games'||path==='/api/player/top-games')return json({games:rows});
+      const summary={totalSeconds:rows.reduce((n,r)=>n+r.totalSeconds,0),gamesPlayed:rows.length,totalSessions:rows.reduce((n,r)=>n+r.sessions,0),mostPlayed:rows[0]||null,lastPlayed:[...rows].sort((a,b)=>String(b.lastPlayedAt).localeCompare(String(a.lastPlayedAt)))[0]||null};
+      return json(path==='/api/player/export'?{exportedAt:now,profile:{anonymous:true},summary,games:rows}:{summary,games:rows});
+    }
+    if(request.method==='DELETE'&&path==='/api/player/history'){await env.DB.prepare('DELETE FROM players WHERE id=?').bind(playerId).run();const response=json({ok:true});response.headers.append('Set-Cookie',`${PLAYER_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);return response;}
+    return json({error:'Endpoint não encontrado.'},404);
+  });
 }
 function cleanText(value,max) { return typeof value==='string'?value.trim().slice(0,max):''; }
 function clientAllowed(request) {
@@ -123,6 +167,7 @@ async function support(request,env) {
 }
 export default {async fetch(request,env,ctx){
   const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
+  if(url.pathname.startsWith('/api/player/'))return playerApi(request,env,url.pathname);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
   if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
   const gbcDebug=url.searchParams.get('debug')==='1';

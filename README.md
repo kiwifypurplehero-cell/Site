@@ -1,5 +1,13 @@
 # PlumpGames
 
+## Perfil anônimo e tempo jogado
+
+O navegador cria `plumpgames_player_id` com `crypto.randomUUID()` na primeira visita. Esse identificador local existe apenas para representar o perfil na interface; a API usa um cookie first-party `HttpOnly`, sem aceitar `playerId` em URL ou payload. Não há login, e-mail, fingerprint, identificação por IP ou sincronização confiável entre dispositivos. Se os dados locais/cookies forem apagados, nasce outro perfil.
+
+Todos os players usam `PlaytimeTracker` e descritores estáveis (`git:web:<repo>` ou `emulator:<sistema>:<id>`). O contador só começa no carregamento efetivo do iframe ou primeiro frame do emulador, mede intervalos com `performance.now()`, pausa ao perder foco/visibilidade e persiste a cada 45 segundos ativos. Pausas, fechamento e `pagehide` fazem flush; `sendBeacon` é usado no encerramento. Uma trava local por jogador+jogo evita contagem dupla entre abas, e uma fila local limitada a 100 atualizações tolera períodos offline.
+
+O D1 mantém `players`, `games`, `play_sessions` (auditoria e períodos futuros) e `play_stats` (resumo materializado para consultas rápidas). UUIDs, IDs, sequência idempotente e duração máxima de 60 segundos por atualização são validados pelo Worker. O painel `/profile.html` oferece resumo, ranking por tempo, tiers relativos por percentil (somente com três ou mais jogos), exportação JSON e exclusão completa.
+
 ## Bridge de controles para jogos incorporados
 
 Jogos publicados na mesma origem da PlumpGames recebem os eventos virtuais
