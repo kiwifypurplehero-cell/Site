@@ -40,3 +40,23 @@ export class EmulatorLoadingManager {
 }
 
 export function instrumentFirstFrame(container,callback){const disposers=[];for(const [prototype,methods] of [[globalThis.WebGLRenderingContext?.prototype,['drawArrays','drawElements']], [globalThis.WebGL2RenderingContext?.prototype,['drawArrays','drawElements']],[globalThis.CanvasRenderingContext2D?.prototype,['drawImage','putImageData','fillRect']]])for(const name of methods){if(!prototype?.[name])continue;const original=prototype[name];function wrapped(...args){const result=original.apply(this,args);if(this.canvas?.closest?.(container))queueMicrotask(callback);return result;}prototype[name]=wrapped;disposers.push(()=>{if(prototype[name]===wrapped)prototype[name]=original;});}return()=>disposers.forEach(dispose=>dispose());}
+
+export const BOOT_TIMEOUTS=Object.freeze({runtime_loading:20_000,core_loading:20_000,canvas_creation:20_000,content_mounting:20_000,waiting_first_frame:20_000});
+const BOOT_LABELS={runtime_loading:'Runtime',core_loading:'Core',canvas_creation:'Renderização',content_mounting:'Conteúdo',waiting_first_frame:'Primeiro frame'};
+
+/** Observa o bootstrap real do EmulatorJS sem depender de EJS_onLoadState.
+ * Essa opção é um callback de save-state, não um sinal de que o core/WASM abriu. */
+export class EmulatorBootDiagnostics {
+  constructor({system,container,loading,onError,debug=false,time=globalThis}={}){this.system=system;this.container=container;this.loading=loading;this.onError=onError;this.debug=debug;this.time=time;this.phase='preparing';this.timer=0;this.poller=0;}
+  log(message,details){if(this.debug||message==='error')console.info(`[EMU-LOAD] system=${this.system} phase=${this.phase} ${message}`,details??'');}
+  enter(phase,{timeout=BOOT_TIMEOUTS[phase]}={}){this.cancelTimer();this.phase=phase;this.log(phase);if(timeout)this.timer=this.time.setTimeout(()=>this.fail(Object.assign(new Error('Não foi possível inicializar o emulador.'),{code:phase,detail:`Etapa: ${BOOT_LABELS[phase]||phase}`})),timeout);return this;}
+  complete(step){this.cancelTimer();this.loading?.completeStep(step);this.log(`${step} complete`);return this;}
+  watchRuntime({current=()=>true,onCore,onCanvas}={}){this.stopWatching();this.enter('core_loading');this.loading?.completeStep('core_requested');let coreSeen=false,canvasSeen=false;const inspect=()=>{if(!current())return this.stopWatching();if(!coreSeen&&globalThis.EJS_emulator){coreSeen=true;this.complete('core_loaded');this.enter('canvas_creation');onCore?.();}const canvas=typeof this.container==='string'?globalThis.document?.querySelector?.(`${this.container} canvas`):this.container?.querySelector?.('canvas');if(coreSeen&&!canvasSeen&&canvas?.width&&canvas?.height){canvasSeen=true;this.complete('canvas_created');this.enter('content_mounting');onCanvas?.(canvas);}};this.poller=this.time.setInterval(inspect,50);inspect();return this;}
+  mounted(){this.complete('content_mounted');this.stopWatching();return this;}
+  waitingFirstFrame(){this.enter('waiting_first_frame');return this;}
+  running(){this.cancelTimer();this.stopWatching();this.phase='running';this.log('first frame');}
+  fail(error){this.cancelTimer();this.stopWatching();this.phase='error';this.loading?.fail(error);this.log('error',{code:error.code,message:error.message});this.onError?.(error);}
+  cancelTimer(){if(this.timer)this.time.clearTimeout(this.timer);this.timer=0;}
+  stopWatching(){if(this.poller)this.time.clearInterval(this.poller);this.poller=0;}
+  destroy(){this.cancelTimer();this.stopWatching();}
+}

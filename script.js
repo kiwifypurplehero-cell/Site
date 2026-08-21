@@ -168,14 +168,14 @@ function renderWallpapers() {
 let panelCloseTimer = 0;
 function openPanel() {
   const panel=$('#gx-side-panel'); clearTimeout(panelCloseTimer); lastFocus=document.activeElement;
-  panel.hidden=false; panel.inert=false; $('#gx-panel-backdrop').hidden=false; lockPageScroll('menu');
+  panel.hidden=false; panel.inert=false; $('#gx-panel-backdrop').hidden=false;
   requestAnimationFrame(()=>panel.classList.add('is-open'));
   $('#gx-menu-button').setAttribute('aria-expanded','true'); document.body.classList.add('panel-open'); $('#gx-panel-close').focus();
 }
 function closePanel({restoreFocus=true}={}) {
   const panel=$('#gx-side-panel');
-  if (panel.hidden && !document.body.classList.contains('panel-open')) { unlockPageScroll('menu'); return; }
-  panel.classList.remove('is-open'); panel.inert=true; $('#gx-panel-backdrop').hidden=true; $('#gx-menu-button').setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open'); unlockPageScroll('menu');
+  if (panel.hidden && !document.body.classList.contains('panel-open')) return;
+  panel.classList.remove('is-open'); panel.inert=true; $('#gx-panel-backdrop').hidden=true; $('#gx-menu-button').setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open');
   clearTimeout(panelCloseTimer); panelCloseTimer=setTimeout(()=>{ panel.hidden=true; },220);
   if (restoreFocus) $('#gx-menu-button').focus();
 }
