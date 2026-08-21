@@ -212,7 +212,7 @@ function showModal(title, html, actions='') {
 function closeModal() { $('#site-modal').hidden=true; document.body.classList.remove('modal-open'); unlockPageScroll('modal'); lastFocus?.focus(); }
 $$('[data-close-modal]').forEach(button=>button.addEventListener('click',closeModal));
 $('[data-open-credits]').addEventListener('click',()=>showModal('Créditos','<p>PlumpGames é criado por Matheus (Plump), com ajuda do Codex.</p>'));
-$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>Preferências e cache ficam no navegador. O site não possui contas. Dados informados voluntariamente no formulário de jogos da comunidade são publicados no catálogo compartilhado.</p>'));
+$('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Privacidade','<p>O perfil de jogo usa um UUID aleatório e cookie first-party. Salvamos somente jogos, sessões e tempo ativo; não usamos e-mail, senha, IP como identidade, localização ou fingerprint. Sem autenticação, não existe sincronização confiável entre dispositivos. Você pode exportar ou apagar o histórico em Perfil.</p>'));
 $('[data-open-terms]').addEventListener('click',()=>showModal('Termos de Uso','<p>Os projetos são oferecidos como estão. Consulte o repositório de cada jogo para detalhes.</p>'));
 
 if (!location.href.startsWith(OFFICIAL_URL) && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') console.info(`Site oficial: ${OFFICIAL_URL}`);
@@ -394,6 +394,7 @@ function createGameCard(game) {
   const card = element('article',`game-card game-card--featured${game.community?' game-card--community':''}`);
   card.dataset.catalog=game.community?'community':'official';
   card.dataset.repositoryId=game.id;
+  card.dataset.gameId=`git:web:${String(game.rawName||game.id).toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-|-$/g,'')}`;
   const body=element('div','game-card__body');
   body.append(element('p','card-kicker',`${game.community?'COMUNIDADE':'OFICIAL'} • ${game.language} • ${game.status}`), element('h3','',game.name));
   if(game.community)body.append(element('p','community-creator',`Por: ${game.creator}`));
