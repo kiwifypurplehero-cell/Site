@@ -17,7 +17,10 @@ const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a
 const GAME_ID_RE=/^[a-z0-9][a-z0-9:._-]{2,159}$/i;
 const SESSION_COOKIE='plumpgames_session';
 const SESSION_SECONDS=60*60*24*30;
-const PASSWORD_ITERATIONS=210000;
+const PASSWORD_ITERATIONS=100000;
+const PASSWORD_MIN_ITERATIONS=100000;
+// Keep verification within the iteration count supported by the production Workers runtime.
+const PASSWORD_MAX_ITERATIONS=PASSWORD_ITERATIONS;
 const PASSWORD_ALGORITHM='pbkdf2-sha256';
 const PASSWORD_SALT_BYTES=16;
 const PASSWORD_HASH_BYTES=32;
@@ -58,12 +61,18 @@ async function verifyPassword(password,storedHash){
   const legacy=fields[0]==='pbkdf2'&&fields[1]==='sha256';
   const [algorithm,iterationsText,saltText,expectedText]=legacy?['pbkdf2-sha256',...fields.slice(2)]:fields;
   const iterations=Number(iterationsText);
-  if(algorithm!==PASSWORD_ALGORITHM||!Number.isInteger(iterations)||iterations<100000||!saltText||!expectedText)return false;
+  if(algorithm!==PASSWORD_ALGORITHM||!Number.isInteger(iterations)||iterations<PASSWORD_MIN_ITERATIONS||iterations>PASSWORD_MAX_ITERATIONS||!saltText||!expectedText)return false;
   let salt,expected;
   try{salt=base64ToBytes(saltText);expected=base64ToBytes(expectedText);}catch{return false;}
   if(salt.length<PASSWORD_SALT_BYTES||expected.length!==PASSWORD_HASH_BYTES)return false;
-  const actual=await derivePasswordBytes(password,salt,iterations);
-  return safeEqualBytes(actual,expected);
+  try{
+    const actual=await derivePasswordBytes(password,salt,iterations);
+    return safeEqualBytes(actual,expected);
+  }catch(error){
+    // A runtime crypto limitation is an invalid login, not an internal Worker failure.
+    if(error?.name==='NotSupportedError')return false;
+    throw error;
+  }
 }
 function safeEqualBytes(left,right){let difference=left.length^right.length;const length=Math.max(left.length,right.length);for(let i=0;i<length;i++)difference|=(left[i]||0)^(right[i]||0);return difference===0;}
 function requestOriginAllowed(request,{allowNonBrowser=false}={}){
