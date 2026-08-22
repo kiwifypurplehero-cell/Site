@@ -51,14 +51,14 @@
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
         <a class="brand" href="/?view=home" data-view-link="home" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
-        <div class="primary-nav"><a href="/" aria-current="page" title="Home"><span aria-hidden="true">⌂</span><b>Home</b></a><a href="#jogos" title="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a><a href="/Emuladores/" title="Emuladores"><span aria-hidden="true">▶</span><b>Emuladores</b></a><a href="/profile.html" title="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a></div>
+        <div class="primary-nav" data-app-navigation><a href="?view=home" data-view-link="home" aria-current="page" title="Home"><span aria-hidden="true">⌂</span><b>Home</b></a><a href="?view=library" data-view-link="library" title="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a><a href="?view=emulators" data-view-link="emulators" title="Emuladores"><span aria-hidden="true">▶</span><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile" title="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a></div>
         <div class="header-actions"><button id="plump-assistant-button" class="assistant-button" type="button" title="Abrir PJ Assistant" aria-label="Abrir PJ Assistant" aria-expanded="false" aria-controls="plump-assistant-panel"><span>PJ</span><small>AI</small><i aria-hidden="true"></i></button><button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button></div>
         <div class="sidebar-controls"><button id="sidebar-toggle" type="button" title="Recolher barra" aria-label="Recolher barra lateral">«</button><button type="button" data-sidebar-logout title="Sair"><span aria-hidden="true">⇥</span><b>Sair</b></button></div>
       </nav>
     </header>
 
     <main id="main-content">
-      <div id="home-view" data-app-view="home">
+      <div id="library-view" class="app-view" data-app-view="library" hidden>
       <section class="section section--catalog container" id="jogos" aria-labelledby="games-title">
         <div class="section-heading reveal"><div><p class="eyebrow">Jogo em destaque</p><h2 id="games-title">Jogue do seu jeito</h2></div><p>Conheça jogos para navegador e escolha entre visitar o projeto ou baixar a versão mais recente diretamente do GitHub.</p></div>
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
@@ -74,7 +74,8 @@
         <p id="community-message" class="games-message community-warning" role="status" aria-live="polite" hidden></p>
         <div class="games-list" id="games-list" data-view="detailed" aria-live="polite"></div>
       </section>
-
+      </div>
+      <div id="home-view" class="app-view" data-app-view="home">
       <section class="section container updates-panel reveal" aria-labelledby="updates-title"><div class="section-heading"><div><p class="eyebrow">Status do site</p><h2 id="updates-title">Última atualização do site</h2></div><div class="project-update project-update--site" data-update-project="site"><p data-update-date>Verificando atualização…</p><small data-update-relative></small><small data-update-status>Verificando atualização…</small></div></div></section>
 
       <section class="section section--news" id="novidades" aria-labelledby="news-title"><div class="container"><div class="section-heading reveal"><div><p class="eyebrow">Demonstração de atualizações</p><h2 id="news-title">Novidades</h2></div><p>Acompanhe notícias e próximos passos do universo PlumpGames.</p></div><div class="news-grid">
@@ -85,8 +86,16 @@
 
       <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
       </div>
-
+      <div id="emulators-view" class="app-view app-view--external" data-app-view="emulators" hidden data-view-src="/Emuladores/" aria-live="polite"></div>
+      <div id="profile-view" class="app-view app-view--external" data-app-view="profile" hidden data-view-src="/profile.html" aria-live="polite"></div>
     </main>
+
+    <nav class="mobile-bottom-nav" data-app-navigation aria-label="Navegação principal">
+      <a href="?view=home" data-view-link="home" aria-label="Home" aria-current="page"><span aria-hidden="true">⌂</span><b>Home</b></a>
+      <a href="?view=library" data-view-link="library" aria-label="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a>
+      <a href="?view=emulators" data-view-link="emulators" aria-label="Emuladores"><span aria-hidden="true">▶</span><b>Emul.</b></a>
+      <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
+    </nav>
 
     <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p><nav class="footer-primary-nav" aria-label="Navegação da PlumpGames"><a href="/" aria-current="page">Home</a><a href="/Emuladores/">Emuladores</a></nav></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
 
@@ -155,5 +164,6 @@
     <script type="module" src="site-loader.js"></script>
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
+    <script type="module" src="app-router.js"></script>
   </body>
 </html>
