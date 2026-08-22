@@ -11,22 +11,24 @@ class MemoryStatement{
   bind(...values){this.values=values;return this;}
   async first(){
     if(this.sql.startsWith('SELECT u.id,u.username')){const session=this.db.sessions.get(this.values[0]);const user=session&&session.expires_at>this.values[1]?this.db.users.get(session.user_id):null;return user?{...user,...session}:null;}
-    if(this.sql.startsWith('SELECT library_view'))return this.db.preferences.get(this.values[0])||null;
-    if(this.sql.startsWith('SELECT * FROM users'))return [...this.db.users.values()].find(user=>user.username_normalized===this.values[0])||null;
+    if(this.sql.startsWith('SELECT theme'))return this.db.preferences.get(this.values[0])||null;
+    if(this.sql.startsWith('SELECT id FROM users WHERE username'))return [...this.db.users.values()].find(user=>user.username.toLowerCase()===String(this.values[0]).toLowerCase())||null;
+    if(this.sql.startsWith('SELECT id,username,password_hash'))return [...this.db.users.values()].find(user=>user.username.toLowerCase()===String(this.values[0]).toLowerCase())||null;
+    if(this.sql.startsWith('INSERT INTO users')){const [username,password_hash,display_name]=this.values;if([...this.db.users.values()].some(user=>user.username.toLowerCase()===username.toLowerCase()))throw new Error('UNIQUE constraint failed: users.username');const user={id:this.db.nextId++,username,email:null,password_hash,display_name,avatar:'controller',bio:'',is_public:1,role:'user'};this.db.users.set(user.id,user);return user;}
+    if(this.sql.startsWith('SELECT password_hash FROM users'))return this.db.users.get(this.values[0])||null;
     throw new Error(`Unsupported first query: ${this.sql}`);
   }
   async run(){
-    if(this.sql.startsWith('INSERT INTO users')){const [id,username,username_normalized,password_hash,password_salt,created_at]=this.values;if([...this.db.users.values()].some(user=>user.username_normalized===username_normalized))throw new Error('UNIQUE constraint failed: users.username_normalized');this.db.users.set(id,{id,username,username_normalized,password_hash,password_salt,created_at});return {};}
-    if(this.sql.startsWith('INSERT INTO user_preferences')){const [user_id,updated_at]=this.values;this.db.preferences.set(user_id,{library_view:'detailed',live_wallpaper:'none',settings_json:'{}',updated_at});return {};}
-    if(this.sql.startsWith('INSERT INTO sessions')){const [token_hash,user_id,created_at,expires_at,last_seen_at]=this.values;this.db.sessions.set(token_hash,{user_id,created_at,expires_at,last_seen_at});return {};}
-    if(this.sql.startsWith('UPDATE users SET last_login_at')){this.db.users.get(this.values[1]).last_login_at=this.values[0];return {};}
-    if(this.sql.startsWith('UPDATE sessions SET last_seen_at')){this.db.sessions.get(this.values[1]).last_seen_at=this.values[0];return {};}
+    if(this.sql.startsWith('INSERT OR IGNORE INTO user_preferences')){const [user_id,updated_at]=this.values;this.db.preferences.set(user_id,{theme:'default',wallpaper:'none',animations:1,view_mode:'detailed',reduce_motion:0,updated_at});return {};}
+    if(this.sql.startsWith('INSERT INTO sessions')){const [token_hash,user_id,created_at,expires_at]=this.values;this.db.sessions.set(token_hash,{user_id,created_at,expires_at});return {};}
     if(this.sql.startsWith('DELETE FROM sessions WHERE token_hash')){this.db.sessions.delete(this.values[0]);return {};}
+    if(this.sql.startsWith('UPDATE users SET password_hash')){this.db.users.get(this.values[1]).password_hash=this.values[0];return {};}
+    if(this.sql.startsWith('DELETE FROM sessions WHERE user_id')){for(const [hash,session] of this.db.sessions)if(session.user_id===this.values[0]&&hash!==this.values[1])this.db.sessions.delete(hash);return {};}
     throw new Error(`Unsupported run query: ${this.sql}`);
   }
 }
 class MemoryDB{
-  constructor(){this.users=new Map();this.sessions=new Map();this.preferences=new Map();}
+  constructor(){this.users=new Map();this.sessions=new Map();this.preferences=new Map();this.nextId=1;}
   prepare(sql){return new MemoryStatement(this,sql);}
   async batch(statements){for(const statement of statements)await statement.run();}
 }
@@ -49,7 +51,7 @@ test('fluxo público de cadastro, sessão, logout e login preserva a conta',asyn
   const expired=await worker.fetch(authRequest('/api/auth/me',null,firstCookie),env,{});assert.equal(expired.status,401);
   const login=await worker.fetch(authRequest('/api/auth/login',{username:'plumpteste',password:'12345678'}),env,{});assert.equal(login.status,200);assert.equal((await responseBody(login)).user.username,'PlumpTeste');
   const secondCookie=cookieFrom(login);assert.notEqual(secondCookie,firstCookie);
-  const restored=await worker.fetch(authRequest('/api/auth/me',null,secondCookie),env,{});assert.equal(restored.status,200);assert.deepEqual((await responseBody(restored)).preferences,{libraryView:'detailed',liveWallpaper:'none',settings:{}});
+  const restored=await worker.fetch(authRequest('/api/auth/me',null,secondCookie),env,{});assert.equal(restored.status,200);assert.deepEqual((await responseBody(restored)).preferences,{theme:'default',libraryView:'detailed',liveWallpaper:'none',animations:true,reduceMotion:false});
 });
 
 test('origem cruzada é recusada sem tornar cadastro e login dependentes de sessão',async()=>{
@@ -59,4 +61,28 @@ test('origem cruzada é recusada sem tornar cadastro e login dependentes de sess
     assert.equal(response.status,403);assert.equal((await responseBody(response)).code,'ORIGIN_NOT_ALLOWED');
   }
   const privateResponse=await worker.fetch(authRequest('/api/auth/logout',{},null,{'X-PlumpGames-Request':'same-origin'}),env,{});assert.equal(privateResponse.status,401);
+});
+
+test('cadastro valida username e senha e persiste somente hash versionado',async()=>{
+  const env={DB:new MemoryDB()};
+  assert.equal((await worker.fetch(authRequest('/api/auth/register',{username:'ab',password:'12345678'}),env,{})).status,400);
+  assert.equal((await worker.fetch(authRequest('/api/auth/register',{username:'usuario',password:'1234567'}),env,{})).status,400);
+  const response=await worker.fetch(authRequest('/api/auth/register',{username:'Usuario',password:'12345678'}),env,{});
+  assert.equal(response.status,201);const stored=env.DB.users.values().next().value;
+  assert.equal(stored.email,null);assert.equal(stored.display_name,'Usuario');assert.match(stored.password_hash,/^pbkdf2\$sha256\$210000\$/);
+  assert.doesNotMatch(JSON.stringify(await response.json()),/password|hash|token/i);
+});
+
+test('alteração de senha invalida a antiga e permite a nova',async()=>{
+  const env={DB:new MemoryDB()};
+  const registration=await worker.fetch(authRequest('/api/auth/register',{username:'TrocaSenha',password:'senha-antiga'}),env,{});const cookie=cookieFrom(registration);
+  const changed=await worker.fetch(authRequest('/api/auth/change-password',{currentPassword:'senha-antiga',newPassword:'senha-nova'},cookie,{'X-PlumpGames-Request':'same-origin'}),env,{});assert.equal(changed.status,200);
+  assert.equal((await worker.fetch(authRequest('/api/auth/login',{username:'TrocaSenha',password:'senha-antiga'}),env,{})).status,401);
+  assert.equal((await worker.fetch(authRequest('/api/auth/login',{username:'TrocaSenha',password:'senha-nova'}),env,{})).status,200);
+});
+
+test('migration torna email nulo preservando ids, dados e binding real',async()=>{
+  const [sql,config]=await Promise.all([read('migrations/0005_optional_email_and_current_schema.sql'),read('wrangler.jsonc')]);
+  assert.match(sql,/email TEXT COLLATE NOCASE/);assert.doesNotMatch(sql,/email TEXT NOT NULL/);assert.match(sql,/INSERT INTO users_new[\s\S]*SELECT id,username,email/);assert.match(sql,/UNIQUE INDEX users_username_nocase_uq/);
+  assert.match(config,/"binding": "DB"/);assert.match(config,/"database_name": "plumpgames-auth"/);
 });

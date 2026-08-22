@@ -36,7 +36,9 @@ async function bodyJson(request){if(!request.headers.get('Content-Type')?.toLowe
 const bytesToBase64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes)));
 const base64ToBytes=value=>Uint8Array.from(atob(value),character=>character.charCodeAt(0));
 async function sha256(value){return bytesToBase64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));}
-async function passwordHash(password,salt){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations:PASSWORD_ITERATIONS},key,256));}
+async function derivePassword(password,salt,iterations=PASSWORD_ITERATIONS){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations},key,256));}
+async function passwordHash(password){const salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));return `pbkdf2$sha256$${PASSWORD_ITERATIONS}$${salt}$${await derivePassword(password,salt)}`;}
+async function passwordMatches(password,stored){const [algorithm,digest,iterationsText,salt,expected]=String(stored||'').split('$');const iterations=Number(iterationsText);if(algorithm!=='pbkdf2'||digest!=='sha256'||!Number.isInteger(iterations)||iterations<100000||!salt||!expected)return false;return safeEqual(await derivePassword(password,salt,iterations),expected);}
 function safeEqual(left,right){if(left.length!==right.length)return false;let difference=0;for(let i=0;i<left.length;i++)difference|=left.charCodeAt(i)^right.charCodeAt(i);return difference===0;}
 function requestOriginAllowed(request,{allowNonBrowser=false}={}){
   const expected=new URL(request.url).origin;
@@ -48,44 +50,50 @@ function requestOriginAllowed(request,{allowNonBrowser=false}={}){
 }
 const sameOrigin=request=>requestOriginAllowed(request);
 function authLimited(request,kind){const key=`auth:${kind}:${request.headers.get('CF-Connecting-IP')||'unknown'}`,now=Date.now(),recent=(requestBuckets.get(key)||[]).filter(time=>now-time<AUTH_WINDOW_MS);if(recent.length>=AUTH_LIMIT)return true;recent.push(now);requestBuckets.set(key,recent);return false;}
-function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return {username,normalized:username.toLocaleLowerCase('und')};}
+function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return username;}
 async function requireAuth(request,env){
   const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;const tokenHash=await sha256(token),now=new Date().toISOString();
-  const user=await env.DB.prepare('SELECT u.id,u.username,s.expires_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
-  if(!user)return null;if(Date.now()-Date.parse(user.last_seen_at)>15*60*1000)await env.DB.prepare('UPDATE sessions SET last_seen_at=? WHERE token_hash=?').bind(now,tokenHash).run();
-  return {id:user.id,username:user.username,tokenHash};
+  const user=await env.DB.prepare('SELECT u.id,u.username,u.display_name,u.avatar,u.bio,u.is_public,u.role,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
+  if(!user)return null;
+  return {...user,tokenHash};
 }
-const publicUser=user=>({id:user.id,username:user.username});
-async function preferences(env,userId){const row=await env.DB.prepare('SELECT library_view,live_wallpaper,settings_json FROM user_preferences WHERE user_id=?').bind(userId).first();return {libraryView:row?.library_view||'detailed',liveWallpaper:row?.live_wallpaper||'none',settings:JSON.parse(row?.settings_json||'{}')};}
+const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:user.avatar||'controller',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user'});
+async function preferences(env,userId){const row=await env.DB.prepare('SELECT theme,wallpaper,animations,view_mode,reduce_motion FROM user_preferences WHERE user_id=?').bind(userId).first();return {theme:row?.theme||'default',libraryView:row?.view_mode||'detailed',liveWallpaper:row?.wallpaper||'none',animations:row?.animations!==0,reduceMotion:row?.reduce_motion===1};}
 function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
-async function createSession(env,userId){const token=bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString(),now.toISOString()).run();return token;}
+async function createSession(env,userId){const token=bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString()).run();return token;}
+const authLog=(stage,detail='')=>console.log(`[AUTH] ${stage}${detail?` ${detail}`:''}`);
+const isInfrastructureError=error=>/D1_ERROR|database.*(?:unavailable|not found)|binding|network|timeout/i.test(String(error?.message||error));
 async function authApi(request,env,path){
   if(!env.DB)return json({error:'O serviço de contas não está configurado.',code:'AUTH_CONFIGURATION_ERROR'},503);
+  let stage='start';
   try{
-    if(request.method==='GET'&&path==='/api/auth/me'){const user=await requireAuth(request,env);return user?json({user:publicUser(user),preferences:await preferences(env,user.id)}):json({error:'Autenticação necessária.'},401);}
+    if(request.method==='GET'&&path==='/api/auth/me'){const user=await requireAuth(request,env);return user?json({user:publicUser(user),preferences:await preferences(env,user.id)}):json({error:'Sessão inválida ou expirada.',code:'INVALID_SESSION'},401,{'Set-Cookie':sessionCookie('',0)});}
     if(request.method!=='POST')return json({error:'Método não permitido.'},405);
     const publicEndpoint=path==='/api/auth/register'||path==='/api/auth/login';
     if(!requestOriginAllowed(request,{allowNonBrowser:publicEndpoint}))return json({error:'Requisição não autorizada.',code:'ORIGIN_NOT_ALLOWED'},403);
     if(path==='/api/auth/logout'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.tokenHash).run();return json({ok:true},200,{'Set-Cookie':sessionCookie('',0)});}
     const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
     if(path==='/api/auth/register'){
+      authLog('register start');authLog('DB available');
       if(authLimited(request,'register'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
-      const name=usernameData(payload.username);if(!name)return json({error:'Use 3–24 letras, números, _ ou -.'},400);
-      if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha deve ter entre 8 e 128 caracteres.'},400);
-      if(payload.confirmPassword!==undefined&&payload.password!==payload.confirmPassword)return json({error:'As senhas não coincidem.'},400);
-      const id=crypto.randomUUID(),salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.password,salt),now=new Date().toISOString();
-      try{await env.DB.batch([env.DB.prepare('INSERT INTO users(id,username,username_normalized,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)').bind(id,name.username,name.normalized,hash,salt,now),env.DB.prepare("INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,'detailed','none','{}',?)").bind(id,now)]);}catch(error){if(String(error).includes('UNIQUE'))return json({error:'Este nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}
-      const token=await createSession(env,id);return json({user:{id,username:name.username},preferences:await preferences(env,id)},201,{'Set-Cookie':sessionCookie(token)});
+      if(!payload||Object.keys(payload).some(key=>!['username','password'].includes(key)))return json({error:'Dados inválidos.',code:'INVALID_PAYLOAD'},400);
+      const username=usernameData(payload.username);if(!username)return json({error:'Use 3–24 letras, números, _ ou -.',code:'INVALID_USERNAME'},400);
+      if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);
+      stage='username check';const existing=await env.DB.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(existing)return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);authLog('username checked');
+      stage='password hash';const hash=await passwordHash(payload.password);authLog('password hashed');
+      stage='user insert';let inserted;try{inserted=await env.DB.prepare('INSERT INTO users(username,email,password_hash,display_name) VALUES(?,NULL,?,?) RETURNING id,username,display_name,avatar,bio,is_public,role').bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
+      stage='preferences insert';await env.DB.prepare("INSERT OR IGNORE INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,'default','none',1,'detailed',0,?)").bind(inserted.id,new Date().toISOString()).run();
+      stage='session create';const token=await createSession(env,inserted.id);authLog('session created');authLog('success');return json({user:publicUser(inserted),preferences:await preferences(env,inserted.id)},201,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/login'){
       if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
-      const name=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!name||typeof payload.password!=='string')return invalid();
-      const user=await env.DB.prepare('SELECT * FROM users WHERE username_normalized=?').bind(name.normalized).first();if(!user)return invalid();const calculated=await passwordHash(payload.password,user.password_salt);if(!safeEqual(calculated,user.password_hash))return invalid();
-      const now=new Date().toISOString();await env.DB.prepare('UPDATE users SET last_login_at=? WHERE id=?').bind(now,user.id).run();const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
+      const username=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!username||typeof payload.password!=='string')return invalid();
+      const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await passwordMatches(payload.password,user.password_hash))return invalid();
+      const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
     }
-    if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A nova senha deve ter entre 8 e 128 caracteres.'},400);const stored=await env.DB.prepare('SELECT password_hash,password_salt FROM users WHERE id=?').bind(user.id).first();if(!safeEqual(await passwordHash(payload.currentPassword||'',stored.password_salt),stored.password_hash))return json({error:'Senha atual incorreta.'},400);const salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.newPassword,salt);await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=? WHERE id=?').bind(hash,salt,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
+    if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);const stored=await env.DB.prepare('SELECT password_hash FROM users WHERE id=?').bind(user.id).first();if(!stored||!await passwordMatches(payload.currentPassword||'',stored.password_hash))return json({error:'Senha atual incorreta.',code:'INVALID_CURRENT_PASSWORD'},401);const hash=await passwordHash(payload.newPassword);await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").bind(hash,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
     return json({error:'Endpoint não encontrado.'},404);
-  }catch(error){console.error('Account API failure',error);return json({error:'Serviço de contas temporariamente indisponível.',code:'AUTH_SERVICE_UNAVAILABLE'},503);}
+  }catch(error){console.error(`[AUTH] failure stage=${stage} type=${error?.name||'Error'} code=${error?.code||'unknown'}`);return isInfrastructureError(error)?json({error:'Serviço temporariamente indisponível. Tente novamente.',code:'AUTH_SERVICE_UNAVAILABLE'},503):json({error:'Falha interna inesperada.',code:'AUTH_INTERNAL_ERROR'},500);}
 }
 async function profileApi(request,env,path){
   if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
@@ -93,8 +101,7 @@ async function profileApi(request,env,path){
     if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
     const current=await preferences(env,user.id),view=payload.libraryView??current.libraryView,wallpaper=payload.liveWallpaper??current.liveWallpaper;
     if(!['detailed','list','icons'].includes(view)||typeof wallpaper!=='string'||wallpaper.length>60)return json({error:'Preferência inválida.'},400);
-    const settings=payload.settings===undefined?current.settings:payload.settings;if(!settings||typeof settings!=='object'||Array.isArray(settings)||JSON.stringify(settings).length>4000)return json({error:'Configurações inválidas.'},400);
-    await env.DB.prepare('INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET library_view=excluded.library_view,live_wallpaper=excluded.live_wallpaper,settings_json=excluded.settings_json,updated_at=excluded.updated_at').bind(user.id,view,wallpaper,JSON.stringify(settings),new Date().toISOString()).run();return json({preferences:{libraryView:view,liveWallpaper:wallpaper,settings}});
+    await env.DB.prepare('INSERT INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,wallpaper=excluded.wallpaper,animations=excluded.animations,view_mode=excluded.view_mode,reduce_motion=excluded.reduce_motion,updated_at=excluded.updated_at').bind(user.id,payload.theme??current.theme,wallpaper,(payload.animations??current.animations)?1:0,view,(payload.reduceMotion??current.reduceMotion)?1:0,new Date().toISOString()).run();return json({preferences:{...current,theme:payload.theme??current.theme,libraryView:view,liveWallpaper:wallpaper,animations:payload.animations??current.animations,reduceMotion:payload.reduceMotion??current.reduceMotion}});
   }
   if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats'))return playerApi(request,env,'/api/player/stats');
   return json({error:'Endpoint não encontrado.'},404);
