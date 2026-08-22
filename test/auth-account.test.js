@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
 import worker from '../worker.js';
 const read=path=>readFile(new URL(`../${path}`,import.meta.url),'utf8');
-test('contas usam PBKDF2, salt individual e cookie seguro',async()=>{const worker=await read('worker.js');assert.match(worker,/PBKDF2/);assert.match(worker,/210000/);assert.match(worker,/HttpOnly; Secure; SameSite=Lax/);assert.doesNotMatch(worker,/localStorage.*password/i);});
+test('contas usam PBKDF2 com 100000 iterações e cookie seguro',async()=>{const source=await read('worker.js');assert.match(source,/const PASSWORD_ITERATIONS=100000;/);assert.match(source,/PBKDF2/);assert.match(source,/HttpOnly; Secure; SameSite=Lax/);assert.doesNotMatch(source,/localStorage.*password/i);});
 test('diagnósticos temporários isolam hash, sessão e D1 sem expor material sensível',async()=>{
   const disabled=await worker.fetch(authRequest('/api/auth/debug-password',{password:'12345678'}),{},{});assert.equal(disabled.status,404);
   const env={AUTH_DEBUG:'true',DB:{prepare(sql){return {async first(){assert.match(sql,/^SELECT 1 AS ok FROM (users|sessions) LIMIT 1$/);return null;}};}}};
@@ -80,8 +80,29 @@ test('cadastro valida username e senha e persiste somente hash versionado',async
   assert.equal((await worker.fetch(authRequest('/api/auth/register',{username:'usuario',password:'1234567'}),env,{})).status,400);
   const response=await worker.fetch(authRequest('/api/auth/register',{username:'Usuario',password:'12345678'}),env,{});
   assert.equal(response.status,201);const stored=env.DB.users.values().next().value;
-  assert.equal(stored.email,null);assert.equal(stored.display_name,'Usuario');assert.match(stored.password_hash,/^pbkdf2-sha256\$210000\$[A-Za-z0-9+/]+=*\$[A-Za-z0-9+/]+=*$/);
+  assert.equal(stored.email,null);assert.equal(stored.display_name,'Usuario');assert.match(stored.password_hash,/^pbkdf2-sha256\$100000\$[A-Za-z0-9+/]+=*\$[A-Za-z0-9+/]+=*$/);
   assert.doesNotMatch(JSON.stringify(await response.json()),/password|hash|token/i);
+});
+
+test('hashPassword usa 100000 iterações, verifica a senha e gera salt individual',async()=>{
+  const env={DB:new MemoryDB()};
+  const first=await worker.fetch(authRequest('/api/auth/register',{username:'HashUm',password:'12345678'}),env,{});
+  const second=await worker.fetch(authRequest('/api/auth/register',{username:'HashDois',password:'12345678'}),env,{});
+  assert.equal(first.status,201);assert.equal(second.status,201);
+  const [firstHash,secondHash]=[...env.DB.users.values()].map(user=>user.password_hash);
+  for(const hash of [firstHash,secondHash])assert.match(hash,/^pbkdf2-sha256\$100000\$[A-Za-z0-9+/]+=*\$[A-Za-z0-9+/]+=*$/);
+  assert.notEqual(firstHash.split('$')[2],secondHash.split('$')[2]);
+  const login=await worker.fetch(authRequest('/api/auth/login',{username:'HashUm',password:'12345678'}),env,{});
+  assert.equal(login.status,200);
+});
+
+test('hash acima do limite atual é recusado sem causar erro interno',async()=>{
+  const env={DB:new MemoryDB()};
+  await worker.fetch(authRequest('/api/auth/register',{username:'HashAntigo',password:'12345678'}),env,{});
+  const stored=env.DB.users.values().next().value;
+  stored.password_hash=stored.password_hash.replace('$100000$','$210000$');
+  const login=await worker.fetch(authRequest('/api/auth/login',{username:'HashAntigo',password:'12345678'}),env,{});
+  assert.equal(login.status,401);assert.equal((await responseBody(login)).code,'INVALID_CREDENTIALS');
 });
 
 test('login aceita o formato PBKDF2 legado para preservar usuários existentes',async()=>{
