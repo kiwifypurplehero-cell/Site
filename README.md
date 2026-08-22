@@ -150,3 +150,9 @@ O diagnóstico do loader fica em **Configurações → Desempenho → Diagnósti
 Antes de carregar o core, a view faz somente um `HEAD` no endpoint seguro para exibir disponibilidade e metadados no diagnóstico (`/Emuladores/PS1/player?game=<id>&debug=1`). O endpoint suporta Range, mas o loader do EmulatorJS controla a leitura do jogo: esta integração não afirma que o pcsx_rearmed inicia progressivamente. Ele pode baixar o arquivo completo diretamente para a memória WebAssembly e exibe o progresso nativo, sem um `arrayBuffer()` ou uma segunda cópia criada pelo código da PlumpGames.
 
 Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJS podem ser hospedados como assets próprios, desde que a GPL-3.0 e os avisos do projeto sejam preservados; o estado atual usa CDN e portanto requer conexão com esse host.
+
+## Contas e persistência
+
+A aplicação exige uma conta antes de carregar o catálogo. O Worker usa o D1 existente para `users`, sessões e preferências. Senhas são derivadas com PBKDF2-HMAC-SHA-256 (210.000 iterações e salt aleatório individual); somente o hash e o salt são persistidos. Sessões duram 30 dias e usam cookie `HttpOnly`, `Secure`, `SameSite=Lax`.
+
+A migration `0004_real_accounts.sql` mantém o histórico anônimo anterior em tabelas `anonymous_*` somente como arquivo, sem associá-lo automaticamente a uma conta (o vínculo seria inseguro). Novas sessões e estatísticas usam exclusivamente o `user_id` autenticado. Aplique com `npx wrangler d1 migrations apply plumpgames-auth --remote` antes de publicar.

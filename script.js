@@ -59,7 +59,8 @@ function closeTransientUiForNavigation() {
 document.addEventListener('plumpgames:before-view-change', closeTransientUiForNavigation);
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+let preferenceTimer;
+const save = () => {localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));clearTimeout(preferenceTimer);preferenceTimer=setTimeout(()=>window.PlumpAuth?.api('/api/profile/preferences',{method:'PUT',headers:window.PlumpAuth.csrfHeaders(),body:JSON.stringify({libraryView:preferences.view,liveWallpaper:preferences.wallpaper,settings:{theme:preferences.theme,economy:preferences.economy}})}).catch(()=>{}),350);};
 const currentWallpaper = () => wallpapers.find(item => item.id === preferences.wallpaper) || wallpapers.at(-1);
 
 function applyColors(colors) {
@@ -190,7 +191,7 @@ $('#apply-theme').addEventListener('click', () => { preferences.custom=Object.fr
 $('#reset-theme').addEventListener('click', () => { preferences={...defaults, custom:{...DEFAULT_COLORS}}; save(); syncControls(); selectWallpaper('none'); });
 $('#wallpaper-colors').addEventListener('change', event => { preferences.wallpaperColors=event.target.checked; save(); syncControls(); });
 $('#menu-opacity').addEventListener('input', event => { preferences.menuOpacity=Number(event.target.value); save(); syncControls(); });
-$$('[data-view-mode]').forEach(button => button.addEventListener('click', () => { preferences.view=button.dataset.viewMode; save(); syncControls(); }));
+$$('[data-view-mode]').forEach(button => button.addEventListener('click', () => { preferences.view=button.dataset.viewMode; gameLibrary?.setMode(preferences.view); save(); syncControls(); }));
 [['economy-mode','economy']].forEach(([id,key]) => $(`#${id}`).addEventListener('change', event => { preferences[key]=event.target.checked; save(); syncControls(); if(key==='reduceMotion'||key==='economy') selectWallpaper(preferences.wallpaper); }));
 [['glow-strength','glow'],['card-opacity','opacity'],['animation-strength','animation']].forEach(([id,key]) => $(`#${id}`).addEventListener('input', event => { preferences[key]=Number(event.target.value); save(); syncControls(); }));
 $('#wallpaper-pause').addEventListener('click',()=>{pauseWallpaper(true);setStatus('Wallpaper pausado.');});
@@ -405,7 +406,7 @@ function createGameCard(game) {
   body.append(details);
   const compactMeta=element('p','compact-meta');
   const compactRelative=element('span','relative-update',formatRelativeTime(game.updatedAt)); compactRelative.dataset.updatedAt=game.updatedAt;
-  compactMeta.append(element('span','',game.language),compactRelative); body.append(compactMeta);
+  compactMeta.append(element('span','',`Lançamento: ${game.createdAt?formatDate(game.createdAt):'Não informado'}`),compactRelative,element('span','',`Versão: ${game.version||'Não informado'}`)); body.append(compactMeta);
   const actions=element('div','card-actions');
   const playUrl=getGamePlayUrl(game);
   if (playUrl) { const play=element('button','button button--small button--play','▶ Jogar agora'); play.type='button'; play.addEventListener('click',()=>openGamePage(game)); actions.append(play); }
@@ -420,12 +421,14 @@ function setGamesMessage(message, error = false) {
   const area=$('#games-message'); area.textContent=message; area.hidden=!message; area.classList.toggle('is-error',error);
 }
 
+let gameLibrary;
 function renderGames(games) {
   currentGames=games;
-  const list=$('#games-list'); list.replaceChildren();
+  const list=$('#games-list');
   if (!games.length) { setGamesMessage('Nenhum jogo público foi encontrado no GitHub.'); return; }
   setGamesMessage('');
-  const fragment=document.createDocumentFragment(); games.forEach(game=>fragment.append(createGameCard(game))); list.append(fragment);
+  gameLibrary ||= new GameLibraryView(list,{mode:preferences.view,createItem:createGameCard,onModeChange:mode=>{preferences.view=mode;}});
+  gameLibrary.setGames(games);
 }
 
 function renderAllGames() { renderGames([...officialGames,...communityGames]); }

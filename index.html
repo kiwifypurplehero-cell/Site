@@ -29,13 +29,19 @@
       body.loading-active{overflow:hidden}#site-loader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;color:#f5f6ff;background:rgba(5,5,15,.25);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-family:Inter,ui-sans-serif,system-ui,sans-serif;transition:opacity .24s ease}#site-loader.is-complete{opacity:0;pointer-events:none}#site-loader[hidden]{display:none!important;pointer-events:none!important}.site-loader__card{width:min(390px,88vw);text-align:center}.site-loader__name{margin:0 0 22px;font-size:clamp(1.65rem,7vw,2.35rem);letter-spacing:-.03em;text-shadow:0 2px 18px #05050f}.site-loader__track{height:9px;overflow:hidden;border:1px solid #ffffff2b;border-radius:999px;background:#08091970;box-shadow:0 5px 20px #0005}.site-loader__bar{width:10%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8b5cf6,#38d9f5);box-shadow:0 0 14px #38d9f580;transition:width .2s ease}.site-loader__percent{display:block;margin-top:12px;font-size:1.15rem;font-variant-numeric:tabular-nums}.site-loader__message{margin:8px 0 0;color:#e2e4f4;font-size:.92rem}@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){#site-loader{background:rgba(5,5,15,.58)}}@media(max-width:600px){#site-loader{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}}@media(prefers-reduced-motion:reduce){#site-loader,.site-loader__bar{transition:none}}
     </style>
     <link rel="stylesheet" href="style.css" data-critical-style>
-    <script type="module" src="site-loader.js"></script>
-    <script src="play-utils.js" defer></script>
-    <script src="script.js" defer></script>
-    <script type="module" src="catalog-playtime.js"></script>
-    <script src="accessibility.js" defer></script>
+    <link rel="stylesheet" href="auth.css">
   </head>
   <body class="loading-active">
+    <section id="auth-gate" class="auth-gate" aria-label="Autenticação PlumpGames">
+      <div class="auth-card">
+        <h1 class="auth-logo"><span aria-hidden="true">P</span> PLUMPGAMES</h1><p class="auth-subtitle">Seu explorador pessoal de jogos.</p>
+        <div class="auth-actions" data-auth-form="choice"><button type="button" data-show-auth="login">Entrar</button><button class="auth-secondary" type="button" data-show-auth="register">Criar conta</button></div>
+        <form data-auth-form="login" hidden><label>Nome de usuário<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required></label><button type="submit">Entrar</button><button class="auth-back" type="button" data-auth-back>Voltar</button></form>
+        <form data-auth-form="register" hidden><label>Nome de usuário<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><p class="auth-hint">3–24 letras, números, _ ou -</p><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><label>Confirmar senha<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><button type="submit">Criar conta</button><button class="auth-back" type="button" data-auth-back>Voltar</button></form>
+        <p class="auth-status" data-auth-status role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <div id="app-shell" hidden>
     <div id="site-loader" data-state="boot" role="status" aria-live="polite" aria-label="Carregando PlumpGames"><div class="site-loader__card"><h1 class="site-loader__name">PlumpGames</h1><div class="site-loader__track" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"><div class="site-loader__bar"></div></div><strong class="site-loader__percent" data-loader-percent>10%</strong><p class="site-loader__message">Carregando...</p></div></div>
     <div id="wallpaper-stage" class="wallpaper-stage" aria-hidden="true"></div>
     <div class="wallpaper-overlay" aria-hidden="true"></div>
@@ -57,8 +63,9 @@
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
           <span>Visualização dos jogos</span>
           <div class="segmented-control" role="group" aria-label="Alternar visualização dos jogos">
-            <button type="button" data-view-mode="detailed" aria-pressed="true">Detalhada</button>
-            <button type="button" data-view-mode="compact" aria-pressed="false">Compacta</button>
+            <button type="button" data-view-mode="detailed" aria-pressed="true"title="Detalhado" aria-label="Detalhado">☷</button>
+            <button type="button" data-view-mode="list" title="Lista compacta" aria-label="Lista compacta">≡</button>
+            <button type="button" data-view-mode="icons" title="Ícones" aria-label="Ícones">▦</button>
           </div>
           <button class="button button--small button--ghost" type="button" id="refresh-games">Atualizar jogos</button>
         </div>
@@ -105,7 +112,7 @@
           <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar cores</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
         </div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><button id="wallpaper-retry" class="button button--small button--ghost" type="button" hidden>Tentar novamente</button><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo desempenho</label><p id="performance-suggestion" class="performance-suggestion" hidden>Seu dispositivo pode se beneficiar do modo desempenho.</p></div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed">Detalhada</button><button type="button" data-view-mode="compact">Compacta</button></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed" title="Detalhado">☷</button><button type="button" data-view-mode="list" title="Lista compacta">≡</button><button type="button" data-view-mode="icons" title="Ícones">▦</button></div></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
         <section class="gx-accordion accessibility-section"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <small id="accessibility-menu-status">Inativa</small><span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden>
           <div class="a11y-intro"><strong>Configuração rápida</strong><p>Uma prévia é aplicada imediatamente e fica somente neste navegador.</p><div id="a11y-quick-actions" class="a11y-quick-actions" aria-label="Atalhos de acessibilidade"></div></div>
@@ -144,5 +151,7 @@
     </div>
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <script type="module" src="auth.js"></script>
   </body>
 </html>
