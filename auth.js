@@ -25,9 +25,15 @@ function loadApp(user){
   if(loaded)return; loaded=true;
   gate.hidden=true; app.hidden=false; document.body.classList.remove('auth-locked');
   window.plumpUser=user;
-  for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js',''],['script.js',''],['catalog-playtime.js','module'],['accessibility.js','']]){
+  for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js',''],['script.js','']]){
     const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
   }
+  const loadSecondary=()=>{
+    for(const [src,type] of [['catalog-playtime.js','module'],['accessibility.js','']]){
+      const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
+    }
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(loadSecondary,{timeout:2500});else setTimeout(loadSecondary,1200);
   window.dispatchEvent(new CustomEvent('plumpgames:authenticated',{detail:user}));
 }
 function showForm(name){gate.querySelectorAll('[data-auth-form]').forEach(form=>form.hidden=form.dataset.authForm!==name);status.textContent='';}
