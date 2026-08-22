@@ -155,6 +155,19 @@ async function authApi(request,env,path){
 }
 async function profileApi(request,env,path){
   if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
+  if(request.method==='PUT'&&path==='/api/profile'){
+    if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
+    const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
+    const allowed=new Set(['displayName','avatar','bio','isPublic']);
+    if(Object.keys(payload).some(key=>!allowed.has(key)))return json({error:'Campo de perfil não permitido.'},400);
+    const displayName=typeof payload.displayName==='string'?payload.displayName.trim():'';
+    const bio=typeof payload.bio==='string'?payload.bio.trim():'';
+    const avatars=['controller','rocket','ghost','pixel','wizard','star'];
+    if(displayName.length<1||displayName.length>40||bio.length>240||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
+    await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,user.id).run();
+    const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role FROM users WHERE id=?').bind(user.id).first();
+    return json({user:publicUser(updated)});
+  }
   if(request.method==='PUT'&&path==='/api/profile/preferences'){
     if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
     const current=await preferences(env,user.id),view=payload.libraryView??current.libraryView,wallpaper=payload.liveWallpaper??current.liveWallpaper;
