@@ -69,8 +69,17 @@ test('cadastro valida username e senha e persiste somente hash versionado',async
   assert.equal((await worker.fetch(authRequest('/api/auth/register',{username:'usuario',password:'1234567'}),env,{})).status,400);
   const response=await worker.fetch(authRequest('/api/auth/register',{username:'Usuario',password:'12345678'}),env,{});
   assert.equal(response.status,201);const stored=env.DB.users.values().next().value;
-  assert.equal(stored.email,null);assert.equal(stored.display_name,'Usuario');assert.match(stored.password_hash,/^pbkdf2\$sha256\$210000\$/);
+  assert.equal(stored.email,null);assert.equal(stored.display_name,'Usuario');assert.match(stored.password_hash,/^pbkdf2-sha256\$210000\$[A-Za-z0-9+/]+=*\$[A-Za-z0-9+/]+=*$/);
   assert.doesNotMatch(JSON.stringify(await response.json()),/password|hash|token/i);
+});
+
+test('login aceita o formato PBKDF2 legado para preservar usuários existentes',async()=>{
+  const env={DB:new MemoryDB()};
+  const registration=await worker.fetch(authRequest('/api/auth/register',{username:'HashLegado',password:'senha-legada'}),env,{});
+  const stored=env.DB.users.values().next().value;
+  stored.password_hash=stored.password_hash.replace(/^pbkdf2-sha256\$/, 'pbkdf2$sha256$');
+  const login=await worker.fetch(authRequest('/api/auth/login',{username:'HashLegado',password:'senha-legada'}),env,{});
+  assert.equal(registration.status,201);assert.equal(login.status,200);
 });
 
 test('alteração de senha invalida a antiga e permite a nova',async()=>{
