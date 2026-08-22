@@ -16,8 +16,35 @@ function initializeView(view) {
   frame.src = view.dataset.viewSrc;
   frame.title = view.dataset.appView === 'profile' ? 'Perfil do usuário' : 'Biblioteca de emuladores';
   frame.loading = 'eager';
+  frame.scrolling = 'no';
+  frame.addEventListener('load', () => connectFrameHeight(frame));
   view.replaceChildren(frame);
   view.dataset.initialized = 'true';
+}
+
+function connectFrameHeight(frame) {
+  const document = frame.contentDocument;
+  if (!document) return;
+
+  document.documentElement.classList.add('embedded-app-view');
+  const embeddedStyles = document.createElement('style');
+  embeddedStyles.textContent = `
+    html.embedded-app-view,html.embedded-app-view body{height:auto!important;min-height:0!important;overflow:hidden!important}
+    html.embedded-app-view .site-header,html.embedded-app-view .profile-header{display:none!important}
+    html.embedded-app-view .emulators-page{padding-top:32px!important}
+    html.embedded-app-view .profile-main{padding-top:32px!important}
+  `;
+  document.head.append(embeddedStyles);
+
+  const resize = () => {
+    const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    if (Math.abs(frame.getBoundingClientRect().height - height) > 1) frame.style.height = `${height}px`;
+  };
+  resize();
+  const observer = new ResizeObserver(resize);
+  observer.observe(document.body);
+  frame._viewResizeObserver = observer;
+  document.fonts?.ready.then(resize);
 }
 
 function updateNavigation(name) {
@@ -36,24 +63,47 @@ function showView(name, { direction, restoreScroll = true } = {}) {
   const token = ++transitionToken;
   if (previous === next && !next.hidden) { updateNavigation(name); return; }
 
+  views.forEach(view => {
+    window.gsap?.killTweensOf(view);
+    if (view !== previous && view !== next) {
+      view.hidden = true;
+      view.removeAttribute('style');
+    }
+  });
+
   scrollPositions.set(previousName, scrollY);
   initializeView(next);
   const movingForward = direction ?? VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(previousName);
-  previous?.classList.add(movingForward ? 'view-exit-left' : 'view-exit-right');
   next.hidden = false;
-  next.classList.add(movingForward ? 'view-enter-right' : 'view-enter-left');
-  next.getBoundingClientRect();
-  requestAnimationFrame(() => next.classList.add('view-transition-active'));
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const gsap = window.gsap;
+  if (previous) {
+    previous.style.position = 'absolute';
+    previous.style.insetInline = '0';
+    previous.style.pointerEvents = 'none';
+  }
   activeView = name;
   updateNavigation(name);
   document.documentElement.dataset.activeView = name;
 
-  window.setTimeout(() => {
+  const finish = () => {
     if (token !== transitionToken) return;
-    if (previous) { previous.hidden = true; previous.className = previous.className.replace(/\s*view-(?:exit-(?:left|right)|transition-active)/g, ''); }
-    next.classList.remove('view-enter-right', 'view-enter-left', 'view-transition-active');
+    if (previous) {
+      previous.hidden = true;
+      previous.removeAttribute('style');
+    }
+    next.removeAttribute('style');
     if (restoreScroll) scrollTo({ top: scrollPositions.get(name) || 0, behavior: 'instant' });
-  }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240);
+  };
+
+  if (!gsap || reducedMotion) {
+    finish();
+  } else {
+    gsap.killTweensOf([previous, next].filter(Boolean));
+    gsap.set(next, { xPercent: movingForward ? 15 : -15, opacity: 0 });
+    if (previous) gsap.to(previous, { xPercent: movingForward ? -15 : 15, opacity: 0, duration: .24, ease: 'power2.out' });
+    gsap.to(next, { xPercent: 0, opacity: 1, duration: .24, ease: 'power2.out', onComplete: finish });
+  }
 }
 
 function navigate(name) {
