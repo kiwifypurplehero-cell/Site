@@ -1,4 +1,4 @@
-import {EMULATORS, findEmulator} from './emulator-registry.js';
+import {EMULATORS, findEmulator} from '../../Emuladores/emulator-registry.js';
 
 const PUBLIC_CACHE = 'public, max-age=60, s-maxage=60, stale-while-revalidate=30';
 const PS1_COVER_CACHE = 'public, max-age=86400, stale-while-revalidate=604800';

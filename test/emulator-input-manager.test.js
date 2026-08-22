@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CONTROL_PROFILES,diagnostics,displayCode} from '../emulator-input-manager.js';
+import {CONTROL_PROFILES,diagnostics,displayCode} from '../Emuladores/shared/emulator-input-manager.js';
 
 test('profiles expose only each core control set',()=>{
   assert.equal(CONTROL_PROFILES.gbc.controls.length,8);

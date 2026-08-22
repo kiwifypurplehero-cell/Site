@@ -1,4 +1,4 @@
-import {emulatorApi} from './emulator-api.js';
+import {emulatorApi} from './api/emulators/index.js';
 
 /** Cloudflare Worker da PlumpGames: assets estáticos e APIs. */
 const SUPPORT_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
@@ -170,42 +170,24 @@ export default {async fetch(request,env,ctx){
   if(url.pathname.startsWith('/api/player/'))return playerApi(request,env,url.pathname);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
   if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
-  const gbcDebug=url.searchParams.get('debug')==='1';
-  if(url.pathname==='/gbc-player'||url.pathname==='/gbc-player/') {
-    const target=new URL('/gbc-player.html',url); target.search=url.search;
-    if(gbcDebug) {
-      console.info('[GBC-ROUTE] request path',url.pathname);
-      console.info('[GBC-ROUTE] query',url.search);
-      console.info('[GBC-ROUTE] redirect target',target.pathname+target.search);
-      console.info('[GBC-ROUTE] response',302);
-    }
-    if(target.href===url.href) {
-      if(gbcDebug)console.warn('[GBC-ROUTE] response','blocked self redirect');
-      return json({error:'Redirecionamento inválido.'},500);
-    }
-    return Response.redirect(target,302);
-  }
-  if(url.pathname==='/gbc-player.html') {
-    if(gbcDebug) {
-      console.info('[GBC-ROUTE] request path',url.pathname);
-      console.info('[GBC-ROUTE] query',url.search);
-    }
-    const response=await env.ASSETS.fetch(new Request(new URL('/gbc-player.html',url),request));
-    if(gbcDebug)console.info('[GBC-ROUTE] response',response.status);
-    return response;
-  }
-  if(url.pathname==='/gba-player'||url.pathname==='/gba-player/') {
-    const target=new URL('/gba-player.html',url); target.search=url.search;
-    return Response.redirect(target,302);
-  }
-  if(url.pathname==='/emulators/ps2'||url.pathname==='/emulators/ps2/')return json({error:'Emulador temporariamente indisponível.'},404);
-  const emulatorPages=new Map([['/emulators','/emulators.html'],['/emulators/','/emulators.html'],['/emulators/ps1','/?view=ps1'],['/emulators/ps1/','/?view=ps1'],['/ps1-player','/ps1-player.html'],['/ps1-player/','/ps1-player.html'],['/play/ps1','/ps1-player.html'],['/play/ps1/','/ps1-player.html']]);
-  if(emulatorPages.has(url.pathname)) {
-    const asset=await env.ASSETS.fetch(new Request(new URL(emulatorPages.get(url.pathname),url),request));
-    if(!url.pathname.startsWith('/play/ps1')&&!url.pathname.startsWith('/ps1-player')) return asset;
-    const headers=new Headers(asset.headers); headers.set('Cross-Origin-Opener-Policy','same-origin');
-    // EmulatorJS is currently served by its CDN. Enabling COEP would block that
-    // un-versioned cross-origin dependency, so threads remain capability-gated off.
+  const cleanPages=new Map([
+    ['/Emuladores','/Emuladores/index.html'],['/Emuladores/','/Emuladores/index.html'],
+    ['/Emuladores/PS1','/Emuladores/PS1/index.html'],['/Emuladores/PS1/','/Emuladores/PS1/index.html'],['/Emuladores/PS1/player','/Emuladores/PS1/player.html'],
+    ['/Emuladores/GBC','/Emuladores/GBC/index.html'],['/Emuladores/GBC/','/Emuladores/GBC/index.html'],['/Emuladores/GBC/player','/Emuladores/GBC/player.html'],
+    ['/Emuladores/GBA','/Emuladores/GBA/index.html'],['/Emuladores/GBA/','/Emuladores/GBA/index.html'],['/Emuladores/GBA/player','/Emuladores/GBA/player.html']
+  ]);
+  const legacyRoutes=new Map([
+    ['/emulators','/Emuladores/'],['/emulators/','/Emuladores/'],['/emulators.html','/Emuladores/'],
+    ['/gbc-player','/Emuladores/GBC/player'],['/gbc-player/','/Emuladores/GBC/player'],['/gbc-player.html','/Emuladores/GBC/player'],
+    ['/gba-player','/Emuladores/GBA/player'],['/gba-player/','/Emuladores/GBA/player'],['/gba-player.html','/Emuladores/GBA/player'],
+    ['/ps1-player','/Emuladores/PS1/player'],['/ps1-player/','/Emuladores/PS1/player'],['/ps1-player.html','/Emuladores/PS1/player'],
+    ['/play/ps1','/Emuladores/PS1/player'],['/play/ps1/','/Emuladores/PS1/player']
+  ]);
+  if(legacyRoutes.has(url.pathname)){const target=new URL(legacyRoutes.get(url.pathname),url);target.search=url.search;return Response.redirect(target,308);}
+  if(cleanPages.has(url.pathname)){
+    const asset=await env.ASSETS.fetch(new Request(new URL(cleanPages.get(url.pathname),url),request));
+    if(!url.pathname.endsWith('/player'))return asset;
+    const headers=new Headers(asset.headers);headers.set('Cross-Origin-Opener-Policy','same-origin');
     return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
   }
   let response=await env.ASSETS.fetch(request);

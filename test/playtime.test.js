@@ -36,7 +36,7 @@ test('tracker não inicia no loading e envia somente tempo após gameplay',async
 });
 
 test('integração universal, privacidade, offline e idempotência permanecem declaradas',()=>{
-  for(const file of ['play.js','gbc-player.js','gba-player.js','ps1-player.js'])assert.match(fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8'),/PlaytimeTracker/);
+  for(const file of ['play.js','Emuladores/GBC/gbc-player.js','Emuladores/GBA/gba-player.js','Emuladores/PS1/ps1-player.js'])assert.match(fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8'),/PlaytimeTracker/);
   const worker=fs.readFileSync(new URL('../worker.js',import.meta.url),'utf8'),tracker=fs.readFileSync(new URL('../playtime-tracker.js',import.meta.url),'utf8');
   assert.match(worker,/HttpOnly; Secure; SameSite=Lax/);assert.match(worker,/last_sequence/);assert.match(worker,/seconds>60/);assert.doesNotMatch(worker,/searchParams\.get\(['"]playerId/);
   assert.match(tracker,/BroadcastChannel/);assert.match(tracker,/MAX_QUEUE=100/);assert.match(tracker,/performance\.now/);assert.match(tracker,/visibilitychange/);assert.match(tracker,/sendBeacon/);

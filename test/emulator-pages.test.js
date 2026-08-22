@@ -2,104 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import worker from '../worker.js';
-
-const root = new URL('../', import.meta.url);
-const contentTypes = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8'};
-async function assetFetch(request) {
-  const pathname = new URL(request.url).pathname;
-  const file = pathname === '/' ? 'index.html' : pathname.slice(1);
-  try { return new Response(await readFile(new URL(file, root)), {headers: {'Content-Type': contentTypes[file.slice(file.lastIndexOf('.'))] || 'application/octet-stream'}}); }
-  catch { return new Response('Not found', {status: 404}); }
-}
-const env = {ASSETS: {fetch: assetFetch}};
-const request = path => worker.fetch(new Request(`https://local.test${path}`, {headers: {Accept: 'text/html'}}), env);
-
-test('home contém as três views e navegação interna', async () => {
-  const response = await request('/');
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  for (const view of ['home', 'emulators', 'ps1', 'gbc', 'gba']) assert.match(html, new RegExp(`data-app-view="${view}"`));
-  assert.match(html, /data-view-link="emulators"/);
-  assert.match(html, /data-view-link="ps1">Abrir emulador/);
-  assert.match(html, /data-view-link="gba">Abrir emulador/);
-  assert.doesNotMatch(html, /data-view-link="ps2"/);
-  assert.match(html, /data-view-link="emulators">← Voltar/);
-  assert.doesNotMatch(html, /target="_blank"|href="\/emulators\.html"|href="\/emulators\/ps2\/"/);
-});
-
-test('GBC abre a rota canônica diretamente e ela responde sem redirect', async () => {
-  const [html, source, response] = await Promise.all([request('/').then(r => r.text()), readFile(new URL('../emulators.js', import.meta.url), 'utf8'), request('/gbc-player.html?game=pokemon')]);
-  assert.match(html, /data-view-link="gbc">Abrir emulador/);
-  assert.match(source, /new URL\(`\/\$\{play\.dataset\.playSystem\}-player`/);
-  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('location'), null);
-  const player = await response.text();
-  assert.match(player, /id="gbc-player-shell"/);
-});
-
-test('variações GBC fazem no máximo um redirect para a rota canônica', async () => {
-  for (const path of ['/gbc-player', '/gbc-player/', '/gbc-player?game=abc']) {
-    const response=await request(path);
-    assert.equal(response.status,302);
-    const target=new URL(response.headers.get('location'));
-    assert.equal(target.pathname,'/gbc-player.html');
-    assert.notEqual(target.href,`https://local.test${path}`);
-    const finalResponse=await request(`${target.pathname}${target.search}`);
-    assert.equal(finalResponse.status,200);
-    assert.equal(finalResponse.headers.get('location'),null);
-  }
-});
-
-test('controlador troca views via estado e preserva History API', async () => {
-  const source = await readFile(new URL('../emulators.js', import.meta.url), 'utf8');
-  assert.match(source, /appViewState = \{currentView: 'home'/);
-  assert.match(source, /function setView\(view/);
-  assert.match(source, /history\.pushState/);
-  assert.match(source, /addEventListener\('popstate'/);
-  assert.doesNotMatch(source, /location\.href\s*=/);
-  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
-});
-
-test('PS2 fica indisponível e GBA usa core mGBA declarado', async () => {
-  const [worker,registry,html]=await Promise.all(['worker.js','emulator-registry.js','index.html'].map(file=>readFile(new URL(`../${file}`,import.meta.url),'utf8')));
-  assert.match(worker,/Emulador temporariamente indisponível/);
-  assert.match(registry,/id: 'gba'[\s\S]*id: 'gba', engine: 'mGBA'/);
-  assert.doesNotMatch(registry,/id: 'ps2'/);
-  assert.doesNotMatch(html,/data-view-link="ps2"/);
-});
-
-test('PS1 envia ISO ao pcsx_rearmed/HLE sem exigir BIOS nem pré-bloquear a extensão', async () => {
-  const [html, source, registry] = await Promise.all([
-    readFile(new URL('../index.html', import.meta.url), 'utf8'),
-    readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
-    readFile(new URL('../emulator-registry.js', import.meta.url), 'utf8')
-  ]);
-  assert.match(source, /EJS_core = document\.querySelector\('#ps1-core'\)\.value \|\| 'psx'/);
-  assert.match(source, /biosMode: 'hle'/);
-  assert.doesNotMatch(source, /window\.EJS_biosUrl = biosObjectUrl \|\| undefined/);
-  assert.doesNotMatch(source, /coreExtensions\.includes|não anuncia suporte direto a ISO/);
-  assert.match(registry, /coreExtensions: Object\.freeze\(\['iso', 'bin', 'cue', 'chd'/);
-  assert.match(source, /inspectPs1File\(gameUrl/);
-  assert.match(source, /window\.EJS_gameUrl = gameUrl/);
-  for (const state of ['Preparando emulador', 'Conectando ao arquivo', 'Carregando jogo', 'Inicializando core', 'Executando']) assert.match(source, new RegExp(state));
-  assert.match(html, /Automático\/HLE/);
-  assert.match(html, /Executando sem BIOS externa\. Alguns jogos podem ter compatibilidade reduzida\./);
-});
-
-test('PS1 mantém EmulatorJS em uma área 4:3 limitada e desmonta uma instância antes de recriar', async () => {
-  const [html, source, styles] = await Promise.all([
-    readFile(new URL('../index.html', import.meta.url), 'utf8'),
-    readFile(new URL('../emulators.js', import.meta.url), 'utf8'),
-    readFile(new URL('../style.css', import.meta.url), 'utf8')
-  ]);
-  assert.match(html, /class="ps1-emulator-shell"/);
-  assert.match(styles, /\.ps1-emulator-shell\{[^}]*aspect-ratio:4\/3[^}]*overflow:hidden/);
-  assert.match(styles, /\.ps1-player canvas[^}]*height:100%!important[^}]*max-height:100%!important/);
-  assert.match(styles, /\.ps1-overlay\[hidden\],\.ps1-error\[hidden\]\{display:none\}/);
-  assert.doesNotMatch(styles, /#ps1-emulator\{[^}]*min-height/);
-  assert.match(source, /instance: null/);
-  assert.match(source, /PS1EmulatorState\.instance \|\| PS1EmulatorState\.loading/);
-  assert.match(source, /ps1LayoutResizeObserver\?\.disconnect/);
-  assert.match(source, /scrollHeight: document\.documentElement\.scrollHeight/);
-});
+const root=new URL('../',import.meta.url),types={'.html':'text/html','.js':'text/javascript','.css':'text/css'};
+async function assetFetch(request){const pathname=new URL(request.url).pathname,file=pathname==='/'?'index.html':pathname.slice(1);try{return new Response(await readFile(new URL(file,root)),{headers:{'Content-Type':types[file.slice(file.lastIndexOf('.'))]||'application/octet-stream'}})}catch{return new Response('Not found',{status:404})}}
+const env={ASSETS:{fetch:assetFetch}},request=path=>worker.fetch(new Request(`https://local.test${path}`,{headers:{Accept:'text/html'}}),env);
+test('Home contém apenas link e não referencia módulos pesados',async()=>{const html=await request('/').then(r=>r.text());assert.match(html,/href="\/Emuladores\/"/);assert.doesNotMatch(html,/Emuladores\/(?:PS1|GBC|GBA|cores)|EmulatorJS|\.wasm|emulators\.js/);});
+test('área central usa somente registry e aponta às pastas dos consoles',async()=>{const [html,source]=await Promise.all([request('/Emuladores/').then(r=>r.text()),readFile(new URL('../Emuladores/emulators.js',import.meta.url),'utf8')]);assert.match(html,/emulators\.js/);assert.match(source,/emulator-registry\.js/);assert.doesNotMatch(source,/loading-manager|EmulatorJS|\.wasm/);});
+for(const [id,folder] of [['ps1','PS1'],['gbc','GBC'],['gba','GBA']])test(`${id} possui biblioteca e player em rota limpa`,async()=>{assert.equal((await request(`/Emuladores/${folder}/`)).status,200);const player=await request(`/Emuladores/${folder}/player?game=abc`);assert.equal(player.status,200);assert.match(await player.text(),new RegExp(`${id}-player\\.js`));});
+test('URLs antigas redirecionam uma vez às novas rotas',async()=>{for(const [old,target] of [['/gbc-player','/Emuladores/GBC/player'],['/gba-player.html','/Emuladores/GBA/player'],['/ps1-player','/Emuladores/PS1/player'],['/emulators','/Emuladores/']]){const response=await request(`${old}?game=abc`);assert.equal(response.status,308);const location=new URL(response.headers.get('location'));assert.equal(location.pathname,target);assert.equal((await request(`${location.pathname}${location.search}`)).status,200);}});
+test('registry é metadata-only e declara os três cores',async()=>{const source=await readFile(new URL('../Emuladores/emulator-registry.js',import.meta.url),'utf8');for(const value of ["id:'ps1'","id:'gbc'","id:'gba'","engine:'pcsx_rearmed'","engine:'gambatte'","engine:'mGBA'"])assert.match(source,new RegExp(value));assert.doesNotMatch(source,/^import /m);});

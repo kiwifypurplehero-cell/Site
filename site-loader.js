@@ -14,7 +14,6 @@ let realProgress = 10;
 let visualProgress = 10;
 let animationFrame;
 let safetyTimer;
-let emulatorModule;
 const debugMetrics = {fcp: null, lcp: null, longTasks: 0, longTaskTime: 0};
 
 if (debug && 'PerformanceObserver' in window) {
@@ -69,26 +68,6 @@ function waitForMainScript() {
   if (window.__PLUMPGAMES_MAIN_READY__) return Promise.resolve();
   return new Promise(resolve => document.addEventListener('plumpgames:critical-ready', resolve, {once: true}));
 }
-
-async function loadEmulators(view) {
-  emulatorModule ||= import('./emulators.js');
-  const module = await emulatorModule;
-  if (view) module.setView(view, {historyMode: 'replace'});
-}
-
-function requestedView() {
-  const view = new URL(location.href).searchParams.get('view') || 'home';
-  return ['home', 'emulators', 'ps1', 'gbc', 'gba', 'ps2'].includes(view) ? view : 'home';
-}
-
-// Internal navigation remains instant and only lazily downloads emulator code.
-document.addEventListener('click', event => {
-  const control = event.target.closest('[data-view-link]');
-  const view = control?.dataset.viewLink;
-  if (!control || view === 'home' || emulatorModule) return;
-  event.preventDefault();
-  loadEmulators(view).catch(error => console.error('Falha ao abrir a área de emuladores.', error));
-});
 
 function cleanup() {
   cancelAnimationFrame(animationFrame);

@@ -1,7 +1,7 @@
-import {EmulatorBootDiagnostics,EmulatorLoadingManager,instrumentFirstFrame} from './emulator-loading-manager.js';
-import {PlaytimeTracker,descriptor,bindEmulatorControls} from './playtime-tracker.js';
-import {EmulatorViewportManager} from './emulator-viewport.js';
-import {EmulatorInputManager} from './emulator-input-manager.js';
+import {EmulatorBootDiagnostics,EmulatorLoadingManager,instrumentFirstFrame} from '../shared/emulator-loading-manager.js';
+import {PlaytimeTracker,descriptor,bindEmulatorControls} from '../../playtime-tracker.js';
+import {EmulatorViewportManager} from '../shared/emulator-viewport-manager.js';
+import {EmulatorInputManager} from '../shared/emulator-input-manager.js';
 const DATA='https://cdn.emulatorjs.org/4.2.3/data/',$=s=>document.querySelector(s),id=new URLSearchParams(location.search).get('game')||'',shell=$('#gba-shell');
 let playtime;const loading=new EmulatorLoadingManager({profile:'gbc'});let controller,romUrl,biosUrl,script,dispose,game,attempt=0,compatible=false,started=false,lastFrame=performance.now(),frames=0,fps=0,adaptive=0;
 const boot=new EmulatorBootDiagnostics({system:'gba',container:'#gba-emulator',loading,onError:error=>fail(error),debug:new URLSearchParams(location.search).has('debug')});

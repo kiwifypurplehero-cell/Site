@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPs1Archive, downloadPs1Content, inspectPs1File, ps1StreamUrl} from '../ps1-utils.js';
+import {createPs1Archive, downloadPs1Content, inspectPs1File, ps1StreamUrl} from '../Emuladores/PS1/ps1-utils.js';
 
 test('codifica espaço e barra da key exatamente uma vez', () => {
   const expected = '/api/emulators/ps1/file/Jogos%2FGran%20Turismo.iso';
@@ -38,7 +38,7 @@ test('erro de rede não é convertido em HTTP 403 nem bloqueia o loader', async 
   assert.doesNotMatch(result.warning.message, /403/);
 });
 
-import {resolvePs1Launch} from '../ps1-utils.js';
+import {resolvePs1Launch} from '../Emuladores/PS1/ps1-utils.js';
 
 test('resolve launch usa bootKey CUE e expõe BIN como dependência segura', () => {
   const launch = resolvePs1Launch({bootKey: 'Jogos/Crash (PT-BR)/Crash.cue', format: 'cue+bin', files: [{key: 'Jogos/Crash (PT-BR)/Crash.cue'}, {key: 'Jogos/Crash (PT-BR)/Crash.bin', type: 'bin'}]});

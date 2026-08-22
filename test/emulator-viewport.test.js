@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fitEmulatorViewport, readViewportSize} from '../emulator-viewport.js';
+import {fitEmulatorViewport, readViewportSize} from '../Emuladores/shared/emulator-viewport-manager.js';
 
 test('fits GBC into landscape without changing its aspect ratio', () => {
   assert.deepEqual(fitEmulatorViewport({availableWidth: 800, availableHeight: 360, nativeWidth: 160, nativeHeight: 144}), {width: 400, height: 360, scale: 2.5});
