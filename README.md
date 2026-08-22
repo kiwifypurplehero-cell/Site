@@ -153,6 +153,6 @@ Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJ
 
 ## Contas e persistência
 
-A aplicação exige uma conta antes de carregar o catálogo. O Worker usa o D1 existente para `users`, sessões e preferências. Senhas são derivadas com PBKDF2-HMAC-SHA-256 (210.000 iterações e salt aleatório individual); somente o hash e o salt são persistidos. Sessões duram 30 dias e usam cookie `HttpOnly`, `Secure`, `SameSite=Lax`.
+A aplicação exige uma conta antes de carregar o catálogo. O Worker usa o D1 existente para `users`, sessões e preferências. Senhas são derivadas com Web Crypto PBKDF2-HMAC-SHA-256 (210.000 iterações e salt aleatório individual) e persistidas no formato versionado `pbkdf2-sha256$210000$SALT_BASE64$HASH_BASE64`; o formato anterior `pbkdf2$sha256$...` continua aceito na verificação. Sessões duram 30 dias e usam cookie `HttpOnly`, `Secure`, `SameSite=Lax`.
 
 A migration `0004_real_accounts.sql` mantém o histórico anônimo anterior em tabelas `anonymous_*` somente como arquivo, sem associá-lo automaticamente a uma conta (o vínculo seria inseguro). Novas sessões e estatísticas usam exclusivamente o `user_id` autenticado. Aplique com `npx wrangler d1 migrations apply plumpgames-auth --remote` antes de publicar.

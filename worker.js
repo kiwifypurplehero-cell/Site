@@ -18,6 +18,9 @@ const GAME_ID_RE=/^[a-z0-9][a-z0-9:._-]{2,159}$/i;
 const SESSION_COOKIE='plumpgames_session';
 const SESSION_SECONDS=60*60*24*30;
 const PASSWORD_ITERATIONS=210000;
+const PASSWORD_ALGORITHM='pbkdf2-sha256';
+const PASSWORD_SALT_BYTES=16;
+const PASSWORD_HASH_BYTES=32;
 const AUTH_WINDOW_MS=15*60*1000;
 const AUTH_LIMIT=10;
 
@@ -36,10 +39,31 @@ async function bodyJson(request){if(!request.headers.get('Content-Type')?.toLowe
 const bytesToBase64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes)));
 const base64ToBytes=value=>Uint8Array.from(atob(value),character=>character.charCodeAt(0));
 async function sha256(value){return bytesToBase64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));}
-async function derivePassword(password,salt,iterations=PASSWORD_ITERATIONS){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations},key,256));}
-async function passwordHash(password){const salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));return `pbkdf2$sha256$${PASSWORD_ITERATIONS}$${salt}$${await derivePassword(password,salt)}`;}
-async function passwordMatches(password,stored){const [algorithm,digest,iterationsText,salt,expected]=String(stored||'').split('$');const iterations=Number(iterationsText);if(algorithm!=='pbkdf2'||digest!=='sha256'||!Number.isInteger(iterations)||iterations<100000||!salt||!expected)return false;return safeEqual(await derivePassword(password,salt,iterations),expected);}
-function safeEqual(left,right){if(left.length!==right.length)return false;let difference=0;for(let i=0;i<left.length;i++)difference|=left.charCodeAt(i)^right.charCodeAt(i);return difference===0;}
+async function derivePasswordBytes(password,salt,iterations,{logStages=false}={}){
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),{name:'PBKDF2'},false,['deriveBits']);
+  if(logStages)authLog('password import ok');
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:{name:'SHA-256'},salt,iterations},key,PASSWORD_HASH_BYTES*8);
+  if(logStages)authLog('password derive ok');
+  return new Uint8Array(bits);
+}
+async function hashPassword(password){
+  const salt=crypto.getRandomValues(new Uint8Array(PASSWORD_SALT_BYTES));
+  const hash=await derivePasswordBytes(password,salt,PASSWORD_ITERATIONS,{logStages:true});
+  return `${PASSWORD_ALGORITHM}$${PASSWORD_ITERATIONS}$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
+}
+async function verifyPassword(password,storedHash){
+  const fields=String(storedHash||'').split('$');
+  const legacy=fields[0]==='pbkdf2'&&fields[1]==='sha256';
+  const [algorithm,iterationsText,saltText,expectedText]=legacy?['pbkdf2-sha256',...fields.slice(2)]:fields;
+  const iterations=Number(iterationsText);
+  if(algorithm!==PASSWORD_ALGORITHM||!Number.isInteger(iterations)||iterations<100000||!saltText||!expectedText)return false;
+  let salt,expected;
+  try{salt=base64ToBytes(saltText);expected=base64ToBytes(expectedText);}catch{return false;}
+  if(salt.length<PASSWORD_SALT_BYTES||expected.length!==PASSWORD_HASH_BYTES)return false;
+  const actual=await derivePasswordBytes(password,salt,iterations);
+  return safeEqualBytes(actual,expected);
+}
+function safeEqualBytes(left,right){let difference=left.length^right.length;const length=Math.max(left.length,right.length);for(let i=0;i<length;i++)difference|=(left[i]||0)^(right[i]||0);return difference===0;}
 function requestOriginAllowed(request,{allowNonBrowser=false}={}){
   const expected=new URL(request.url).origin;
   const origin=request.headers.get('Origin');
@@ -80,7 +104,7 @@ async function authApi(request,env,path){
       const username=usernameData(payload.username);if(!username)return json({error:'Use 3–24 letras, números, _ ou -.',code:'INVALID_USERNAME'},400);
       if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);
       stage='username check';const existing=await env.DB.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(existing)return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);authLog('username checked');
-      stage='password hash';const hash=await passwordHash(payload.password);authLog('password hashed');
+      stage='password hash';const hash=await hashPassword(payload.password);authLog('password hash stored');
       stage='user insert';let inserted;try{inserted=await env.DB.prepare('INSERT INTO users(username,email,password_hash,display_name) VALUES(?,NULL,?,?) RETURNING id,username,display_name,avatar,bio,is_public,role').bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
       stage='preferences insert';await env.DB.prepare("INSERT OR IGNORE INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,'default','none',1,'detailed',0,?)").bind(inserted.id,new Date().toISOString()).run();
       stage='session create';const token=await createSession(env,inserted.id);authLog('session created');authLog('success');return json({user:publicUser(inserted),preferences:await preferences(env,inserted.id)},201,{'Set-Cookie':sessionCookie(token)});
@@ -88,10 +112,10 @@ async function authApi(request,env,path){
     if(path==='/api/auth/login'){
       if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
       const username=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!username||typeof payload.password!=='string')return invalid();
-      const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await passwordMatches(payload.password,user.password_hash))return invalid();
+      const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await verifyPassword(payload.password,user.password_hash))return invalid();
       const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
     }
-    if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);const stored=await env.DB.prepare('SELECT password_hash FROM users WHERE id=?').bind(user.id).first();if(!stored||!await passwordMatches(payload.currentPassword||'',stored.password_hash))return json({error:'Senha atual incorreta.',code:'INVALID_CURRENT_PASSWORD'},401);const hash=await passwordHash(payload.newPassword);await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").bind(hash,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
+    if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);const stored=await env.DB.prepare('SELECT password_hash FROM users WHERE id=?').bind(user.id).first();if(!stored||!await verifyPassword(payload.currentPassword||'',stored.password_hash))return json({error:'Senha atual incorreta.',code:'INVALID_CURRENT_PASSWORD'},401);const hash=await hashPassword(payload.newPassword);authLog('password hash stored');await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").bind(hash,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
     return json({error:'Endpoint não encontrado.'},404);
   }catch(error){console.error(`[AUTH] failure stage=${stage} type=${error?.name||'Error'} code=${error?.code||'unknown'}`);return isInfrastructureError(error)?json({error:'Serviço temporariamente indisponível. Tente novamente.',code:'AUTH_SERVICE_UNAVAILABLE'},503):json({error:'Falha interna inesperada.',code:'AUTH_INTERNAL_ERROR'},500);}
 }
