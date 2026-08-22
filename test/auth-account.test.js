@@ -2,6 +2,17 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 import worker from '../worker.js';
 const read=path=>readFile(new URL(`../${path}`,import.meta.url),'utf8');
 test('contas usam PBKDF2, salt individual e cookie seguro',async()=>{const worker=await read('worker.js');assert.match(worker,/PBKDF2/);assert.match(worker,/210000/);assert.match(worker,/HttpOnly; Secure; SameSite=Lax/);assert.doesNotMatch(worker,/localStorage.*password/i);});
+test('diagnósticos temporários isolam hash, sessão e D1 sem expor material sensível',async()=>{
+  const disabled=await worker.fetch(authRequest('/api/auth/debug-password',{password:'12345678'}),{},{});assert.equal(disabled.status,404);
+  const env={AUTH_DEBUG:'true',DB:{prepare(sql){return {async first(){assert.match(sql,/^SELECT 1 AS ok FROM (users|sessions) LIMIT 1$/);return null;}};}}};
+  const password=await worker.fetch(authRequest('/api/auth/debug-password',{password:'12345678'}),env,{});
+  assert.equal(password.status,200);const passwordBody=await responseBody(password);assert.deepEqual(passwordBody,{ok:true,stage:'password_hash'});
+  const session=await worker.fetch(authRequest('/api/auth/debug-session',{}),env,{});
+  assert.equal(session.status,200);const sessionBody=await responseBody(session);assert.deepEqual(sessionBody,{ok:true,stage:'session'});
+  const db=await worker.fetch(authRequest('/api/auth/debug-db'),env,{});
+  assert.equal(db.status,200);const dbBody=await responseBody(db);assert.deepEqual(dbBody,{ok:true,db:true,usersTable:true,sessionsTable:true});
+  for(const body of [passwordBody,sessionBody,dbBody])assert.doesNotMatch(JSON.stringify(body),/12345678|salt|token|cookie|stack|sql/i);
+});
 test('migration vincula sessões, preferências e playtime ao usuário real',async()=>{const sql=await read('migrations/0004_real_accounts.sql');for(const table of ['users','sessions','user_preferences','play_sessions','play_stats'])assert.match(sql,new RegExp(`CREATE TABLE ${table}`));assert.match(sql,/user_id TEXT NOT NULL REFERENCES users/);});
 test('gate adia scripts pesados e biblioteca oferece três modos',async()=>{const [html,auth,library]=await Promise.all([read('index.html'),read('auth.js'),read('components/library/game-library-view.js')]);assert.match(html,/data-auth-form="login"/);assert.doesNotMatch(html,/<script[^>]+src="script\.js"/);assert.match(auth,/\['script\.js'/);for(const mode of ['detailed','list','icons'])assert.match(library,new RegExp(`'${mode}'`));assert.match(library,/abbreviation/);});
 test('APIs protegidas derivam identidade somente da sessão',async()=>{const worker=await read('worker.js');assert.match(worker,/async function requireAuth/);assert.doesNotMatch(worker,/X-PlumpGames-Player/);assert.match(worker,/WHERE s\.user_id=\?|WHERE s\.user_id/);});

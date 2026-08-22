@@ -23,6 +23,8 @@ const PASSWORD_SALT_BYTES=16;
 const PASSWORD_HASH_BYTES=32;
 const AUTH_WINDOW_MS=15*60*1000;
 const AUTH_LIMIT=10;
+// TEMPORARY AUTH DIAGNOSTICS: remove these endpoints after the production issue is isolated.
+const AUTH_DEBUG_ENABLED_VALUE='true';
 
 const SYSTEM_PROMPT = `Você é PJ Assistant, assistente oficial de suporte da PlumpGames.
 Seu objetivo principal é ajudar visitantes a utilizar o site, acessar jogos, solucionar problemas simples e entender os recursos da PlumpGames.
@@ -84,10 +86,33 @@ async function requireAuth(request,env){
 const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:user.avatar||'controller',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user'});
 async function preferences(env,userId){const row=await env.DB.prepare('SELECT theme,wallpaper,animations,view_mode,reduce_motion FROM user_preferences WHERE user_id=?').bind(userId).first();return {theme:row?.theme||'default',libraryView:row?.view_mode||'detailed',liveWallpaper:row?.wallpaper||'none',animations:row?.animations!==0,reduceMotion:row?.reduce_motion===1};}
 function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
-async function createSession(env,userId){const token=bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString()).run();return token;}
+const createSessionToken=()=>bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
+async function createSession(env,userId){const token=createSessionToken(),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString()).run();return token;}
 const authLog=(stage,detail='')=>console.log(`[AUTH] ${stage}${detail?` ${detail}`:''}`);
 const isInfrastructureError=error=>/D1_ERROR|database.*(?:unavailable|not found)|binding|network|timeout/i.test(String(error?.message||error));
+const safeErrorType=error=>typeof error?.name==='string'&&error.name?error.name:'Error';
+async function authDebugApi(request,env,path){
+  // Deliberately absent from wrangler.jsonc: enable only in a temporary development environment.
+  if(env.AUTH_DEBUG!==AUTH_DEBUG_ENABLED_VALUE)return json({error:'Endpoint não encontrado.'},404);
+  if(!requestOriginAllowed(request,{allowNonBrowser:true}))return json({error:'Requisição não autorizada.'},403);
+  if(path==='/api/auth/debug-password'&&request.method==='POST'){
+    const payload=await bodyJson(request);
+    if(!payload||Object.keys(payload).some(key=>key!=='password')||typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'Dados inválidos.'},400);
+    try{await hashPassword(payload.password);return json({ok:true,stage:'password_hash'});}catch(error){return json({ok:false,stage:'password_hash',errorType:safeErrorType(error)},500);}
+  }
+  if(path==='/api/auth/debug-session'&&request.method==='POST'){
+    try{const token=createSessionToken();await sha256(token);sessionCookie(token);return json({ok:true,stage:'session'});}catch(error){return json({ok:false,stage:'session',errorType:safeErrorType(error)},500);}
+  }
+  if(path==='/api/auth/debug-db'&&request.method==='GET'){
+    if(!env.DB)return json({ok:false,stage:'db',errorType:'MissingBinding'},500);
+    try{await env.DB.prepare('SELECT 1 AS ok FROM users LIMIT 1').first();}catch(error){return json({ok:false,stage:'usersTable',errorType:safeErrorType(error)},500);}
+    try{await env.DB.prepare('SELECT 1 AS ok FROM sessions LIMIT 1').first();}catch(error){return json({ok:false,stage:'sessionsTable',errorType:safeErrorType(error)},500);}
+    return json({ok:true,db:true,usersTable:true,sessionsTable:true});
+  }
+  return json({error:'Endpoint não encontrado.'},404);
+}
 async function authApi(request,env,path){
+  if(path.startsWith('/api/auth/debug-'))return authDebugApi(request,env,path);
   if(!env.DB)return json({error:'O serviço de contas não está configurado.',code:'AUTH_CONFIGURATION_ERROR'},503);
   let stage='start';
   try{
