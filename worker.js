@@ -38,7 +38,15 @@ const base64ToBytes=value=>Uint8Array.from(atob(value),character=>character.char
 async function sha256(value){return bytesToBase64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));}
 async function passwordHash(password,salt){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations:PASSWORD_ITERATIONS},key,256));}
 function safeEqual(left,right){if(left.length!==right.length)return false;let difference=0;for(let i=0;i<left.length;i++)difference|=left.charCodeAt(i)^right.charCodeAt(i);return difference===0;}
-function sameOrigin(request){const origin=request.headers.get('Origin');return origin?origin===new URL(request.url).origin:request.headers.get('X-PlumpGames-Request')==='same-origin';}
+function requestOriginAllowed(request,{allowNonBrowser=false}={}){
+  const expected=new URL(request.url).origin;
+  const origin=request.headers.get('Origin');
+  if(origin)return origin===expected;
+  const referer=request.headers.get('Referer');
+  if(referer){try{return new URL(referer).origin===expected;}catch{return false;}}
+  return allowNonBrowser||request.headers.get('X-PlumpGames-Request')==='same-origin';
+}
+const sameOrigin=request=>requestOriginAllowed(request);
 function authLimited(request,kind){const key=`auth:${kind}:${request.headers.get('CF-Connecting-IP')||'unknown'}`,now=Date.now(),recent=(requestBuckets.get(key)||[]).filter(time=>now-time<AUTH_WINDOW_MS);if(recent.length>=AUTH_LIMIT)return true;recent.push(now);requestBuckets.set(key,recent);return false;}
 function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return {username,normalized:username.toLocaleLowerCase('und')};}
 async function requireAuth(request,env){
@@ -52,31 +60,32 @@ async function preferences(env,userId){const row=await env.DB.prepare('SELECT li
 function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
 async function createSession(env,userId){const token=bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString(),now.toISOString()).run();return token;}
 async function authApi(request,env,path){
-  if(!env.DB)return json({error:'Contas temporariamente indisponíveis.'},503);
+  if(!env.DB)return json({error:'O serviço de contas não está configurado.',code:'AUTH_CONFIGURATION_ERROR'},503);
   try{
     if(request.method==='GET'&&path==='/api/auth/me'){const user=await requireAuth(request,env);return user?json({user:publicUser(user),preferences:await preferences(env,user.id)}):json({error:'Autenticação necessária.'},401);}
     if(request.method!=='POST')return json({error:'Método não permitido.'},405);
-    if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
-    if(path==='/api/auth/logout'){const user=await requireAuth(request,env);if(user)await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.tokenHash).run();return json({ok:true},200,{'Set-Cookie':sessionCookie('',0)});}
+    const publicEndpoint=path==='/api/auth/register'||path==='/api/auth/login';
+    if(!requestOriginAllowed(request,{allowNonBrowser:publicEndpoint}))return json({error:'Requisição não autorizada.',code:'ORIGIN_NOT_ALLOWED'},403);
+    if(path==='/api/auth/logout'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.tokenHash).run();return json({ok:true},200,{'Set-Cookie':sessionCookie('',0)});}
     const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
     if(path==='/api/auth/register'){
       if(authLimited(request,'register'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
       const name=usernameData(payload.username);if(!name)return json({error:'Use 3–24 letras, números, _ ou -.'},400);
       if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha deve ter entre 8 e 128 caracteres.'},400);
-      if(payload.password!==payload.confirmPassword)return json({error:'As senhas não coincidem.'},400);
+      if(payload.confirmPassword!==undefined&&payload.password!==payload.confirmPassword)return json({error:'As senhas não coincidem.'},400);
       const id=crypto.randomUUID(),salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.password,salt),now=new Date().toISOString();
-      try{await env.DB.batch([env.DB.prepare('INSERT INTO users(id,username,username_normalized,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)').bind(id,name.username,name.normalized,hash,salt,now),env.DB.prepare("INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,'detailed','none','{}',?)").bind(id,now)]);}catch(error){if(String(error).includes('UNIQUE'))return json({error:'Este nome de usuário já está em uso.'},409);throw error;}
+      try{await env.DB.batch([env.DB.prepare('INSERT INTO users(id,username,username_normalized,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)').bind(id,name.username,name.normalized,hash,salt,now),env.DB.prepare("INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,'detailed','none','{}',?)").bind(id,now)]);}catch(error){if(String(error).includes('UNIQUE'))return json({error:'Este nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}
       const token=await createSession(env,id);return json({user:{id,username:name.username},preferences:await preferences(env,id)},201,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/login'){
       if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
-      const name=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.'},401);if(!name||typeof payload.password!=='string')return invalid();
+      const name=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!name||typeof payload.password!=='string')return invalid();
       const user=await env.DB.prepare('SELECT * FROM users WHERE username_normalized=?').bind(name.normalized).first();if(!user)return invalid();const calculated=await passwordHash(payload.password,user.password_salt);if(!safeEqual(calculated,user.password_hash))return invalid();
       const now=new Date().toISOString();await env.DB.prepare('UPDATE users SET last_login_at=? WHERE id=?').bind(now,user.id).run();const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A nova senha deve ter entre 8 e 128 caracteres.'},400);const stored=await env.DB.prepare('SELECT password_hash,password_salt FROM users WHERE id=?').bind(user.id).first();if(!safeEqual(await passwordHash(payload.currentPassword||'',stored.password_salt),stored.password_hash))return json({error:'Senha atual incorreta.'},400);const salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.newPassword,salt);await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=? WHERE id=?').bind(hash,salt,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
     return json({error:'Endpoint não encontrado.'},404);
-  }catch(error){console.error('Account API failure',error);return json({error:'Não foi possível concluir a operação.'},500);}
+  }catch(error){console.error('Account API failure',error);return json({error:'Serviço de contas temporariamente indisponível.',code:'AUTH_SERVICE_UNAVAILABLE'},503);}
 }
 async function profileApi(request,env,path){
   if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
