@@ -8,7 +8,16 @@ function csrfHeaders(){return {'Content-Type':'application/json','X-PlumpGames-R
 async function api(path,options={}){
   const response=await fetch(path,{credentials:'same-origin',...options});
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(body.error||'Não foi possível concluir.'),{status:response.status});
+  if(!response.ok){
+    const messages={
+      USERNAME_TAKEN:'Este nome de usuário já está em uso. Escolha outro nome.',
+      INVALID_CREDENTIALS:'Usuário ou senha inválidos.',
+      AUTH_CONFIGURATION_ERROR:'O serviço de contas não está configurado. Tente novamente mais tarde.',
+      AUTH_SERVICE_UNAVAILABLE:'O serviço de contas está temporariamente indisponível. Tente novamente em alguns minutos.'
+    };
+    const fallback=response.status>=500?'O servidor está temporariamente indisponível. Tente novamente mais tarde.':'Não foi possível concluir a operação.';
+    throw Object.assign(new Error(messages[body.code]||body.error||fallback),{status:response.status,code:body.code});
+  }
   return body;
 }
 function loadApp(user){
