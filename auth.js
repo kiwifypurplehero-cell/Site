@@ -12,6 +12,7 @@ async function api(path,options={}){
     const messages={
       USERNAME_TAKEN:'Este nome de usuário já está em uso. Escolha outro nome.',
       INVALID_CREDENTIALS:'Usuário ou senha inválidos.',
+      PASSWORD_TOO_SHORT:'A senha precisa ter pelo menos 8 caracteres.',
       AUTH_CONFIGURATION_ERROR:'O serviço de contas não está configurado. Tente novamente mais tarde.',
       AUTH_SERVICE_UNAVAILABLE:'O serviço de contas está temporariamente indisponível. Tente novamente em alguns minutos.'
     };
@@ -37,8 +38,10 @@ gate.addEventListener('submit',async event=>{
   status.textContent='';submit.disabled=true;
   try{
     const values=Object.fromEntries(new FormData(form));
-    const endpoint=form.dataset.authForm==='register'?'/api/auth/register':'/api/auth/login';
-    const result=await api(endpoint,{method:'POST',headers:csrfHeaders(),body:JSON.stringify(values)});
+    const registering=form.dataset.authForm==='register';
+    if(registering&&values.password!==values.confirmPassword)throw new Error('As senhas não coincidem.');
+    const endpoint=registering?'/api/auth/register':'/api/auth/login';
+    const result=await api(endpoint,{method:'POST',headers:csrfHeaders(),body:JSON.stringify({username:values.username,password:values.password})});
     if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper}));
     loadApp(result.user);
   }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
