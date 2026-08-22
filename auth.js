@@ -25,7 +25,7 @@ function loadApp(user){
   if(loaded)return; loaded=true;
   gate.hidden=true; app.hidden=false; document.body.classList.remove('auth-locked');
   window.plumpUser=user;
-  for(const [src,type] of [['site-loader.js','module'],['play-utils.js',''],['components/library/game-library-view.js',''],['script.js',''],['catalog-playtime.js','module'],['accessibility.js','']]){
+  for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js',''],['script.js',''],['catalog-playtime.js','module'],['accessibility.js','']]){
     const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
   }
   window.dispatchEvent(new CustomEvent('plumpgames:authenticated',{detail:user}));
@@ -46,6 +46,20 @@ gate.addEventListener('submit',async event=>{
     loadApp(result.user);
   }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
 });
-api('/api/auth/me').then(result=>{if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper}));loadApp(result.user);}).catch(()=>{gate.hidden=false;});
+const authController=new AbortController();
+const authTimer=setTimeout(()=>authController.abort(),7000);
+api('/api/auth/me',{signal:authController.signal}).then(result=>{
+  clearTimeout(authTimer);
+  if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper,theme:result.preferences.theme}));
+  window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:true,preferences:true};
+  document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
+  loadApp(result.user);
+}).catch(error=>{
+  clearTimeout(authTimer);gate.hidden=false;
+  const connectionFailure=error.name==='AbortError'||error.status>=500;
+  if(connectionFailure){status.innerHTML='Não foi possível verificar sua sessão. <button type="button">Tentar novamente</button>';status.querySelector('button').onclick=()=>location.reload();}
+  window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:false,degraded:connectionFailure};
+  document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
+});
 
 window.PlumpAuth={api,csrfHeaders,logout:async()=>{await api('/api/auth/logout',{method:'POST',headers:csrfHeaders(),body:'{}'});location.href='/';}};

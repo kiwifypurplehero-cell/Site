@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const read=path=>readFile(new URL(`../${path}`,import.meta.url),'utf8');
+test('perfil edita somente campos permitidos pela sessão',async()=>{const worker=await read('worker.js');assert.match(worker,/allowed=new Set\(\['displayName','avatar','bio','isPublic'\]\)/);assert.match(worker,/WHERE id=\?"?\)\.bind\(displayName,payload\.avatar,bio,payload\.isPublic\?1:0,user\.id\)/);assert.doesNotMatch(worker,/payload\.user_?[Ii]d/);});
+test('perfil oferece identidade, avatares, bio e preferências sincronizadas',async()=>{const [html,js]=await Promise.all([read('profile.html'),read('profile.js')]);for(const value of ['displayName','avatar','bio','isPublic','theme','liveWallpaper','libraryView'])assert.match(html,new RegExp(`name="${value}"`));assert.match(js,/textContent=user\.bio/);assert.match(js,/\/api\/profile\/preferences/);});
