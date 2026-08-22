@@ -15,7 +15,11 @@ const COMMUNITY_FIELDS = new Set(['name','creator','githubUrl','playUrl','gameTy
 const PLAY_HOSTS = new Set(['itch.io','gamejolt.com','github.io']);
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GAME_ID_RE=/^[a-z0-9][a-z0-9:._-]{2,159}$/i;
-const PLAYER_COOKIE='plumpgames_guest';
+const SESSION_COOKIE='plumpgames_session';
+const SESSION_SECONDS=60*60*24*30;
+const PASSWORD_ITERATIONS=210000;
+const AUTH_WINDOW_MS=15*60*1000;
+const AUTH_LIMIT=10;
 
 const SYSTEM_PROMPT = `Você é PJ Assistant, assistente oficial de suporte da PlumpGames.
 Seu objetivo principal é ajudar visitantes a utilizar o site, acessar jogos, solucionar problemas simples e entender os recursos da PlumpGames.
@@ -28,45 +32,99 @@ function json(data,status=200,headers={}) {
   return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers}});
 }
 function cookieValue(request,name){const match=request.headers.get('Cookie')?.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));return match?decodeURIComponent(match[1]):'';}
-function playerIdentity(request){const local=request.headers.get('X-PlumpGames-Player')||'',cookie=cookieValue(request,PLAYER_COOKIE);if(UUID_RE.test(local)&&local!==cookie)return {id:local,setCookie:true};return UUID_RE.test(cookie)?{id:cookie,setCookie:false}:{id:crypto.randomUUID(),setCookie:true};}
-function withPlayerCookie(response,identity){if(!identity.setCookie)return response;const headers=new Headers(response.headers);headers.append('Set-Cookie',`${PLAYER_COOKIE}=${identity.id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`);return new Response(response.body,{status:response.status,statusText:response.statusText,headers});}
-async function playerJson(request,env,handler){if(!env.DB)return json({error:'Histórico temporariamente indisponível.'},503);const identity=playerIdentity(request);try{return withPlayerCookie(await handler(identity.id),identity);}catch(error){console.error('D1 playtime failure',error);return withPlayerCookie(json({error:'Histórico temporariamente indisponível.'},503),identity);}}
 async function bodyJson(request){if(!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json'))return null;if(Number(request.headers.get('Content-Length')||0)>4000)return null;try{return await request.json();}catch{return null;}}
+const bytesToBase64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const base64ToBytes=value=>Uint8Array.from(atob(value),character=>character.charCodeAt(0));
+async function sha256(value){return bytesToBase64(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));}
+async function passwordHash(password,salt){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations:PASSWORD_ITERATIONS},key,256));}
+function safeEqual(left,right){if(left.length!==right.length)return false;let difference=0;for(let i=0;i<left.length;i++)difference|=left.charCodeAt(i)^right.charCodeAt(i);return difference===0;}
+function sameOrigin(request){const origin=request.headers.get('Origin');return origin?origin===new URL(request.url).origin:request.headers.get('X-PlumpGames-Request')==='same-origin';}
+function authLimited(request,kind){const key=`auth:${kind}:${request.headers.get('CF-Connecting-IP')||'unknown'}`,now=Date.now(),recent=(requestBuckets.get(key)||[]).filter(time=>now-time<AUTH_WINDOW_MS);if(recent.length>=AUTH_LIMIT)return true;recent.push(now);requestBuckets.set(key,recent);return false;}
+function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return {username,normalized:username.toLocaleLowerCase('und')};}
+async function requireAuth(request,env){
+  const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;const tokenHash=await sha256(token),now=new Date().toISOString();
+  const user=await env.DB.prepare('SELECT u.id,u.username,s.expires_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
+  if(!user)return null;if(Date.now()-Date.parse(user.last_seen_at)>15*60*1000)await env.DB.prepare('UPDATE sessions SET last_seen_at=? WHERE token_hash=?').bind(now,tokenHash).run();
+  return {id:user.id,username:user.username,tokenHash};
+}
+const publicUser=user=>({id:user.id,username:user.username});
+async function preferences(env,userId){const row=await env.DB.prepare('SELECT library_view,live_wallpaper,settings_json FROM user_preferences WHERE user_id=?').bind(userId).first();return {libraryView:row?.library_view||'detailed',liveWallpaper:row?.live_wallpaper||'none',settings:JSON.parse(row?.settings_json||'{}')};}
+function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
+async function createSession(env,userId){const token=bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''),tokenHash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+SESSION_SECONDS*1000);await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?)').bind(tokenHash,userId,now.toISOString(),expires.toISOString(),now.toISOString()).run();return token;}
+async function authApi(request,env,path){
+  if(!env.DB)return json({error:'Contas temporariamente indisponíveis.'},503);
+  try{
+    if(request.method==='GET'&&path==='/api/auth/me'){const user=await requireAuth(request,env);return user?json({user:publicUser(user),preferences:await preferences(env,user.id)}):json({error:'Autenticação necessária.'},401);}
+    if(request.method!=='POST')return json({error:'Método não permitido.'},405);
+    if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
+    if(path==='/api/auth/logout'){const user=await requireAuth(request,env);if(user)await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.tokenHash).run();return json({ok:true},200,{'Set-Cookie':sessionCookie('',0)});}
+    const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
+    if(path==='/api/auth/register'){
+      if(authLimited(request,'register'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
+      const name=usernameData(payload.username);if(!name)return json({error:'Use 3–24 letras, números, _ ou -.'},400);
+      if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha deve ter entre 8 e 128 caracteres.'},400);
+      if(payload.password!==payload.confirmPassword)return json({error:'As senhas não coincidem.'},400);
+      const id=crypto.randomUUID(),salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.password,salt),now=new Date().toISOString();
+      try{await env.DB.batch([env.DB.prepare('INSERT INTO users(id,username,username_normalized,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)').bind(id,name.username,name.normalized,hash,salt,now),env.DB.prepare("INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,'detailed','none','{}',?)").bind(id,now)]);}catch(error){if(String(error).includes('UNIQUE'))return json({error:'Este nome de usuário já está em uso.'},409);throw error;}
+      const token=await createSession(env,id);return json({user:{id,username:name.username},preferences:await preferences(env,id)},201,{'Set-Cookie':sessionCookie(token)});
+    }
+    if(path==='/api/auth/login'){
+      if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
+      const name=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.'},401);if(!name||typeof payload.password!=='string')return invalid();
+      const user=await env.DB.prepare('SELECT * FROM users WHERE username_normalized=?').bind(name.normalized).first();if(!user)return invalid();const calculated=await passwordHash(payload.password,user.password_salt);if(!safeEqual(calculated,user.password_hash))return invalid();
+      const now=new Date().toISOString();await env.DB.prepare('UPDATE users SET last_login_at=? WHERE id=?').bind(now,user.id).run();const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
+    }
+    if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A nova senha deve ter entre 8 e 128 caracteres.'},400);const stored=await env.DB.prepare('SELECT password_hash,password_salt FROM users WHERE id=?').bind(user.id).first();if(!safeEqual(await passwordHash(payload.currentPassword||'',stored.password_salt),stored.password_hash))return json({error:'Senha atual incorreta.'},400);const salt=bytesToBase64(crypto.getRandomValues(new Uint8Array(16))),hash=await passwordHash(payload.newPassword,salt);await env.DB.batch([env.DB.prepare('UPDATE users SET password_hash=?,password_salt=? WHERE id=?').bind(hash,salt,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
+    return json({error:'Endpoint não encontrado.'},404);
+  }catch(error){console.error('Account API failure',error);return json({error:'Não foi possível concluir a operação.'},500);}
+}
+async function profileApi(request,env,path){
+  if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
+  if(request.method==='PUT'&&path==='/api/profile/preferences'){
+    if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
+    const current=await preferences(env,user.id),view=payload.libraryView??current.libraryView,wallpaper=payload.liveWallpaper??current.liveWallpaper;
+    if(!['detailed','list','icons'].includes(view)||typeof wallpaper!=='string'||wallpaper.length>60)return json({error:'Preferência inválida.'},400);
+    const settings=payload.settings===undefined?current.settings:payload.settings;if(!settings||typeof settings!=='object'||Array.isArray(settings)||JSON.stringify(settings).length>4000)return json({error:'Configurações inválidas.'},400);
+    await env.DB.prepare('INSERT INTO user_preferences(user_id,library_view,live_wallpaper,settings_json,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET library_view=excluded.library_view,live_wallpaper=excluded.live_wallpaper,settings_json=excluded.settings_json,updated_at=excluded.updated_at').bind(user.id,view,wallpaper,JSON.stringify(settings),new Date().toISOString()).run();return json({preferences:{libraryView:view,liveWallpaper:wallpaper,settings}});
+  }
+  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats'))return playerApi(request,env,'/api/player/stats');
+  return json({error:'Endpoint não encontrado.'},404);
+}
 function validGame(game){return game&&GAME_ID_RE.test(game.gameId)&&typeof game.title==='string'&&game.title.trim().length<=120&&typeof game.system==='string'&&game.system.trim().length<=40&&['git','web','emulator'].includes(game.source)&&typeof game.sourceKey==='string'&&game.sourceKey.length<=160&&(!game.cover||typeof game.cover==='string'&&game.cover.length<=500);}
 async function playerApi(request,env,path){
-  return playerJson(request,env,async playerId=>{
+  if(!env.DB)return json({error:'Histórico temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);const playerId=user.id;
+  if(['POST','PUT','PATCH','DELETE'].includes(request.method)&&!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
+  try{
     const now=new Date().toISOString();
     if(request.method==='POST'&&path==='/api/player/session/start'){
       const p=await bodyJson(request);if(!p||!UUID_RE.test(p.sessionId)||!validGame(p.game))return json({error:'Sessão ou jogo inválido.'},400);
-      const existing=await env.DB.prepare('SELECT id FROM play_sessions WHERE id=? AND player_id=?').bind(p.sessionId,playerId).first();if(existing)return json({ok:true,sessionId:p.sessionId,duplicate:true});
+      const existing=await env.DB.prepare('SELECT id FROM play_sessions WHERE id=? AND user_id=?').bind(p.sessionId,playerId).first();if(existing)return json({ok:true,sessionId:p.sessionId,duplicate:true});
       await env.DB.batch([
-        env.DB.prepare('INSERT INTO players(id,created_at,last_seen_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen_at=excluded.last_seen_at').bind(playerId,now,now),
         env.DB.prepare('INSERT INTO games(id,system,title,source,source_key,cover_url) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET system=excluded.system,title=excluded.title,cover_url=excluded.cover_url').bind(p.game.gameId,p.game.system.trim(),p.game.title.trim(),p.game.source,p.game.sourceKey,p.game.cover||''),
-        env.DB.prepare('INSERT OR IGNORE INTO play_sessions(id,player_id,game_id,started_at,last_heartbeat_at) VALUES(?,?,?,?,?)').bind(p.sessionId,playerId,p.game.gameId,now,now),
-        env.DB.prepare('INSERT INTO play_stats(player_id,game_id,total_seconds,sessions,last_played_at) VALUES(?,?,0,1,?) ON CONFLICT(player_id,game_id) DO UPDATE SET sessions=sessions+1,last_played_at=excluded.last_played_at').bind(playerId,p.game.gameId,now)
+        env.DB.prepare('INSERT OR IGNORE INTO play_sessions(id,user_id,game_id,started_at,last_heartbeat_at) VALUES(?,?,?,?,?)').bind(p.sessionId,playerId,p.game.gameId,now,now),
+        env.DB.prepare('INSERT INTO play_stats(user_id,game_id,total_seconds,sessions,last_played_at) VALUES(?,?,0,1,?) ON CONFLICT(user_id,game_id) DO UPDATE SET sessions=sessions+1,last_played_at=excluded.last_played_at').bind(playerId,p.game.gameId,now)
       ]);return json({ok:true,sessionId:p.sessionId},201);
     }
     if(request.method==='POST'&&(path==='/api/player/session/heartbeat'||path==='/api/player/session/end')){
       const p=await bodyJson(request);if(!p||!UUID_RE.test(p.sessionId)||!Number.isInteger(p.sequence)||p.sequence<1||p.sequence>1000000)return json({error:'Atualização inválida.'},400);
       const seconds=p.activeSeconds??0;if(!Number.isInteger(seconds)||seconds<0||seconds>60)return json({error:'Duração inválida (máximo 60 segundos).'},400);
-      const session=await env.DB.prepare('SELECT game_id,last_sequence,ended_at FROM play_sessions WHERE id=? AND player_id=?').bind(p.sessionId,playerId).first();
+      const session=await env.DB.prepare('SELECT game_id,last_sequence,ended_at FROM play_sessions WHERE id=? AND user_id=?').bind(p.sessionId,playerId).first();
       if(!session)return json({error:'Sessão não encontrada.'},404);if(p.sequence<=session.last_sequence)return json({ok:true,duplicate:true});if(session.ended_at)return json({ok:true,ended:true});
-      const accepted=await env.DB.prepare(`UPDATE play_sessions SET active_seconds=active_seconds+?,last_sequence=?,last_heartbeat_at=?,ended_at=${path.endsWith('end')?'?':'ended_at'} WHERE id=? AND player_id=? AND last_sequence<?`).bind(...(path.endsWith('end')?[seconds,p.sequence,now,now,p.sessionId,playerId,p.sequence]:[seconds,p.sequence,now,p.sessionId,playerId,p.sequence])).run();
+      const accepted=await env.DB.prepare(`UPDATE play_sessions SET active_seconds=active_seconds+?,last_sequence=?,last_heartbeat_at=?,ended_at=${path.endsWith('end')?'?':'ended_at'} WHERE id=? AND user_id=? AND last_sequence<?`).bind(...(path.endsWith('end')?[seconds,p.sequence,now,now,p.sessionId,playerId,p.sequence]:[seconds,p.sequence,now,p.sessionId,playerId,p.sequence])).run();
       if(!accepted.meta?.changes)return json({ok:true,duplicate:true});
       await env.DB.batch([
-        env.DB.prepare('UPDATE play_stats SET total_seconds=total_seconds+?,last_played_at=? WHERE player_id=? AND game_id=?').bind(seconds,now,playerId,session.game_id),
-        env.DB.prepare('UPDATE players SET last_seen_at=? WHERE id=?').bind(now,playerId)
+        env.DB.prepare('UPDATE play_stats SET total_seconds=total_seconds+?,last_played_at=? WHERE user_id=? AND game_id=?').bind(seconds,now,playerId,session.game_id)
       ]);return json({ok:true,acceptedSeconds:seconds});
     }
     if(request.method==='GET'&&['/api/player/stats','/api/player/games','/api/player/top-games','/api/player/export'].includes(path)){
-      const rows=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system,g.source,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.sessions,s.last_played_at AS lastPlayedAt FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.player_id=? ORDER BY s.total_seconds DESC,g.title LIMIT 500').bind(playerId).all()).results||[];
+      const rows=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system,g.source,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.sessions,s.last_played_at AS lastPlayedAt FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.user_id=? ORDER BY s.total_seconds DESC,g.title LIMIT 500').bind(playerId).all()).results||[];
       if(path==='/api/player/games'||path==='/api/player/top-games')return json({games:rows});
       const summary={totalSeconds:rows.reduce((n,r)=>n+r.totalSeconds,0),gamesPlayed:rows.length,totalSessions:rows.reduce((n,r)=>n+r.sessions,0),mostPlayed:rows[0]||null,lastPlayed:[...rows].sort((a,b)=>String(b.lastPlayedAt).localeCompare(String(a.lastPlayedAt)))[0]||null};
-      return json(path==='/api/player/export'?{exportedAt:now,profile:{anonymous:true},summary,games:rows}:{summary,games:rows});
+      return json(path==='/api/player/export'?{exportedAt:now,profile:publicUser(user),summary,games:rows}:{user:publicUser(user),summary,games:rows});
     }
-    if(request.method==='DELETE'&&path==='/api/player/history'){await env.DB.prepare('DELETE FROM players WHERE id=?').bind(playerId).run();const response=json({ok:true});response.headers.append('Set-Cookie',`${PLAYER_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);return response;}
+    if(request.method==='DELETE'&&path==='/api/player/history'){if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);await env.DB.batch([env.DB.prepare('DELETE FROM play_sessions WHERE user_id=?').bind(playerId),env.DB.prepare('DELETE FROM play_stats WHERE user_id=?').bind(playerId)]);return json({ok:true});}
     return json({error:'Endpoint não encontrado.'},404);
-  });
+  }catch(error){console.error('D1 playtime failure',error);return json({error:'Histórico temporariamente indisponível.'},503);}
 }
 function cleanText(value,max) { return typeof value==='string'?value.trim().slice(0,max):''; }
 function clientAllowed(request) {
@@ -166,16 +224,19 @@ async function support(request,env) {
   } catch(error) { console.error('Workers AI failure',error); return json({error:'Suporte inteligente indisponível.'},503); }
 }
 export default {async fetch(request,env,ctx){
-  const url=new URL(request.url); if(url.pathname==='/api/support')return support(request,env);
+  const url=new URL(request.url); if(url.pathname.startsWith('/api/auth/'))return authApi(request,env,url.pathname);
+  if(url.pathname==='/api/profile'||url.pathname.startsWith('/api/profile/'))return profileApi(request,env,url.pathname);
+  if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname.startsWith('/api/player/'))return playerApi(request,env,url.pathname);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
-  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
+  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/')){if(env.DB&&!await requireAuth(request,env))return json({error:'Sua sessão expirou. Entre novamente.'},401);return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);}
   const cleanPages=new Map([
     ['/Emuladores','/Emuladores/index.html'],['/Emuladores/','/Emuladores/index.html'],
     ['/Emuladores/PS1','/Emuladores/PS1/index.html'],['/Emuladores/PS1/','/Emuladores/PS1/index.html'],['/Emuladores/PS1/player','/Emuladores/PS1/player.html'],
     ['/Emuladores/GBC','/Emuladores/GBC/index.html'],['/Emuladores/GBC/','/Emuladores/GBC/index.html'],['/Emuladores/GBC/player','/Emuladores/GBC/player.html'],
     ['/Emuladores/GBA','/Emuladores/GBA/index.html'],['/Emuladores/GBA/','/Emuladores/GBA/index.html'],['/Emuladores/GBA/player','/Emuladores/GBA/player.html']
   ]);
+  if(env.DB&&cleanPages.has(url.pathname)&&!await requireAuth(request,env))return Response.redirect(new URL('/?login=required',url),302);
   const legacyRoutes=new Map([
     ['/emulators','/Emuladores/'],['/emulators/','/Emuladores/'],['/emulators.html','/Emuladores/'],
     ['/gbc-player','/Emuladores/GBC/player'],['/gbc-player/','/Emuladores/GBC/player'],['/gbc-player.html','/Emuladores/GBC/player'],

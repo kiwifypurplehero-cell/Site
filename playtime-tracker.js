@@ -1,5 +1,3 @@
-import {playerProfile} from './player-profile.js';
-
 const QUEUE_KEY='plumpgames_playtime_queue';
 const HEARTBEAT_MS=45_000;
 const LOCK_TTL=12_000;
@@ -12,7 +10,7 @@ function queueWrite(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice
 async function send(path,payload,{beacon=false}={}){
   const body=JSON.stringify(payload);
   if(beacon&&navigator.sendBeacon?.(path,new Blob([body],{type:'application/json'})))return true;
-  const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PlumpGames-Player':playerProfile.get().guestPlayerId},body,keepalive:beacon});
+  const response=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body,keepalive:beacon});
   if(!response.ok)throw new Error(`playtime ${response.status}`);return true;
 }
 
@@ -20,7 +18,7 @@ export class PlaytimeTracker extends EventTarget {
   constructor(game,{heartbeatMs=HEARTBEAT_MS,now=()=>performance.now()}={}){
     super();if(!validDescriptor(game))throw new TypeError('Invalid game descriptor');
     this.game={gameId:game.gameId,title:String(game.title).slice(0,120),system:String(game.system).slice(0,40),source:String(game.source).slice(0,20),sourceKey:String(game.sourceKey||game.gameId).slice(0,160),cover:String(game.cover||'').slice(0,500)};
-    this.sessionId=uuid();this.heartbeatMs=heartbeatMs;this.now=now;this.sequence=0;this.pending=0;this.totalLocal=0;this.running=false;this.focused=document.hasFocus();this.lastTick=0;this.tabId=uuid();this.lockKey=`plumpgames_lock:${playerProfile.get().guestPlayerId}:${game.gameId}`;
+    this.sessionId=uuid();this.heartbeatMs=heartbeatMs;this.now=now;this.sequence=0;this.pending=0;this.totalLocal=0;this.running=false;this.focused=document.hasFocus();this.lastTick=0;this.tabId=uuid();this.lockKey=`plumpgames_lock:${game.gameId}`;
     this.channel=typeof BroadcastChannel==='function'?new BroadcastChannel('plumpgames-playtime'):null;this.channel?.addEventListener('message',()=>this.refreshLock());
     this.onVisibility=()=>{this.focused=!document.hidden&&document.hasFocus();this.focused?this.resumeClock():this.pauseClock();};
     this.onOnline=async()=>{try{await this.ensureSession();}catch{}this.syncQueue();};document.addEventListener('visibilitychange',this.onVisibility);addEventListener('focus',this.onVisibility);addEventListener('blur',this.onVisibility);addEventListener('online',this.onOnline);addEventListener('pagehide',()=>this.end({beacon:true}),{once:true});
