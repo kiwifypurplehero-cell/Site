@@ -257,3 +257,30 @@ html,body{max-width:100%;overflow-x:hidden}.ps1-layout{display:grid;gap:20px}.ps
 /* Explorer-style shared library modes */
 .games-list[data-view="list"]{gap:7px}.games-list[data-view="list"] .game-card{display:grid;grid-template-columns:1fr;transform:none}.games-list[data-view="list"] .game-card__image,.games-list[data-view="list"] .card-kicker,.games-list[data-view="list"] .game-card__body>p,.games-list[data-view="list"] .game-details,.games-list[data-view="list"] .card-actions{display:none}.games-list[data-view="list"] .game-card__body{padding:12px 16px;display:grid;grid-template-columns:minmax(150px,1fr) minmax(280px,2fr);align-items:center}.games-list[data-view="list"] .compact-meta{display:flex!important;justify-content:flex-end;gap:18px;min-height:0;margin:0!important}.games-list[data-view="icons"]{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px}.games-list[data-view="icons"] .game-card{aspect-ratio:1;display:grid;place-items:center;transform:none}.games-list[data-view="icons"] .game-card__body{display:none}.games-list[data-view="icons"] .game-card__image{width:100%;height:100%;min-height:0}.games-list[data-view="icons"] .game-card__image>*{display:none}.games-list[data-view="icons"] .game-card__image::after{content:attr(data-abbreviation);animation:none;width:auto;border:0;filter:none;font-size:1.55rem;font-weight:900}.games-list[data-view="icons"] .game-card::after{content:attr(data-abbreviation);position:absolute;font-size:1.5rem;font-weight:900;color:var(--color-accent)}
 @media(max-width:680px){.games-list[data-view="list"] .game-card__body{grid-template-columns:1fr}.games-list[data-view="list"] .compact-meta{justify-content:flex-start;gap:6px 12px}.games-list[data-view="icons"]{grid-template-columns:repeat(auto-fill,minmax(86px,1fr))}}
+
+/* Navegação interna e bottom navigation mobile */
+.mobile-bottom-nav{display:none}
+.app-view{min-width:0;will-change:transform,opacity}
+.app-view--external{height:calc(100dvh - var(--header));margin-top:var(--header);overflow:hidden}
+.app-view-frame{display:block;width:100%;height:100%;border:0;background:var(--bg)}
+.view-enter-right,.view-enter-left{position:relative;opacity:0;transform:translate3d(18%,0,0)}
+.view-enter-left{transform:translate3d(-18%,0,0)}
+.view-transition-active{opacity:1;transform:translate3d(0,0,0);transition:transform .24s ease,opacity .24s ease}
+.view-exit-left,.view-exit-right{position:absolute;inset-inline:0;opacity:0;pointer-events:none;transform:translate3d(-12%,0,0);transition:transform .24s ease,opacity .24s ease}
+.view-exit-right{transform:translate3d(12%,0,0)}
+
+@media(max-width:767px){
+  :root{--mobile-nav-height:60px;--header:58px}
+  .site-header{height:var(--header);border-bottom:1px solid var(--border)}
+  .navbar.container{width:calc(100% - 24px)}
+  .brand__mark{width:34px;border-radius:10px}.brand{gap:8px}
+  .header-actions{display:flex;align-items:center;gap:7px}.assistant-button,.gx-menu-button{width:42px;height:42px;margin:0}
+  #main-content{min-height:100dvh;padding-bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 12px)}
+  .app-view--external{height:calc(100dvh - var(--header) - var(--mobile-nav-height) - env(safe-area-inset-bottom));margin-top:var(--header)}
+  .mobile-bottom-nav{position:fixed;z-index:30;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);height:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));padding:4px max(6px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(6px,env(safe-area-inset-left));border-top:1px solid var(--border);background:color-mix(in srgb,var(--color-surface) 94%,transparent);box-shadow:0 -8px 24px rgba(0,0,0,.22);backdrop-filter:blur(18px)}
+  .mobile-bottom-nav a{display:flex;min-width:0;min-height:52px;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-radius:11px;color:var(--muted);font-size:.69rem;font-weight:800;line-height:1.15}
+  .mobile-bottom-nav a span{font-size:1.18rem;line-height:1}.mobile-bottom-nav a b{font:inherit;white-space:nowrap}
+  .mobile-bottom-nav a[aria-current=page]{color:var(--color-text);background:color-mix(in srgb,var(--color-primary) 24%,transparent)}
+  .site-footer{padding-bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 20px)}
+}
+@media(prefers-reduced-motion:reduce){.view-transition-active,.view-exit-left,.view-exit-right{transition:none}}
