@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emulatorApi, normalizeGbaLibrary, normalizeGbcLibrary, normalizePs1Library, parseB2Error} from '../emulator-api.js';
+import {emulatorApi, normalizeGbaLibrary, normalizeGbcLibrary, normalizePs1Library, parseB2Error} from '../api/emulators/index.js';
 
 const ps1Env = {B2_PS1_ACCESS_KEY_ID: 'test-id', B2_PS1_SECRET_ACCESS_KEY: 'test-secret'};
 

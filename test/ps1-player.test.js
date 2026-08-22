@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {fetchPs1Game, resolvePs1Launch} from '../ps1-utils.js';
+import {fetchPs1Game, resolvePs1Launch} from '../Emuladores/PS1/ps1-utils.js';
 
 test('biblioteca abre o player PS1 dedicado em nova aba por gesto direto', () => {
-  const source = fs.readFileSync(new URL('../emulators.js', import.meta.url), 'utf8');
-  assert.match(source, /new URL\(`\/\$\{play\.dataset\.playSystem\}-player`/);
-  assert.match(source, /searchParams\.set\('game', play\.dataset\.gameId\)/);
-  assert.match(source, /window\.open\(url\.href, '_blank', 'noopener'\)/);
+  const source = fs.readFileSync(new URL('../Emuladores/shared/console-library.js', import.meta.url), 'utf8');
+  assert.match(source, /system\.playerPath/);
+  assert.match(source, /encodeURIComponent\(game\.id\)/);
+  assert.match(source, /link\.href/);
 });
 
 test('player consulta novamente a API por id em refresh ou acesso direto', async () => {
@@ -32,14 +32,14 @@ test('Crash inicia pelo CUE com BIN e Gran Turismo continua em ISO', () => {
 });
 
 test('tentar novamente repete a consulta e voltar restaura a página principal', () => {
-  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../Emuladores/PS1/ps1-player.js', import.meta.url), 'utf8');
   assert.match(source, /\$\('#retry'\)\.onclick=start/);
   assert.match(source, /window\.opener\.focus\(\);window\.close\(\)/);
-  assert.match(source, /location\.href='\/\?view=ps1'/);
+  assert.match(source, /location\.href='\/Emuladores\/PS1\/'/);
 });
 
 test('player PS1 preserva BIN+CUE, core leve e defaults seguros', () => {
-  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../Emuladores/PS1/ps1-player.js', import.meta.url), 'utf8');
   assert.match(source, /downloadPs1Content/);
   assert.match(source, /EJS_core:'psx'/);
   assert.match(source, /EJS_threads:false/);
@@ -49,8 +49,8 @@ test('player PS1 preserva BIN+CUE, core leve e defaults seguros', () => {
 });
 
 test('loading dedicado usa estado real, cancelamento e só some no início do jogo', () => {
-  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
-  const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../Emuladores/PS1/ps1-player.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../Emuladores/PS1/player.html', import.meta.url), 'utf8');
   assert.match(source, /export const ps1LoadState/); assert.match(source, /new AbortController\(\)/);
   assert.match(source, /function noteFrame\(\).*\$\('#loading'\)\.hidden=true/);
   assert.match(source, /setTimeout\(renderLoadState,150\)/);
@@ -58,7 +58,7 @@ test('loading dedicado usa estado real, cancelamento e só some no início do jo
 });
 
 test('estados de boot, primeiro frame e fallback não confundem download com execução', () => {
-  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../Emuladores/PS1/ps1-player.js', import.meta.url), 'utf8');
   for (const phase of ['preparing','network_check','downloading','download_complete','core_loading','content_mounting','booting','running','error']) assert.match(source, new RegExp(`'${phase}'`));
   assert.match(source, /drawArrays/); assert.match(source, /drawElements/);
   assert.match(source, /BLACK_SCREEN_TIMEOUT/); assert.match(source, /NO_FIRST_FRAME/);
@@ -66,9 +66,9 @@ test('estados de boot, primeiro frame e fallback não confundem download com exe
 });
 
 test('fullscreen automático é exclusivo de mobile e shell contém configurações overlay', () => {
-  const source = fs.readFileSync(new URL('../ps1-player.js', import.meta.url), 'utf8');
-  const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
-  const css = fs.readFileSync(new URL('../ps1-player.css', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../Emuladores/PS1/ps1-player.js', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../Emuladores/PS1/player.html', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../Emuladores/PS1/ps1.css', import.meta.url), 'utf8');
   assert.match(source, /pointer: coarse/); assert.match(source, /maxTouchPoints/); assert.match(source, /requestPlayerFullscreen/);
   assert.match(source, /fullscreenchange/); assert.match(source, /fullscreenerror/); assert.match(source, /orientationchange/);
   assert.match(html, /id="ps1-player-shell"[\s\S]*id="settings-toggle"[\s\S]*id="settings"/);
@@ -76,7 +76,7 @@ test('fullscreen automático é exclusivo de mobile e shell contém configuraç�
 });
 
 test('página dedicada não carrega scripts gerais da PlumpGames', () => {
-  const html = fs.readFileSync(new URL('../ps1-player.html', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../Emuladores/PS1/player.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /script\.js|emulators\.js|accessibility\.js|PJ Assistant/i);
   assert.match(html, /ps1-player\.js/);
 });

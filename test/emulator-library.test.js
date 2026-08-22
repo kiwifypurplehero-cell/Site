@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {clearLibraryCache, fetchEmulatorLibrary, refreshLibraryButton} from '../emulator-library.js';
+import {clearLibraryCache, fetchEmulatorLibrary, refreshLibraryButton} from '../Emuladores/shared/emulator-library.js';
 
 const response = games => ({ok: true, json: async () => ({games})});
 

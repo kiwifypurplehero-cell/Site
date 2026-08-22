@@ -72,7 +72,7 @@ Para desenvolvimento local, use `npx wrangler d1 migrations apply plumpgames-aut
 
 ## Home, Emuladores e biblioteca PS2
 
-A navegação principal separa **Home** (catálogo de jogos web/comunidade) de **Emuladores**. A página `emulators.html` lê o registro declarativo em `emulator-registry.js`; portanto, um novo sistema entra na arquitetura como outra definição (identificador, formatos e URLs do núcleo), sem duplicar a interface. O mesmo registro é importado pelo Worker para validar rotas.
+A navegação principal separa **Home** (catálogo de jogos web/comunidade) de **Emuladores**. A página `Emuladores/index.html` lê o registro declarativo em `Emuladores/emulator-registry.js`; portanto, um novo sistema entra na arquitetura como outra definição (identificador, formatos e URLs do núcleo), sem duplicar a interface. O mesmo registro é importado pelo Worker para validar rotas.
 
 A biblioteca PS2 usa a API S3 privada do Backblaze B2. No bucket `plumpgames-storage-ps2`, publique cada ROM nesta convenção:
 
@@ -96,7 +96,7 @@ O endpoint de ROM encaminha o cabeçalho HTTP `Range` ao Backblaze B2. O bucket 
 
 ### Configuração do Backblaze B2 e secrets
 
-O endpoint S3, o nome do bucket e o prefixo são configurações não secretas declaradas em `wrangler.jsonc`. `emulator-api.js` assina no Worker as operações privadas de listagem, consulta e transmissão com AWS Signature Version 4.
+O endpoint S3, o nome do bucket e o prefixo são configurações não secretas declaradas em `wrangler.jsonc`. `api/emulators/index.js` assina no Worker as operações privadas de listagem, consulta e transmissão com AWS Signature Version 4.
 
 Configure as credenciais somente como secrets do Worker, nunca no frontend ou em arquivos versionados:
 
@@ -126,7 +126,7 @@ O player mede somente o FPS **renderizado pelo navegador**, frame time e frames 
 
 `EJS_threads` permanece deliberadamente `false`. O Worker aplica COOP à rota dedicada, mas o `stable/data` atual vem do CDN do EmulatorJS; aplicar COEP `require-corp` agora bloquearia assets que não estão sob controle desta origem. Threads só devem ser habilitadas depois de fixar/self-hostar a build, servir todos os assets com CORS/CORP e comparar PS1 ON/OFF em aparelhos reais. Não há resultados de FPS inventados no repositório: o baseline Android informado é ~20 FPS, e antes/depois deve ser registrado no diagnóstico em hardware real.
 
-A view interna `?view=ps1` usa o **EmulatorJS estável** como frontend de emulação, carregado explicitamente de `https://cdn.emulatorjs.org/stable/data/`. O core fixo é `psx` (pcsx_rearmed). Esta dependência é distribuída sob a [GPL-3.0](https://github.com/EmulatorJS/EmulatorJS/blob/main/LICENSE). Nenhum arquivo de BIOS protegido é incluído: o visitante pode selecionar uma BIOS legalmente obtida, mantida somente como URL de objeto local durante a sessão.
+O player `/Emuladores/PS1/player` usa o **EmulatorJS estável** como frontend de emulação, carregado explicitamente de `https://cdn.emulatorjs.org/stable/data/`. O core fixo é `psx` (pcsx_rearmed). Esta dependência é distribuída sob a [GPL-3.0](https://github.com/EmulatorJS/EmulatorJS/blob/main/LICENSE). Nenhum arquivo de BIOS protegido é incluído: o visitante pode selecionar uma BIOS legalmente obtida, mantida somente como URL de objeto local durante a sessão.
 
 O PS1 é completamente separado do PS2. O Worker lista automaticamente `.iso`, `.bin`, `.cue`, `.chd`, `.img`, `.mdf`, `.pbp`, `.ccd` e `.m3u` sob o prefixo configurado (por padrão `Jogos/`) do bucket `plumpgames-storage-ps1`. `GET /api/emulators/ps1/games` tem cache público de 60 segundos e `GET`/`HEAD /api/emulators/ps1/file/<key>` preserva `Range`, `206`, `Content-Range`, `Content-Length` e `Content-Type`. Respostas completas e ranges não elegíveis continuam em streaming; somente um bloco elegível de no máximo 4 MiB é materializado para recortar a resposta do cache, nunca o ISO inteiro.
 
@@ -145,8 +145,8 @@ Ranges de até 16 MiB contidos em um único bloco usam cache edge segmentado de 
 
 `GET /api/emulators/ps1/signed-url?game=Jogos%2FGran%20Turismo.iso` gera uma URL S3 SigV4 limitada ao objeto e a GET, com expiração de 10 minutos e resposta `no-store`. Ela é experimental e não é escolhida automaticamente: compare proxy e URL direta no mesmo dispositivo antes de alterar o loader. O bucket precisa permitir a origem exata `https://site.kiwifypurplehero.workers.dev`, métodos `GET`/`HEAD`, request header `Range` e expor `Content-Length`, `Content-Range`, `Accept-Ranges` e `Content-Type`. Não use `*` quando a origem exata for suficiente.
 
-O diagnóstico do loader fica em **Configurações → Desempenho → Diagnóstico PS1**, habilitado por `?view=ps1&debug=1`. Ele usa Resource Timing somente para o endpoint do jogo (sem monkey-patch global) e mostra requests/bytes observáveis, velocidade média e tempo até o callback de início do core. Alguns navegadores omitem bytes em Resource Timing; nesse caso os logs do Worker são a fonte completa para ranges, sobreposições e paralelismo. O tamanho ISO conhecido de Gran Turismo é 679.619.808 bytes; CHD permanece uma opção futura, sem conversão automática.
+O diagnóstico do loader fica em **Configurações → Desempenho → Diagnóstico PS1**, habilitado por `/Emuladores/PS1/player?game=<id>&debug=1`. Ele usa Resource Timing somente para o endpoint do jogo (sem monkey-patch global) e mostra requests/bytes observáveis, velocidade média e tempo até o callback de início do core. Alguns navegadores omitem bytes em Resource Timing; nesse caso os logs do Worker são a fonte completa para ranges, sobreposições e paralelismo. O tamanho ISO conhecido de Gran Turismo é 679.619.808 bytes; CHD permanece uma opção futura, sem conversão automática.
 
-Antes de carregar o core, a view faz somente um `HEAD` no endpoint seguro para exibir disponibilidade e metadados no diagnóstico (`?view=ps1&debug=1`). O endpoint suporta Range, mas o loader do EmulatorJS controla a leitura do jogo: esta integração não afirma que o pcsx_rearmed inicia progressivamente. Ele pode baixar o arquivo completo diretamente para a memória WebAssembly e exibe o progresso nativo, sem um `arrayBuffer()` ou uma segunda cópia criada pelo código da PlumpGames.
+Antes de carregar o core, a view faz somente um `HEAD` no endpoint seguro para exibir disponibilidade e metadados no diagnóstico (`/Emuladores/PS1/player?game=<id>&debug=1`). O endpoint suporta Range, mas o loader do EmulatorJS controla a leitura do jogo: esta integração não afirma que o pcsx_rearmed inicia progressivamente. Ele pode baixar o arquivo completo diretamente para a memória WebAssembly e exibe o progresso nativo, sem um `arrayBuffer()` ou uma segunda cópia criada pelo código da PlumpGames.
 
 Para produção totalmente reproduzível, os arquivos `stable/data` do EmulatorJS podem ser hospedados como assets próprios, desde que a GPL-3.0 e os avisos do projeto sejam preservados; o estado atual usa CDN e portanto requer conexão com esse host.
