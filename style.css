@@ -1,5 +1,5 @@
 /* Base visual e tokens do tema */
-:root { --color-primary:#8b5cf6; --color-secondary:#4776ff; --color-accent:#38d9f5; --color-background:#050611; --color-surface:#0d1021; --color-text:#f5f6ff; --color-button:#7055ed; --color-glow:#38d9f5; --card-opacity:.92; --glow-strength:.42; --animation-strength:1; --bg:var(--color-background); --surface:var(--color-surface); --text:var(--color-text); --muted:color-mix(in srgb,var(--color-text) 68%,transparent); --purple:var(--color-primary); --blue:var(--color-secondary); --cyan:var(--color-accent); --border:color-mix(in srgb,var(--color-text) 16%,transparent); --header:76px; --radius:22px; }
+:root { --color-primary:#8b5cf6; --color-secondary:#4776ff; --color-accent:#38d9f5; --color-background:#050611; --color-surface:#0d1021; --color-text:#f5f6ff; --color-button:#7055ed; --color-glow:#38d9f5; --card-opacity:.92; --glow-strength:.42; --animation-strength:1; --bg:var(--color-background); --surface:var(--color-surface); --text:var(--color-text); --muted:color-mix(in srgb,var(--color-text) 68%,transparent); --purple:var(--color-primary); --blue:var(--color-secondary); --cyan:var(--color-accent); --border:color-mix(in srgb,var(--color-text) 16%,transparent); --header:76px; --sidebar-width:76px; --sidebar-expanded-width:210px; --radius:22px; }
 * { box-sizing:border-box; }
 [hidden] { display:none!important; }
 html { scroll-behavior:smooth; scroll-padding-top:calc(var(--header) + 24px); }
@@ -27,6 +27,31 @@ body::before { content:""; position:fixed; inset:0; z-index:-3; background:radia
 .nav-link:hover,.nav-link.active { color:white; background:rgba(134,111,255,.1); }
 .menu-toggle { display:none; width:44px; height:44px; padding:10px; background:transparent; border:1px solid var(--border); border-radius:12px; cursor:pointer; }
 .menu-toggle span { display:block; height:2px; background:white; margin:5px 0; transition:.25s; }
+.sidebar-controls{display:none}
+
+@media (min-width:768px){
+  #app-shell{padding-left:var(--sidebar-expanded-width);transition:padding-left .2s ease}
+  .site-header{inset:0 auto 0 0;width:var(--sidebar-expanded-width);height:100dvh;border-right:1px solid var(--border);border-bottom:0;background:#080916;backdrop-filter:none;transition:width .2s ease}
+  .navbar.container{width:100%;height:100%;padding:14px 10px;flex-direction:column;align-items:stretch;margin:0;overflow:hidden}
+  .brand{height:48px;flex:0 0 auto;padding:5px;white-space:nowrap}.brand__mark{flex:0 0 38px}.brand strong{font-size:.95rem}
+  .primary-nav{width:100%;margin:24px 0 auto;display:grid;gap:7px;align-content:start}
+  .primary-nav a,.sidebar-controls button{display:flex;align-items:center;gap:13px;width:100%;min-height:46px;padding:7px 10px;border:0;border-radius:11px;color:var(--muted);background:transparent;font-weight:800;white-space:nowrap;cursor:pointer}
+  .primary-nav a span,.sidebar-controls button span{display:grid;place-items:center;flex:0 0 26px;font-size:1.15rem}.primary-nav a b,.sidebar-controls b{font:inherit}
+  .primary-nav a:hover,.primary-nav a[aria-current=page],.sidebar-controls button:hover{color:var(--color-text);background:var(--menu-hover)}
+  .header-actions{width:100%;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr}.assistant-button,.gx-menu-button{margin:auto}
+  .sidebar-controls{display:grid;gap:5px;border-top:1px solid var(--border);padding-top:8px}
+  .sidebar-controls #sidebar-toggle{justify-content:center;min-height:34px}
+  .section--catalog{padding-top:58px}.site-footer{margin:0}.assistant-panel{bottom:22px}
+  .sidebar-collapsed #app-shell{padding-left:var(--sidebar-width)}
+  .sidebar-collapsed .site-header{width:var(--sidebar-width)}
+  .sidebar-collapsed .brand>span:last-child,.sidebar-collapsed .primary-nav b,.sidebar-collapsed .sidebar-controls b{display:none}
+  .sidebar-collapsed .primary-nav a,.sidebar-collapsed .sidebar-controls button{justify-content:center;padding-inline:5px}
+}
+
+@media (max-width:767px){
+  #app-shell{padding-left:0}.site-header{height:var(--header)}.navbar{flex-wrap:nowrap}
+  .primary-nav{display:none}.sidebar-controls{display:none}.brand strong{font-size:.95rem}
+}
 
 /* Controles compartilhados */
 .eyebrow { margin:0 0 12px; color:#8fa1ff; font-size:.74rem; font-weight:800; letter-spacing:.18em; text-transform:uppercase; }

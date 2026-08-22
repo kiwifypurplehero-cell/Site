@@ -217,7 +217,9 @@ $('[data-open-privacy]').addEventListener('click',()=>showModal('Política de Pr
 $('[data-open-terms]').addEventListener('click',()=>showModal('Termos de Uso','<p>Os projetos são oferecidos como estão. Consulte o repositório de cada jogo para detalhes.</p>'));
 
 if (!location.href.startsWith(OFFICIAL_URL) && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') console.info(`Site oficial: ${OFFICIAL_URL}`);
-renderWallpapers(); syncControls(); selectWallpaper(preferences.wallpaper, true);
+renderWallpapers(); syncControls();
+// Live media is secondary: never compete with the usable Home critical path.
+if(preferences.wallpaper!=='none')document.addEventListener('plumpgames:loader-complete',()=>setTimeout(()=>selectWallpaper(preferences.wallpaper,true),0),{once:true});
 
 const revealObserver = new IntersectionObserver(entries => entries.forEach(entry => { if(entry.isIntersecting){ entry.target.classList.add('visible'); revealObserver.unobserve(entry.target); } }), {threshold:.08});
 $$('.reveal').forEach(item => revealObserver.observe(item));
@@ -370,7 +372,7 @@ function createGameCover(game) {
   cover.setAttribute('aria-label', `Capa automática de ${game.name}`);
   const status = element('span','status',game.community?'COMUNIDADE':'OFICIAL');
   const initials = game.name.split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0]).join('').toLocaleUpperCase('pt-BR') || 'PG';
-  if (game.community && isSafeHttpsUrl(game.coverUrl)) { const image=element('img','game-cover__image'); image.src=game.coverUrl; image.alt=''; image.loading='lazy'; image.referrerPolicy='no-referrer'; cover.append(image); }
+  if (game.community && isSafeHttpsUrl(game.coverUrl)) { const image=element('img','game-cover__image'); image.src=game.coverUrl; image.alt=''; image.loading='lazy'; image.decoding='async'; image.referrerPolicy='no-referrer'; cover.append(image); }
   cover.append(status, element('span','game-cover__icon','🎮'), element('b','',initials), element('small','',game.name));
   return cover;
 }
@@ -625,3 +627,9 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#plump-
 resetAssistant();
 window.__PLUMPGAMES_MAIN_READY__=true;
 document.dispatchEvent(new CustomEvent('plumpgames:critical-ready'));
+
+const sidebarPreference='plumpgames-sidebar-collapsed';
+const applySidebarPreference=collapsed=>{document.documentElement.classList.toggle('sidebar-collapsed',collapsed);$('#sidebar-toggle')?.setAttribute('aria-label',collapsed?'Expandir barra lateral':'Recolher barra lateral');};
+applySidebarPreference(localStorage.getItem(sidebarPreference)==='true');
+$('#sidebar-toggle')?.addEventListener('click',()=>{const collapsed=!document.documentElement.classList.contains('sidebar-collapsed');applySidebarPreference(collapsed);localStorage.setItem(sidebarPreference,String(collapsed));});
+$('[data-sidebar-logout]')?.addEventListener('click',()=>window.PlumpAuth?.logout());
