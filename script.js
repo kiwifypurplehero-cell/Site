@@ -332,7 +332,8 @@ function getGitHubPagesUrl(repo) {
 function openGamePage(game) {
   const playPageUrl = buildPlayPageUrl(game, location.href);
   if (!playPageUrl) return;
-  location.assign(playPageUrl);
+  const tab=window.open(playPageUrl, '_blank', 'noopener');
+  if (!tab) window.location.href=playPageUrl;
 }
 
 function loadGamesCache() {

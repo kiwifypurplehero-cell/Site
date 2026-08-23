@@ -1,4 +1,5 @@
 import {emulatorApi} from './api/emulators/index.js';
+import {TROPHIES,earnedTrophyIds} from './trophy-registry.js';
 
 /** Cloudflare Worker da PlumpGames: assets estáticos e APIs. */
 const SUPPORT_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
@@ -176,7 +177,7 @@ async function profileApi(request,env,path){
     if(!['detailed','list','icons'].includes(view)||typeof wallpaper!=='string'||wallpaper.length>60)return json({error:'Preferência inválida.'},400);
     await env.DB.prepare('INSERT INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,wallpaper=excluded.wallpaper,animations=excluded.animations,view_mode=excluded.view_mode,reduce_motion=excluded.reduce_motion,updated_at=excluded.updated_at').bind(user.id,payload.theme??current.theme,wallpaper,(payload.animations??current.animations)?1:0,view,(payload.reduceMotion??current.reduceMotion)?1:0,new Date().toISOString()).run();return json({preferences:{...current,theme:payload.theme??current.theme,libraryView:view,liveWallpaper:wallpaper,animations:payload.animations??current.animations,reduceMotion:payload.reduceMotion??current.reduceMotion}});
   }
-  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats')){const response=await playerApi(request,env,'/api/player/stats');if(!response.ok)return response;const data=await response.json();return json({...data,preferences:await preferences(env,user.id)});}
+  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats')){const response=await playerApi(request,env,'/api/player/stats');if(!response.ok)return response;const data=await response.json();await evaluateTrophies(env,user.id);return json({...data,preferences:await preferences(env,user.id),trophies:await trophyRows(env,user.id),trophyRegistry:TROPHIES});}
   return json({error:'Endpoint não encontrado.'},404);
 }
 function validGame(game){return game&&GAME_ID_RE.test(game.gameId)&&typeof game.title==='string'&&game.title.trim().length<=120&&typeof game.system==='string'&&game.system.trim().length<=40&&['git','web','emulator'].includes(game.source)&&typeof game.sourceKey==='string'&&game.sourceKey.length<=160&&(!game.cover||typeof game.cover==='string'&&game.cover.length<=500);}
@@ -205,6 +206,22 @@ async function playerApi(request,env,path){
         env.DB.prepare('UPDATE play_stats SET total_seconds=total_seconds+?,last_played_at=? WHERE user_id=? AND game_id=?').bind(seconds,now,playerId,session.game_id)
       ]);return json({ok:true,acceptedSeconds:seconds});
     }
+    if(request.method==='PUT'&&path==='/api/player/preference'){
+      const p=await bodyJson(request);if(!p||!validGame(p.game)||!(p.rating===null||p.rating===-1||p.rating===1)||typeof p.favorite!=='boolean')return json({error:'Preferência inválida.'},400);
+      await env.DB.batch([
+        env.DB.prepare('INSERT INTO games(id,system,title,source,source_key,cover_url) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET system=excluded.system,title=excluded.title,cover_url=excluded.cover_url').bind(p.game.gameId,p.game.system.trim(),p.game.title.trim(),p.game.source,p.game.sourceKey,p.game.cover||''),
+        env.DB.prepare("INSERT INTO user_game_preferences(user_id,game_id,rating,favorite,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET rating=excluded.rating,favorite=excluded.favorite,updated_at=excluded.updated_at").bind(playerId,p.game.gameId,p.rating,p.favorite?1:0,now)
+      ]);await evaluateTrophies(env,playerId);return json({ok:true,rating:p.rating,favorite:p.favorite,updatedAt:now});
+    }
+    if(request.method==='PUT'&&path==='/api/player/trophies/pinned'){
+      const p=await bodyJson(request),ids=Array.isArray(p?.ids)?p.ids.filter(id=>TROPHIES.some(t=>t.id===id)).slice(0,3):null;if(!ids)return json({error:'Troféus inválidos.'},400);
+      await env.DB.prepare(`UPDATE user_trophies SET pinned=CASE WHEN trophy_id IN (${ids.map(()=>'?').join(',')||"''"}) THEN 1 ELSE 0 END WHERE user_id=?`).bind(...ids,playerId).run();return json({ok:true});
+    }
+    if(request.method==='GET'&&path==='/api/player/workspace'){
+      await evaluateTrophies(env,playerId);const recent=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system AS platform,g.source,g.source_key AS sourceKey,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.last_played_at AS lastPlayedAt,COALESCE(p.favorite,0) AS favorite,p.rating FROM play_stats s JOIN games g ON g.id=s.game_id LEFT JOIN user_game_preferences p ON p.user_id=s.user_id AND p.game_id=s.game_id WHERE s.user_id=? ORDER BY s.last_played_at DESC LIMIT 3').bind(playerId).all()).results||[];
+      const favorites=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system AS platform,g.source,g.source_key AS sourceKey,g.cover_url AS cover,p.favorite,p.rating,p.updated_at AS updatedAt FROM user_game_preferences p JOIN games g ON g.id=p.game_id WHERE p.user_id=? AND p.favorite=1 ORDER BY p.updated_at DESC LIMIT 24').bind(playerId).all()).results||[];
+      const trophies=await trophyRows(env,playerId);return json({recent,favorites,trophies,registry:TROPHIES});
+    }
     if(request.method==='GET'&&['/api/player/stats','/api/player/games','/api/player/top-games','/api/player/export'].includes(path)){
       const rows=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system,g.source,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.sessions,s.last_played_at AS lastPlayedAt FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.user_id=? ORDER BY s.total_seconds DESC,g.title LIMIT 500').bind(playerId).all()).results||[];
       if(path==='/api/player/games'||path==='/api/player/top-games')return json({games:rows});
@@ -215,6 +232,8 @@ async function playerApi(request,env,path){
     return json({error:'Endpoint não encontrado.'},404);
   }catch(error){console.error('D1 playtime failure',error);return json({error:'Histórico temporariamente indisponível.'},503);}
 }
+async function trophyRows(env,userId){return (await env.DB.prepare('SELECT trophy_id AS id,earned_at AS earnedAt,pinned FROM user_trophies WHERE user_id=? ORDER BY pinned DESC,earned_at DESC').bind(userId).all()).results||[];}
+async function evaluateTrophies(env,userId){const stats=await env.DB.prepare('SELECT COUNT(*) AS gamesPlayed,COALESCE(SUM(total_seconds),0) AS totalSeconds,COUNT(DISTINCT g.system) AS platforms FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.user_id=?').bind(userId).first();const favorite=await env.DB.prepare('SELECT COUNT(*) AS favorites FROM user_game_preferences WHERE user_id=? AND favorite=1').bind(userId).first();const ids=earnedTrophyIds({...stats,favorites:favorite?.favorites||0});if(ids.length)await env.DB.batch(ids.map(id=>env.DB.prepare('INSERT OR IGNORE INTO user_trophies(user_id,trophy_id,earned_at) VALUES(?,?,?)').bind(userId,id,new Date().toISOString())));}
 function cleanText(value,max) { return typeof value==='string'?value.trim().slice(0,max):''; }
 function clientAllowed(request) {
   const key=request.headers.get('CF-Connecting-IP')||'unknown'; const now=Date.now();
