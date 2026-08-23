@@ -26,8 +26,8 @@ test('migration e cron preservam contas conhecidas e protegem administradores',a
 
 test('bottom nav é fixa, respeita safe area e some em fullscreen',async()=>{
   const css=await read('style.css');
-  assert.match(css,/\.mobile-bottom-nav\{position:fixed/);
-  assert.match(css,/padding-bottom:calc\(var\(--mobile-nav-height\) \+ env\(safe-area-inset-bottom\)/);
-  assert.match(css,/:has\(:fullscreen\) \.mobile-bottom-nav\{display:none!important\}/);
+  assert.match(css,/#mobile-bottom-nav\{position:fixed/);
+  assert.match(css,/padding-bottom:calc\(90px \+ var\(--bottom-safe-offset\)\)/);
+  assert.match(css,/:has\(:fullscreen\) #mobile-bottom-nav/);
   assert.match(css,/object-fit:cover;object-position:center/);
 });

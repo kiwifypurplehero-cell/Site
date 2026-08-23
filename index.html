@@ -92,13 +92,6 @@
       <div id="profile-view" class="app-view app-view--external" data-app-view="profile" hidden data-view-src="/profile.html" aria-live="polite"></div>
     </main>
 
-    <nav class="mobile-bottom-nav" data-app-navigation aria-label="Navegação principal">
-      <a href="?view=home" data-view-link="home" aria-label="Home" aria-current="page"><span aria-hidden="true">⌂</span><b>Home</b></a>
-      <a href="?view=library" data-view-link="library" aria-label="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a>
-      <a href="?view=emulators" data-view-link="emulators" aria-label="Emuladores"><span aria-hidden="true">▶</span><b>Emul.</b></a>
-      <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
-    </nav>
-
     <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
 
     <section id="plump-assistant-panel" class="assistant-panel" role="dialog" aria-labelledby="assistant-title" aria-describedby="assistant-subtitle" hidden>
@@ -163,6 +156,13 @@
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
+    <!-- Global viewport chrome: deliberately outside #app-shell and all animated views. -->
+    <nav id="mobile-bottom-nav" class="mobile-bottom-nav" data-app-navigation aria-label="Navegação principal">
+      <a href="?view=home" data-view-link="home" aria-label="Home" aria-current="page"><span aria-hidden="true">⌂</span><b>Home</b></a>
+      <a href="?view=library" data-view-link="library" aria-label="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a>
+      <a href="?view=emulators" data-view-link="emulators" aria-label="Emuladores"><span aria-hidden="true">▶</span><b>Emul.</b></a>
+      <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
+    </nav>
     <script type="module" src="site-loader.js"></script>
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
