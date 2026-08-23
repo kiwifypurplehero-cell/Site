@@ -31,7 +31,7 @@ function loadApp(user){
     const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
   }
   const loadSecondary=()=>{
-    for(const [src,type] of [['catalog-playtime.js','module'],['accessibility.js','']]){
+    for(const [src,type] of [['catalog-playtime.js','module']]){
       const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
     }
   };

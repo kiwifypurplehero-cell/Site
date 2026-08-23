@@ -406,10 +406,10 @@ function createGameCard(game) {
   body.append(element('p','',game.description));
   const details=element('dl','game-details');
   if(game.community) details.append(detailItem('Plataforma',game.platform),detailItem('Última atualização',formatDate(game.updatedAt)),...(game.license?[detailItem('Licença',game.license)]:[]));
-  else details.append(detailItem('Linguagem',game.language), detailItem('Branch padrão',game.branch), detailItem('Última atualização',formatDate(game.updatedAt)), detailItem('Status',game.status), detailItem('Atualização relativa',formatRelativeTime(game.updatedAt),game.updatedAt));
+  else details.append(detailItem('Versão',game.version||'Não informado'), detailItem('Lançamento',game.createdAt?formatDate(game.createdAt):'Não informado'), detailItem('Última atualização',formatDate(game.updatedAt)));
   body.append(details);
   const compactMeta=element('p','compact-meta');
-  const compactRelative=element('span','relative-update',formatRelativeTime(game.updatedAt)); compactRelative.dataset.updatedAt=game.updatedAt;
+  const compactRelative=element('span','',`Atualizado em: ${formatDate(game.updatedAt)}`);
   compactMeta.append(element('span','',`Lançamento: ${game.createdAt?formatDate(game.createdAt):'Não informado'}`),compactRelative,element('span','',`Versão: ${game.version||'Não informado'}`)); body.append(compactMeta);
   const actions=element('div','card-actions');
   const playUrl=getGamePlayUrl(game);
@@ -635,3 +635,14 @@ const applySidebarPreference=collapsed=>{document.documentElement.classList.togg
 applySidebarPreference(localStorage.getItem(sidebarPreference)==='true');
 $('#sidebar-toggle')?.addEventListener('click',()=>{const collapsed=!document.documentElement.classList.contains('sidebar-collapsed');applySidebarPreference(collapsed);localStorage.setItem(sidebarPreference,String(collapsed));});
 $('[data-sidebar-logout]')?.addEventListener('click',()=>window.PlumpAuth?.logout());
+
+// Stable shell controls: one restrained accent and an account summary.
+(function(){
+  const storedAccent=preferences.custom?.accent||'#8b5cf6';
+  const applySimpleAccent=color=>{if(!/^#[0-9a-f]{6}$/i.test(color))return;document.documentElement.style.setProperty('--color-accent',color);preferences.custom={...preferences.custom,accent:color};preferences.theme='custom';preferences.wallpaperColors=false;save();};
+  document.querySelectorAll('[data-simple-accent]').forEach(button=>button.addEventListener('click',()=>applySimpleAccent(button.dataset.simpleAccent)));
+  document.querySelector('#simple-accent')?.addEventListener('input',event=>applySimpleAccent(event.target.value));
+  if(document.querySelector('#simple-accent'))document.querySelector('#simple-accent').value=storedAccent;
+  const account=document.querySelector('#simple-account');
+  if(account){if(window.plumpUser&&!window.plumpUser.isGuest){const name=document.createElement('p');name.textContent=window.plumpUser.displayName||window.plumpUser.username;const logout=document.createElement('button');logout.type='button';logout.textContent='Sair';logout.onclick=()=>window.PlumpAuth?.logout();account.append(name,logout);}else{const label=document.createElement('p');label.textContent='Modo visitante';const login=document.createElement('a');login.href='/';login.textContent='Entrar';const register=document.createElement('a');register.href='/?register=1';register.textContent='Criar conta';account.append(label,login,document.createTextNode(' · '),register);}}
+})();
