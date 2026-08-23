@@ -61,30 +61,10 @@ gate.addEventListener('submit',async event=>{
     loadApp(result.user);
   }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
 });
-let authBootstrapPromise;
-async function restoreSession(){
-  if(authBootstrapPromise)return authBootstrapPromise;
-  status.textContent='Verificando sua sessão…';
-  authBootstrapPromise=api('/api/auth/me').then(result=>{
-    if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper,theme:result.preferences.theme}));
-    window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:true,preferences:true};
-    document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
-    loadApp(result.user);
-  }).catch(error=>{
-    gate.hidden=false;
-    const connectionFailure=error.status>=500||!error.status;
-    if(connectionFailure){
-      status.replaceChildren('Não foi possível verificar sua sessão. ');
-      const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar novamente';
-      retry.onclick=()=>{authBootstrapPromise=null;restoreSession();};status.append(retry);
-    }else if(error.status===401){status.textContent='';}
-    else{status.textContent=error.message;}
-    window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:false,degraded:connectionFailure};
-    document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
-  });
-  return authBootstrapPromise;
-}
-restoreSession();
+// Authentication is deliberately user initiated. An existing cookie is used only
+// after the player chooses Entrar; opening PlumpGames never calls /api/auth/me.
+window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:false,manual:true};
+document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
 
 if(new URL(location.href).searchParams.has('register'))showForm('register');
 
