@@ -1,12 +1,12 @@
-const VIEW_ORDER = ['home', 'library', 'emulators', 'profile'];
+const VIEW_ORDER = ['workspace', 'emulators', 'profile'];
 const views = new Map([...document.querySelectorAll('[data-app-view]')].map(view => [view.dataset.appView, view]));
 const scrollPositions = new Map();
-let activeView = 'home';
+let activeView = 'workspace';
 let transitionToken = 0;
 
 function requestedView() {
-  const value = new URL(location.href).searchParams.get('view') || 'home';
-  return views.has(value) ? value : 'home';
+  const value = new URL(location.href).searchParams.get('view') || 'workspace';
+  return views.has(value) ? value : 'workspace';
 }
 
 function initializeView(view) {
@@ -64,7 +64,7 @@ function updateNavigation(name) {
 }
 
 function showView(name, { direction, restoreScroll = true } = {}) {
-  if (!views.has(name)) name = 'home';
+  if (!views.has(name)) name = 'workspace';
   const previousName = activeView;
   const previous = views.get(previousName);
   const next = views.get(name);

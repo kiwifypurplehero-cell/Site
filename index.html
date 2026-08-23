@@ -52,8 +52,8 @@
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
-        <a class="brand" href="/?view=home" data-view-link="home" aria-label="PlumpGames — início"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
-        <div class="primary-nav" data-app-navigation><a href="?view=home" data-view-link="home" aria-current="page" title="Home"><span aria-hidden="true">⌂</span><b>Home</b></a><a href="?view=library" data-view-link="library" title="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a><a href="?view=emulators" data-view-link="emulators" title="Emuladores"><span aria-hidden="true">▶</span><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile" title="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a></div>
+        <a class="brand" href="/?view=workspace" data-view-link="workspace" aria-label="PlumpGames — área de trabalho"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
+        <div class="primary-nav" data-app-navigation><a href="?view=workspace" data-view-link="workspace" aria-current="page"><span aria-hidden="true">⌂</span><b>Área de Trabalho</b></a><a href="?view=emulators" data-view-link="emulators"><span aria-hidden="true">▶</span><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile"><span aria-hidden="true">●</span><b>Perfil</b></a></div>
         <div class="header-actions"><button id="plump-assistant-button" class="assistant-button" type="button" title="Abrir PJ Assistant" aria-label="Abrir PJ Assistant" aria-expanded="false" aria-controls="plump-assistant-panel"><span>PJ</span><small>AI</small><i aria-hidden="true"></i></button><button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button></div>
         <div class="sidebar-controls"><button id="sidebar-toggle" type="button" title="Recolher barra" aria-label="Recolher barra lateral">«</button><button type="button" data-sidebar-logout title="Sair"><span aria-hidden="true">⇥</span><b>Sair</b></button></div>
       </nav>
@@ -62,7 +62,14 @@
     <aside class="institutional-strip" aria-label="Sobre a PlumpGames"><div class="container institutional-strip__content"><div class="institutional-strip__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes de Matheus (Plump), gratuitos para jogar ou baixar.</p></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></aside>
 
     <main id="main-content">
-      <div id="library-view" class="app-view" data-app-view="library" hidden>
+      <div id="workspace-view" class="app-view workspace-view" data-app-view="workspace">
+        <section class="workspace-hero"><p class="eyebrow">Sua PlumpGames</p><h1>Área de Trabalho</h1><p>Seu histórico e suas escolhas, sem catálogo desnecessário.</p></section>
+        <section class="workspace-section"><div class="section-heading"><h2>Jogados recentemente</h2><small>Até 3 jogos realmente iniciados</small></div><div id="workspace-recent" class="personal-games"></div></section>
+        <section class="workspace-section"><div class="section-heading"><h2>Favoritos</h2></div><div id="workspace-favorites" class="personal-games"></div></section>
+        <section class="workspace-section"><div class="section-heading"><h2>Para você / Feedback</h2><small>Use os botões; gestos nunca são obrigatórios.</small></div><div id="workspace-feedback" class="personal-games"></div></section>
+        <p id="workspace-status" role="status" aria-live="polite">Carregando sua área…</p>
+      </div>
+      <div id="library-view" class="app-view" data-legacy-view="library" hidden>
       <section class="section section--catalog container" id="jogos" aria-labelledby="games-title">
         <div class="section-heading reveal"><div><p class="eyebrow">Jogo em destaque</p><h2 id="games-title">Jogue do seu jeito</h2></div><p>Conheça jogos para navegador e escolha entre visitar o projeto ou baixar a versão mais recente diretamente do GitHub.</p></div>
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
@@ -79,7 +86,7 @@
         <div class="games-list" id="games-list" data-view="detailed" aria-live="polite"></div>
       </section>
       </div>
-      <div id="home-view" class="app-view" data-app-view="home">
+      <div id="home-view" class="app-view" data-legacy-view="home">
       <section class="section container updates-panel reveal" aria-labelledby="updates-title"><div class="section-heading"><div><p class="eyebrow">Status do site</p><h2 id="updates-title">Última atualização do site</h2></div><div class="project-update project-update--site" data-update-project="site"><p data-update-date>Verificando atualização…</p><small data-update-relative></small><small data-update-status>Verificando atualização…</small></div></div></section>
 
       <section class="section section--news" id="novidades" aria-labelledby="news-title"><div class="container"><div class="section-heading reveal"><div><p class="eyebrow">Demonstração de atualizações</p><h2 id="news-title">Novidades</h2></div><p>Acompanhe notícias e próximos passos do universo PlumpGames.</p></div><div class="news-grid">
@@ -160,8 +167,7 @@
     </div>
     <!-- Global viewport chrome: deliberately outside #app-shell and all animated views. -->
     <nav id="mobile-bottom-nav" class="mobile-bottom-nav" data-app-navigation aria-label="Navegação principal">
-      <a href="?view=home" data-view-link="home" aria-label="Home" aria-current="page"><span aria-hidden="true">⌂</span><b>Home</b></a>
-      <a href="?view=library" data-view-link="library" aria-label="Biblioteca"><span aria-hidden="true">▦</span><b>Biblioteca</b></a>
+      <a href="?view=workspace" data-view-link="workspace" aria-label="Área de Trabalho" aria-current="page"><span aria-hidden="true">⌂</span><b>Área</b></a>
       <a href="?view=emulators" data-view-link="emulators" aria-label="Emuladores"><span aria-hidden="true">▶</span><b>Emul.</b></a>
       <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
     </nav>
@@ -169,5 +175,6 @@
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
     <script type="module" src="app-router.js"></script>
+    <script type="module" src="workspace.js"></script>
   </body>
 </html>

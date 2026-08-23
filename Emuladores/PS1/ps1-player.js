@@ -4,7 +4,7 @@ import {PlaytimeTracker,descriptor,bindEmulatorControls} from '../../playtime-tr
 import {EmulatorViewportManager} from '../shared/emulator-viewport-manager.js';
 import {EmulatorInputManager} from '../shared/emulator-input-manager.js';
 
-const DATA='https://cdn.emulatorjs.org/4.2.3/data/', query=new URLSearchParams(location.search), gameId=query.get('game')||'', debugEnabled=query.has('debug'), $=selector=>document.querySelector(selector);
+const DATA='/Emuladores/vendor/emulatorjs/data/', query=new URLSearchParams(location.search), gameId=query.get('game')||'', debugEnabled=query.has('debug'), $=selector=>document.querySelector(selector);
 let playtime, game, preparedContent, objectUrl, loaderScript, loadController, renderTimer, bootTimer, raf, runToken=0, coreStarted=false, mounted=false, bootRequested=false, firstFrame=false, compatibilityRetried=false, pendingMobileBoot=false, orientationLocked=false, settingsOpen=false, sampleStart, lastFrame, frames=0, dropped=0, renderedFps=0;
 export const PS1_PHASES=['preparing','network_check','downloading','download_complete','core_loading','content_mounting','booting','running','error'];
 export const ps1LoadState={phase:'preparing',loadedBytes:0,totalBytes:0,percent:0,speedBps:0,etaSeconds:null,currentFile:null,error:null};

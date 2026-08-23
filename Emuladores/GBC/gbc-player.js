@@ -2,7 +2,7 @@ import {EmulatorBootDiagnostics,EmulatorLoadingManager,instrumentFirstFrame} fro
 import {PlaytimeTracker,descriptor,bindEmulatorControls} from '../../playtime-tracker.js';
 import {EmulatorViewportManager} from '../shared/emulator-viewport-manager.js';
 import {EmulatorInputManager} from '../shared/emulator-input-manager.js';
-const DATA='https://cdn.emulatorjs.org/4.2.3/data/', $=selector=>document.querySelector(selector), gameId=new URLSearchParams(location.search).get('game')||'', shell=$('#gbc-player-shell');
+const DATA='/Emuladores/vendor/emulatorjs/data/', $=selector=>document.querySelector(selector), gameId=new URLSearchParams(location.search).get('game')||'', shell=$('#gbc-player-shell');
 let playtime,game,controller,romBlob,objectUrl,loader,disposeFrames,token=0,bootRequested=false,firstFrame=false,compatible=false;
 const loading=new EmulatorLoadingManager({profile:'gbc'}),mobile=()=>matchMedia('(pointer:coarse)').matches&&navigator.maxTouchPoints>0;
 const boot=new EmulatorBootDiagnostics({system:'gbc',container:'#gbc-emulator',loading,onError:error=>fail(error),debug:new URLSearchParams(location.search).has('debug')});
