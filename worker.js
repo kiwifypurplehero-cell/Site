@@ -165,7 +165,7 @@ async function profileApi(request,env,path){
     const displayName=typeof payload.displayName==='string'?payload.displayName.trim():'';
     const bio=typeof payload.bio==='string'?payload.bio.trim():'';
     const avatars=['controller','rocket','ghost','pixel','wizard','star'];
-    if(displayName.length<1||displayName.length>40||bio.length>240||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
+    if(displayName.length<1||displayName.length>40||bio.length>200||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
     await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,user.id).run();
     const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role FROM users WHERE id=?').bind(user.id).first();
     return json({user:publicUser(updated)});
@@ -176,7 +176,7 @@ async function profileApi(request,env,path){
     if(!['detailed','list','icons'].includes(view)||typeof wallpaper!=='string'||wallpaper.length>60)return json({error:'Preferência inválida.'},400);
     await env.DB.prepare('INSERT INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,wallpaper=excluded.wallpaper,animations=excluded.animations,view_mode=excluded.view_mode,reduce_motion=excluded.reduce_motion,updated_at=excluded.updated_at').bind(user.id,payload.theme??current.theme,wallpaper,(payload.animations??current.animations)?1:0,view,(payload.reduceMotion??current.reduceMotion)?1:0,new Date().toISOString()).run();return json({preferences:{...current,theme:payload.theme??current.theme,libraryView:view,liveWallpaper:wallpaper,animations:payload.animations??current.animations,reduceMotion:payload.reduceMotion??current.reduceMotion}});
   }
-  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats'))return playerApi(request,env,'/api/player/stats');
+  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats')){const response=await playerApi(request,env,'/api/player/stats');if(!response.ok)return response;const data=await response.json();return json({...data,preferences:await preferences(env,user.id)});}
   return json({error:'Endpoint não encontrado.'},404);
 }
 function validGame(game){return game&&GAME_ID_RE.test(game.gameId)&&typeof game.title==='string'&&game.title.trim().length<=120&&typeof game.system==='string'&&game.system.trim().length<=40&&['git','web','emulator'].includes(game.source)&&typeof game.sourceKey==='string'&&game.sourceKey.length<=160&&(!game.cover||typeof game.cover==='string'&&game.cover.length<=500);}

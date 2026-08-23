@@ -127,3 +127,22 @@ test('migration torna email nulo preservando ids, dados e binding real',async()=
   assert.match(sql,/email TEXT COLLATE NOCASE/);assert.doesNotMatch(sql,/email TEXT NOT NULL/);assert.match(sql,/INSERT INTO users_new[\s\S]*SELECT id,username,email/);assert.match(sql,/UNIQUE INDEX users_username_nocase_uq/);
   assert.match(config,/"binding": "DB"/);assert.match(config,/"database_name": "plumpgames-auth"/);
 });
+
+test('bootstrap consulta auth/me uma vez, envia cookie e diferencia 401 de falha temporária',async()=>{
+  const auth=await read('auth.js');
+  assert.match(auth,/credentials:'include'/);
+  assert.match(auth,/cache:'no-store'/);
+  assert.match(auth,/if\(authBootstrapPromise\)return authBootstrapPromise/);
+  assert.doesNotMatch(auth,/setTimeout\(\(\)=>authController\.abort/);
+  assert.match(auth,/else if\(error\.status===401\)\{status\.textContent=''\;\}/);
+  assert.match(auth,/retry\.onclick=\(\)=>\{authBootstrapPromise=null;restoreSession\(\);\}/);
+});
+
+test('auth/me não usa cache público e falha de D1 não limpa cookie nem vira 401',async()=>{
+  const env={DB:{prepare(){throw Object.assign(new Error('D1_ERROR: database unavailable'),{name:'D1Error'});}}};
+  const response=await worker.fetch(authRequest('/api/auth/me',null,'plumpgames_session=token-persistente'),env,{});
+  assert.equal(response.status,503);
+  assert.equal(response.headers.get('Cache-Control'),'no-store');
+  assert.equal(response.headers.get('Set-Cookie'),null);
+  assert.equal((await responseBody(response)).code,'AUTH_SERVICE_UNAVAILABLE');
+});

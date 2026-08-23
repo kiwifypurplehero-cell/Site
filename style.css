@@ -301,3 +301,10 @@ html,body{max-width:100%;overflow-x:hidden}.ps1-layout{display:grid;gap:20px}.ps
 }
 :fullscreen .mobile-bottom-nav{display:none!important}
 html:has(:fullscreen) #mobile-bottom-nav,html.app-fullscreen #mobile-bottom-nav{display:none!important}
+
+/* Bloco institucional superior, separado da navegação móvel persistente. */
+.institutional-strip{position:relative;z-index:10;margin-top:var(--header);border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--color-surface) 82%,transparent)}
+.institutional-strip__content{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:72px;padding-block:10px}
+.institutional-strip__intro strong{display:block;color:var(--color-text);font-size:.7rem;letter-spacing:.18em}.institutional-strip__intro p{margin:3px 0 0;color:var(--muted);font-size:.75rem}
+.institutional-strip nav{display:flex;align-items:center;flex-wrap:wrap;gap:14px}
+@media(max-width:680px){.institutional-strip{margin-top:var(--header)}.institutional-strip__content{display:block;min-height:0;padding-block:9px}.institutional-strip__intro p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.institutional-strip nav{gap:10px;margin-top:5px}.institutional-strip .footer-link{padding:1px 0;font-size:.68rem}}
