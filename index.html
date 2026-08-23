@@ -52,34 +52,31 @@
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
-        <a class="brand" href="/?view=workspace" data-view-link="workspace" aria-label="PlumpGames — área de trabalho"><span class="brand__mark" aria-hidden="true">P</span><span><strong>PlumpGames</strong></span></a>
-        <div class="primary-nav" data-app-navigation><a href="?view=workspace" data-view-link="workspace" aria-current="page"><span aria-hidden="true">⌂</span><b>Área de Trabalho</b></a><a href="?view=emulators" data-view-link="emulators"><span aria-hidden="true">▶</span><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile"><span aria-hidden="true">●</span><b>Perfil</b></a></div>
-        <div class="header-actions"><button id="plump-assistant-button" class="assistant-button" type="button" title="Abrir PJ Assistant" aria-label="Abrir PJ Assistant" aria-expanded="false" aria-controls="plump-assistant-panel"><span>PJ</span><small>AI</small><i aria-hidden="true"></i></button><button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Menu da PlumpGames" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button></div>
-        <div class="sidebar-controls"><button id="sidebar-toggle" type="button" title="Recolher barra" aria-label="Recolher barra lateral">«</button><button type="button" data-sidebar-logout title="Sair"><span aria-hidden="true">⇥</span><b>Sair</b></button></div>
+        <div class="primary-nav" data-app-navigation><a href="?view=workspace" data-view-link="workspace" aria-current="page"><b>Home</b></a><a href="?view=emulators" data-view-link="emulators"><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile"><b>Perfil</b></a></div>
+        <button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button>
       </nav>
     </header>
 
     <aside class="institutional-strip" aria-label="Sobre a PlumpGames"><div class="container institutional-strip__content"><div class="institutional-strip__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes de Matheus (Plump), gratuitos para jogar ou baixar.</p></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></aside>
 
     <main id="main-content">
-      <div id="workspace-view" class="app-view workspace-view" data-app-view="workspace">
+      <div id="workspace-view" class="app-view workspace-view" hidden>
         <section class="workspace-hero"><p class="eyebrow">Sua PlumpGames</p><h1>Área de Trabalho</h1><p>Seu histórico e suas escolhas, sem catálogo desnecessário.</p></section>
         <section class="workspace-section"><div class="section-heading"><h2>Jogados recentemente</h2><small>Até 3 jogos realmente iniciados</small></div><div id="workspace-recent" class="personal-games"></div></section>
         <section class="workspace-section"><div class="section-heading"><h2>Favoritos</h2></div><div id="workspace-favorites" class="personal-games"></div></section>
         <section class="workspace-section"><div class="section-heading"><h2>Para você / Feedback</h2><small>Use os botões; gestos nunca são obrigatórios.</small></div><div id="workspace-feedback" class="personal-games"></div></section>
         <p id="workspace-status" role="status" aria-live="polite">Carregando sua área…</p>
       </div>
-      <div id="library-view" class="app-view" data-legacy-view="library" hidden>
+      <div id="library-view" class="app-view" data-app-view="workspace">
       <section class="section section--catalog container" id="jogos" aria-labelledby="games-title">
-        <div class="section-heading reveal"><div><p class="eyebrow">Jogo em destaque</p><h2 id="games-title">Jogue do seu jeito</h2></div><p>Conheça jogos para navegador e escolha entre visitar o projeto ou baixar a versão mais recente diretamente do GitHub.</p></div>
+        <div class="section-heading reveal"><div><p class="eyebrow">Catálogo</p><h2 id="games-title">Jogos</h2></div><p>Escolha um jogo para conhecer ou jogar.</p></div>
         <div class="games-toolbar reveal" aria-label="Visualização dos jogos">
           <span>Visualização dos jogos</span>
           <div class="segmented-control" role="group" aria-label="Alternar visualização dos jogos">
-            <button type="button" data-view-mode="detailed" aria-pressed="true"title="Detalhado" aria-label="Detalhado">☷</button>
-            <button type="button" data-view-mode="list" title="Lista compacta" aria-label="Lista compacta">≡</button>
-            <button type="button" data-view-mode="icons" title="Ícones" aria-label="Ícones">▦</button>
+            <button type="button" data-view-mode="detailed" aria-pressed="true">Detalhado</button>
+            <button type="button" data-view-mode="list" aria-pressed="false">Compacto</button>
           </div>
-          <button class="button button--small button--ghost" type="button" id="refresh-games">Atualizar jogos</button>
+
         </div>
         <p id="games-message" class="games-message" role="status" aria-live="polite">Carregando jogos da PlumpGames…</p>
         <p id="community-message" class="games-message community-warning" role="status" aria-live="polite" hidden></p>
@@ -116,26 +113,11 @@
     <aside id="gx-side-panel" class="gx-panel" role="dialog" aria-modal="true" aria-labelledby="gx-panel-title" hidden>
       <header class="gx-panel__header"><div><p class="eyebrow">Central gamer</p><h2 id="gx-panel-title">Menu da PlumpGames</h2></div><button id="gx-panel-close" class="modal__close" type="button" aria-label="Fechar menu">×</button></header>
       <div class="gx-accordions">
-        <div class="community-menu-actions"><button id="open-add-game" class="button button--primary" type="button">Adicionar jogo</button><button id="show-community-games" class="button button--ghost" type="button">Jogos da comunidade</button></div>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="appearance-content">Aparência <span>+</span></button><div id="appearance-content" class="gx-accordion__content" hidden>
-          <label for="theme-select">Tema</label><select id="theme-select"><option value="original">Plump Original</option><option value="blue">Azul Neon</option><option value="purple">Roxo Gamer</option><option value="red">Vermelho Arena</option><option value="green">Verde Terminal</option><option value="light">Claro</option><option value="dark">Escuro</option><option value="custom">Personalizado</option></select>
-          <label class="checkbox-label"><input id="wallpaper-colors" type="checkbox" checked> Usar cores do wallpaper</label>
-          <div class="settings-grid"><label>Cor principal<input id="color-primary" type="color"></label><label>Cor secundária<input id="color-secondary" type="color"></label><label>Cor de destaque<input id="color-accent" type="color"></label><label>Menu<input id="color-menu" type="color"></label><label>Botões<input id="color-button" type="color"></label><label>Brilho<input id="color-glow" type="color"></label></div>
-          <label>Transparência do menu <input id="menu-opacity" type="range" min=".55" max=".98" step=".01"></label>
-          <div class="settings-actions"><button id="apply-theme" class="button button--primary" type="button">Aplicar cores</button><button id="reset-theme" class="button button--ghost" type="button">Restaurar padrão</button></div>
-        </div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><button id="wallpaper-retry" class="button button--small button--ghost" type="button" hidden>Tentar novamente</button><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" class="button button--ghost" type="button">Pausar</button><button id="wallpaper-resume" class="button button--ghost" type="button">Retomar</button></div><label class="checkbox-label"><input id="economy-mode" type="checkbox"> Modo desempenho</label><p id="performance-suggestion" class="performance-suggestion" hidden>Seu dispositivo pode se beneficiar do modo desempenho.</p></div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="games-content">Visualização dos jogos <span>+</span></button><div id="games-content" class="gx-accordion__content" hidden><div class="segmented-control"><button type="button" data-view-mode="detailed" title="Detalhado">☷</button><button type="button" data-view-mode="list" title="Lista compacta">≡</button><button type="button" data-view-mode="icons" title="Ícones">▦</button></div></div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="animations-content">Animações <span>+</span></button><div id="animations-content" class="gx-accordion__content" hidden><label>Intensidade do brilho <input id="glow-strength" type="range" min="0" max="1" step=".01"></label><label>Transparência <input id="card-opacity" type="range" min=".55" max="1" step=".01"></label><label>Intensidade das animações <input id="animation-strength" type="range" min="0" max="1" step=".01"></label></div></section>
-        <section class="gx-accordion accessibility-section"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accessibility-content">Acessibilidade <small id="accessibility-menu-status">Inativa</small><span>+</span></button><div id="accessibility-content" class="gx-accordion__content" hidden>
-          <div class="a11y-intro"><strong>Configuração rápida</strong><p>Uma prévia é aplicada imediatamente e fica somente neste navegador.</p><div id="a11y-quick-actions" class="a11y-quick-actions" aria-label="Atalhos de acessibilidade"></div></div>
-          <div id="reduced-motion-suggestion" class="a11y-suggestion" role="status" hidden>Seu dispositivo prefere movimento reduzido. Deseja aplicar o perfil? <button type="button" data-a11y-suggest>Aplicar</button></div>
-          <div id="accessibility-profiles" class="a11y-profiles"></div>
-          <p id="a11y-conflict" class="a11y-conflict" role="status" aria-live="polite"></p>
-          <div class="a11y-footer"><button id="a11y-undo" class="button button--ghost" type="button" disabled>Desfazer</button><button id="a11y-reset" class="button button--ghost" type="button">Restaurar acessibilidade</button></div>
-          <p class="a11y-privacy">Privacidade: apenas preferências técnicas são salvas localmente. Nenhum diagnóstico é coletado ou enviado.</p>
-        </div></section>
-        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="future-content">Futuramente <span>+</span></button><div id="future-content" class="gx-accordion__content future-grid" hidden></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="wallpapers-content">Live Wallpapers <span>+</span></button><div id="wallpapers-content" class="gx-accordion__content" hidden><p id="wallpaper-status" class="wallpaper-status" role="status"></p><button id="wallpaper-retry" type="button" hidden>Tentar novamente</button><div id="wallpaper-selector" class="wallpaper-selector"></div><div class="playback-controls"><button id="wallpaper-pause" type="button">Pausar</button><button id="wallpaper-resume" type="button">Retomar</button></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accent-content">Cor personalizada do site <span>+</span></button><div id="accent-content" class="gx-accordion__content" hidden><div class="accent-options"><button type="button" data-simple-accent="#8b5cf6">Roxo padrão</button><button type="button" data-simple-accent="#3b82f6">Azul</button><button type="button" data-simple-accent="#ef4444">Vermelho</button><button type="button" data-simple-accent="#22c55e">Verde</button></div><label>Outra cor <input id="simple-accent" type="color" value="#8b5cf6"></label></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="account-content">Conta <span>+</span></button><div id="account-content" class="gx-accordion__content" hidden><div id="simple-account"></div></div></section>
+        <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="about-content">Sobre / Créditos <span>+</span></button><div id="about-content" class="gx-accordion__content" hidden><p>PlumpGames é um projeto de Matheus (Plump), desenvolvido com ajuda do Codex.</p></div></section>
+        <div class="legacy-controls" hidden aria-hidden="true"><button id="refresh-games"></button><button id="open-add-game"></button><button id="show-community-games"></button><button id="plump-assistant-button"></button><select id="theme-select"><option value="original">Original</option><option value="custom">Personalizado</option></select><input id="wallpaper-colors" type="checkbox"><input id="menu-opacity" value=".88"><input id="economy-mode" type="checkbox"><input id="glow-strength" value="0"><input id="card-opacity" value="1"><input id="animation-strength" value="0"><input id="color-primary" type="color"><input id="color-secondary" type="color"><input id="color-accent" type="color"><input id="color-menu" type="color"><input id="color-button" type="color"><input id="color-glow" type="color"><button id="apply-theme"></button><button id="reset-theme"></button><div id="performance-suggestion"></div><div id="future-content"></div></div>
       </div>
     </aside>
     <div class="community-dialog" id="community-dialog" role="dialog" aria-modal="true" aria-labelledby="community-dialog-title" hidden>
@@ -165,12 +147,6 @@
     <div class="modal" id="site-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden><div class="modal__backdrop" data-close-modal></div><div class="modal__panel"><button class="modal__close" type="button" aria-label="Fechar janela" data-close-modal>×</button><p class="eyebrow">PlumpGames</p><h2 id="modal-title"></h2><div id="modal-content"></div><div id="modal-actions"></div></div></div>
     <div class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
-    <!-- Global viewport chrome: deliberately outside #app-shell and all animated views. -->
-    <nav id="mobile-bottom-nav" class="mobile-bottom-nav" data-app-navigation aria-label="Navegação principal">
-      <a href="?view=workspace" data-view-link="workspace" aria-label="Área de Trabalho" aria-current="page"><span aria-hidden="true">⌂</span><b>Área</b></a>
-      <a href="?view=emulators" data-view-link="emulators" aria-label="Emuladores"><span aria-hidden="true">▶</span><b>Emul.</b></a>
-      <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
-    </nav>
     <script type="module" src="site-loader.js"></script>
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
