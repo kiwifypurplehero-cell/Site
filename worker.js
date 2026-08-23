@@ -88,8 +88,10 @@ function authLimited(request,kind){const key=`auth:${kind}:${request.headers.get
 function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return username;}
 async function requireAuth(request,env){
   const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;const tokenHash=await sha256(token),now=new Date().toISOString();
-  const user=await env.DB.prepare('SELECT u.id,u.username,u.display_name,u.avatar,u.bio,u.is_public,u.role,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
+  const user=await env.DB.prepare('SELECT u.id,u.username,u.display_name,u.avatar,u.bio,u.is_public,u.role,u.last_active_at,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
   if(!user)return null;
+  const oneDayAgo=Date.now()-86_400_000;
+  if(!user.last_active_at||Date.parse(user.last_active_at)<oneDayAgo){try{await env.DB.prepare('UPDATE users SET last_active_at=? WHERE id=? AND (last_active_at IS NULL OR last_active_at<?)').bind(now,user.id,new Date(oneDayAgo).toISOString()).run();}catch{/* A failed activity touch must not invalidate an otherwise valid session. */}}
   return {...user,tokenHash};
 }
 const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:user.avatar||'controller',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user'});
@@ -139,7 +141,7 @@ async function authApi(request,env,path){
       if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);
       stage='username check';const existing=await env.DB.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(existing)return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);authLog('username checked');
       stage='password hash';const hash=await hashPassword(payload.password);authLog('password hash stored');
-      stage='user insert';let inserted;try{inserted=await env.DB.prepare('INSERT INTO users(username,email,password_hash,display_name) VALUES(?,NULL,?,?) RETURNING id,username,display_name,avatar,bio,is_public,role').bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
+      stage='user insert';let inserted;try{inserted=await env.DB.prepare("INSERT INTO users(username,email,password_hash,display_name,last_active_at) VALUES(?,NULL,?,?,datetime('now')) RETURNING id,username,display_name,avatar,bio,is_public,role").bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
       stage='preferences insert';await env.DB.prepare("INSERT OR IGNORE INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,'default','none',1,'detailed',0,?)").bind(inserted.id,new Date().toISOString()).run();
       stage='session create';const token=await createSession(env,inserted.id);authLog('session created');authLog('success');return json({user:publicUser(inserted),preferences:await preferences(env,inserted.id)},201,{'Set-Cookie':sessionCookie(token)});
     }
@@ -147,7 +149,7 @@ async function authApi(request,env,path){
       if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
       const username=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!username||typeof payload.password!=='string')return invalid();
       const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await verifyPassword(payload.password,user.password_hash))return invalid();
-      const token=await createSession(env,user.id);return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
+      const token=await createSession(env,user.id);try{await env.DB.prepare("UPDATE users SET last_active_at=datetime('now') WHERE id=?").bind(user.id).run();}catch{/* Migration rollout compatibility; successful auth remains available. */}return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);const stored=await env.DB.prepare('SELECT password_hash FROM users WHERE id=?').bind(user.id).first();if(!stored||!await verifyPassword(payload.currentPassword||'',stored.password_hash))return json({error:'Senha atual incorreta.',code:'INVALID_CURRENT_PASSWORD'},401);const hash=await hashPassword(payload.newPassword);authLog('password hash stored');await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").bind(hash,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
     return json({error:'Endpoint não encontrado.'},404);
@@ -310,20 +312,41 @@ async function support(request,env) {
     return reply?json({reply,model:SUPPORT_MODEL}):json({error:'Resposta indisponível.'},503);
   } catch(error) { console.error('Workers AI failure',error); return json({error:'Suporte inteligente indisponível.'},503); }
 }
+async function cleanupInactiveAccounts(env,{now=new Date(),limit=100}={}){
+  const summary={scanned:0,deleted:0,failed:0};
+  if(!env.DB)return summary;
+  const cutoff=new Date(now.getTime()-180*86_400_000).toISOString();
+  const rows=(await env.DB.prepare("SELECT id FROM users WHERE role != 'admin' AND last_active_at IS NOT NULL AND last_active_at < ? ORDER BY last_active_at LIMIT ?").bind(cutoff,limit).all()).results||[];
+  summary.scanned=rows.length;
+  for(const {id} of rows){
+    try{
+      const result=await env.DB.batch([
+        env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
+        env.DB.prepare('DELETE FROM user_preferences WHERE user_id=?').bind(id),
+        env.DB.prepare('DELETE FROM play_sessions WHERE user_id=?').bind(id),
+        env.DB.prepare('DELETE FROM play_stats WHERE user_id=?').bind(id),
+        env.DB.prepare("DELETE FROM users WHERE id=? AND role != 'admin' AND last_active_at IS NOT NULL AND last_active_at < ?").bind(id,cutoff)
+      ]);
+      const changed=result.at(-1)?.meta?.changes??result.at(-1)?.changes??0;
+      if(changed===1)summary.deleted++;else summary.failed++;
+    }catch{summary.failed++;}
+  }
+  console.log('[ACCOUNT_CLEANUP]',JSON.stringify(summary));
+  return summary;
+}
 export default {async fetch(request,env,ctx){
   const url=new URL(request.url); if(url.pathname.startsWith('/api/auth/'))return authApi(request,env,url.pathname);
   if(url.pathname==='/api/profile'||url.pathname.startsWith('/api/profile/'))return profileApi(request,env,url.pathname);
   if(url.pathname==='/api/support')return support(request,env);
   if(url.pathname.startsWith('/api/player/'))return playerApi(request,env,url.pathname);
   if(url.pathname==='/api/community-games')return communityGames(request,env);
-  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/')){if(env.DB&&!await requireAuth(request,env))return json({error:'Sua sessão expirou. Entre novamente.'},401);return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);}
+  if(url.pathname==='/api/emulators'||url.pathname.startsWith('/api/emulators/'))return (await emulatorApi(request,env,url.pathname,ctx))||json({error:'Endpoint não encontrado.'},404);
   const cleanPages=new Map([
     ['/Emuladores','/Emuladores/index.html'],['/Emuladores/','/Emuladores/index.html'],
     ['/Emuladores/PS1','/Emuladores/PS1/index.html'],['/Emuladores/PS1/','/Emuladores/PS1/index.html'],['/Emuladores/PS1/player','/Emuladores/PS1/player.html'],
     ['/Emuladores/GBC','/Emuladores/GBC/index.html'],['/Emuladores/GBC/','/Emuladores/GBC/index.html'],['/Emuladores/GBC/player','/Emuladores/GBC/player.html'],
     ['/Emuladores/GBA','/Emuladores/GBA/index.html'],['/Emuladores/GBA/','/Emuladores/GBA/index.html'],['/Emuladores/GBA/player','/Emuladores/GBA/player.html']
   ]);
-  if(env.DB&&cleanPages.has(url.pathname)&&!await requireAuth(request,env))return Response.redirect(new URL('/?login=required',url),302);
   const legacyRoutes=new Map([
     ['/emulators','/Emuladores/'],['/emulators/','/Emuladores/'],['/emulators.html','/Emuladores/'],
     ['/gbc-player','/Emuladores/GBC/player'],['/gbc-player/','/Emuladores/GBC/player'],['/gbc-player.html','/Emuladores/GBC/player'],
@@ -341,5 +364,5 @@ export default {async fetch(request,env,ctx){
   let response=await env.ASSETS.fetch(request);
   if(response.status===404&&request.method==='GET'&&request.headers.get('Accept')?.includes('text/html'))response=await env.ASSETS.fetch(new Request(new URL('/index.html',url),request));
   return response;
-}};
-export {SUPPORT_MODEL,validateCommunityPayload,communityGames};
+},async scheduled(_controller,env,ctx){ctx.waitUntil(cleanupInactiveAccounts(env));}};
+export {SUPPORT_MODEL,validateCommunityPayload,communityGames,cleanupInactiveAccounts};

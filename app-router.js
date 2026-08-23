@@ -11,6 +11,14 @@ function requestedView() {
 
 function initializeView(view) {
   if (!view.dataset.viewSrc || view.dataset.initialized) return;
+  if (view.dataset.appView === 'profile' && window.plumpUser?.isGuest) {
+    view.classList.add('guest-profile');
+    view.innerHTML = `<section class="guest-profile__card"><span class="guest-profile__avatar" aria-hidden="true">🎮</span><p class="eyebrow">Sessão temporária</p><h1>${window.plumpUser.displayName}</h1><p>Crie uma conta para salvar seu progresso.</p><button class="button button--primary" type="button" data-guest-create>Criar conta</button><button class="button button--ghost" type="button" data-guest-exit>Sair</button></section>`;
+    view.querySelector('[data-guest-create]').onclick=()=>location.href='/?register=1';
+    view.querySelector('[data-guest-exit]').onclick=()=>window.PlumpAuth.logout();
+    view.dataset.initialized = 'true';
+    return;
+  }
   const frame = document.createElement('iframe');
   frame.className = 'app-view-frame';
   frame.src = view.dataset.viewSrc;
@@ -130,3 +138,11 @@ initializeView(views.get(activeView));
 updateNavigation(activeView);
 document.documentElement.dataset.activeView = activeView;
 history.replaceState({ view: activeView }, '', `${location.pathname}?view=${activeView}`);
+
+// Avoid pinning the navigation above a virtual keyboard; the visual viewport is
+// used only when the keyboard measurably reduces the visible page.
+if (window.visualViewport) {
+  const syncKeyboard = () => document.documentElement.classList.toggle('keyboard-open', innerHeight-window.visualViewport.height>180);
+  window.visualViewport.addEventListener('resize', syncKeyboard, {passive:true});
+}
+document.addEventListener('fullscreenchange',()=>document.documentElement.classList.toggle('app-fullscreen',Boolean(document.fullscreenElement)));

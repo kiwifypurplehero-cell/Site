@@ -25,6 +25,8 @@ function loadApp(user){
   if(loaded)return; loaded=true;
   gate.hidden=true; app.hidden=false; document.body.classList.remove('auth-locked');
   window.plumpUser=user;
+  const temporary=new Map();
+  window.PlumpStorage=user.isGuest?{getItem:key=>temporary.has(key)?temporary.get(key):null,setItem:(key,value)=>temporary.set(key,String(value)),removeItem:key=>temporary.delete(key)}:localStorage;
   for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js',''],['script.js','']]){
     const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
   }
@@ -36,9 +38,16 @@ function loadApp(user){
   if('requestIdleCallback' in window)requestIdleCallback(loadSecondary,{timeout:2500});else setTimeout(loadSecondary,1200);
   window.dispatchEvent(new CustomEvent('plumpgames:authenticated',{detail:user}));
 }
+function enterGuest(){
+  const suffix=String(Math.floor(Math.random()*10000)).padStart(4,'0');
+  const guest={id:`guest-${crypto.randomUUID?.()||Date.now()}`,username:'visitante',displayName:`Visitante ${suffix}`,avatar:'controller',bio:'',isPublic:false,role:'guest',isGuest:true};
+  window.__PLUMPGAMES_GUEST__=guest;
+  loadApp(guest);
+}
 function showForm(name){gate.querySelectorAll('[data-auth-form]').forEach(form=>form.hidden=form.dataset.authForm!==name);status.textContent='';}
 gate.querySelectorAll('[data-show-auth]').forEach(button=>button.onclick=()=>showForm(button.dataset.showAuth));
 gate.querySelectorAll('[data-auth-back]').forEach(button=>button.onclick=()=>showForm('choice'));
+gate.querySelector('[data-guest-login]').addEventListener('click',enterGuest);
 gate.addEventListener('submit',async event=>{
   event.preventDefault(); const form=event.target; const submit=form.querySelector('[type=submit]');
   status.textContent='';submit.disabled=true;
@@ -68,4 +77,6 @@ api('/api/auth/me',{signal:authController.signal}).then(result=>{
   document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
 });
 
-window.PlumpAuth={api,csrfHeaders,logout:async()=>{await api('/api/auth/logout',{method:'POST',headers:csrfHeaders(),body:'{}'});location.href='/';}};
+if(new URL(location.href).searchParams.has('register'))showForm('register');
+
+window.PlumpAuth={api,csrfHeaders,isGuest:()=>Boolean(window.plumpUser?.isGuest),logout:async()=>{if(!window.plumpUser?.isGuest)await api('/api/auth/logout',{method:'POST',headers:csrfHeaders(),body:'{}'});location.href='/';}};
