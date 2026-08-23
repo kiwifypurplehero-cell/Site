@@ -11,6 +11,7 @@
     <meta name="theme-color" content="#050611">
     <link rel="canonical" href="https://site.kiwifypurplehero.workers.dev/">
     <link rel="manifest" href="manifest.json">
+    <link rel="alternate" href="/Emuladores/" title="Emuladores PlumpGames">
 
     <meta property="og:type" content="website">
     <meta property="og:locale" content="pt_BR">
@@ -37,7 +38,7 @@
     <section id="auth-gate" class="auth-gate" aria-label="Autenticação PlumpGames">
       <div class="auth-card">
         <h1 class="auth-logo"><span aria-hidden="true">P</span> PLUMPGAMES</h1><p class="auth-subtitle">Seu explorador pessoal de jogos.</p>
-        <div class="auth-actions" data-auth-form="choice"><button type="button" data-show-auth="login">Entrar</button><button class="auth-secondary" type="button" data-show-auth="register">Criar conta</button></div>
+        <div class="auth-actions" data-auth-form="choice"><button type="button" data-show-auth="login">Entrar</button><button class="auth-secondary" type="button" data-show-auth="register">Criar conta</button><button class="auth-secondary" type="button" data-guest-login>Entrar como visitante</button></div>
         <form data-auth-form="login" hidden><label>Nome de usuário<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required></label><button type="submit">Entrar</button><button class="auth-back" type="button" data-auth-back>Voltar</button></form>
         <form data-auth-form="register" hidden><label>Nome de usuário<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><p class="auth-hint">3–24 letras, números, _ ou -</p><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><label>Confirmar senha<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><button type="submit">Criar conta</button><button class="auth-back" type="button" data-auth-back>Voltar</button></form>
         <p class="auth-status" data-auth-status role="status" aria-live="polite"></p>
@@ -98,7 +99,7 @@
       <a href="?view=profile" data-view-link="profile" aria-label="Perfil"><span aria-hidden="true">●</span><b>Perfil</b></a>
     </nav>
 
-    <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p><nav class="footer-primary-nav" aria-label="Navegação da PlumpGames"><a href="/" aria-current="page">Home</a><a href="/Emuladores/">Emuladores</a></nav></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
+    <footer class="site-footer"><div class="container footer__content"><div class="footer__intro"><strong>PLUMPGAMES</strong><p>Jogos independentes criados por Matheus (Plump), disponíveis para jogar diretamente no navegador ou baixar gratuitamente.</p></div><nav aria-label="Links institucionais"><a class="footer-link" href="https://github.com/kiwifypurplehero-cell">GitHub</a><a class="footer-link" href="#sobre">Sobre</a><button class="footer-link" type="button" data-open-credits>Créditos</button><button class="footer-link" type="button" data-open-privacy>Política de Privacidade</button><button class="footer-link" type="button" data-open-terms>Termos</button></nav></div></footer>
 
     <section id="plump-assistant-panel" class="assistant-panel" role="dialog" aria-labelledby="assistant-title" aria-describedby="assistant-subtitle" hidden>
       <header class="assistant-header"><div><h2 id="assistant-title">PJ Assistant</h2><p id="assistant-subtitle">Suporte PlumpGames</p></div><div class="assistant-header__actions"><button id="assistant-clear" type="button">Limpar conversa</button><button id="assistant-minimize" type="button" aria-label="Minimizar assistente">—</button><button id="assistant-close" type="button" aria-label="Fechar assistente">×</button></div></header>

@@ -1,6 +1,7 @@
 'use strict';
 
 /* Preferências técnicas locais: nomes de diagnósticos nunca são persistidos. */
+const accessibilityStorage=window.PlumpStorage||localStorage;
 const ACCESSIBILITY_STORAGE_KEY = 'plumpgamesAccessibility';
 const A11Y_VERSION = 1;
 const ACCESSIBILITY_PRESETS = Object.freeze({
@@ -57,7 +58,7 @@ const COLOR_PRESETS = {
   monochrome:['#d8d8d8','#8d8d8d','#ffffff','#bdbdbd','#e2e2e2','#737373'], highContrast:['#00ffff','#ffff00','#ffffff','#00ff9d','#ffd400','#ff5c8a']
 };
 let accessibilityState={version:A11Y_VERSION,active:[],manual:{}}, undoState=null, wallpaperPlaybackBeforeA11y=null;
-try { const stored=JSON.parse(localStorage.getItem(ACCESSIBILITY_STORAGE_KEY)||'null'); if(stored?.version===A11Y_VERSION) accessibilityState={...accessibilityState,...stored}; } catch { localStorage.removeItem(ACCESSIBILITY_STORAGE_KEY); }
+try { const stored=JSON.parse(accessibilityStorage.getItem(ACCESSIBILITY_STORAGE_KEY)||'null'); if(stored?.version===A11Y_VERSION) accessibilityState={...accessibilityState,...stored}; } catch { accessibilityStorage.removeItem(ACCESSIBILITY_STORAGE_KEY); }
 const profileMap=Object.fromEntries(PROFILE_DEFINITIONS.map(profile=>[profile[0],profile]));
 
 function controlMarkup(profileId, control) {
@@ -75,7 +76,7 @@ function mergedSettings() {
   return accessibilityState.active.reduce((all,id)=>{ const next={...ACCESSIBILITY_PRESETS[id],...(accessibilityState.manual[id]||{})}; const merged={...all,...next}; ['textScale','interfaceScale','controlScale','lineHeight','focusWidth'].forEach(key=>{ if(all[key]!==undefined&&next[key]!==undefined) merged[key]=Math.max(Number(all[key]),Number(next[key])); }); return merged; },{});
 }
 function rememberUndo(){ undoState=structuredClone(accessibilityState); document.querySelector('#a11y-undo').disabled=false; }
-function persistAccessibility(){ localStorage.setItem(ACCESSIBILITY_STORAGE_KEY,JSON.stringify(accessibilityState)); }
+function persistAccessibility(){ accessibilityStorage.setItem(ACCESSIBILITY_STORAGE_KEY,JSON.stringify(accessibilityState)); }
 function updateSetting(profile,key,value){ rememberUndo(); accessibilityState.manual[profile]={...(accessibilityState.manual[profile]||{}),[key]:value}; if(!accessibilityState.active.includes(profile)) accessibilityState.active.push(profile); persistAccessibility(); applyAccessibility(); syncAccessibilityControls(); }
 function toggleProfile(id){ rememberUndo(); const index=accessibilityState.active.indexOf(id); if(index<0) accessibilityState.active.push(id); else accessibilityState.active.splice(index,1); persistAccessibility(); applyAccessibility(); syncAccessibilityControls(); }
 

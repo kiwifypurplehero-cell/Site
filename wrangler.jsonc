@@ -4,6 +4,9 @@
   "main": "worker.js",
   "compatibility_date": "2026-08-06",
   "keep_vars": true,
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
   "assets": {
     "directory": ".",
     "binding": "ASSETS",

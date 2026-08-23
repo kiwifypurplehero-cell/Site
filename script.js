@@ -1,5 +1,6 @@
 'use strict';
 
+const preferenceStorage=window.PlumpStorage||localStorage;
 const STORAGE_KEY = 'plumpgames-preferences-v3';
 const { getGamePlayUrl, buildPlayPageUrl } = PlumpPlay;
 const OFFICIAL_URL = 'https://site.kiwifypurplehero.workers.dev/';
@@ -23,7 +24,7 @@ const wallpapers = [
 ];
 const defaults = { wallpaper:'none', wallpaperColors:true, theme:'original', custom:DEFAULT_COLORS, menuOpacity:.88, view:'detailed', reduceMotion:false, economy:false, highContrast:false, glow:1, opacity:.86, animation:1 };
 let storedPreferences = {};
-try { storedPreferences = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { localStorage.removeItem(STORAGE_KEY); }
+try { storedPreferences = JSON.parse(preferenceStorage.getItem(STORAGE_KEY) || '{}'); } catch { preferenceStorage.removeItem(STORAGE_KEY); }
 let preferences = { ...defaults, ...storedPreferences, custom: { ...DEFAULT_COLORS, ...(storedPreferences.custom || {}) } };
 let lastFocus = null;
 const pageScrollLocks = new Set();
@@ -60,7 +61,7 @@ document.addEventListener('plumpgames:before-view-change', closeTransientUiForNa
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 let preferenceTimer;
-const save = () => {localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));clearTimeout(preferenceTimer);preferenceTimer=setTimeout(()=>window.PlumpAuth?.api('/api/profile/preferences',{method:'PUT',headers:window.PlumpAuth.csrfHeaders(),body:JSON.stringify({libraryView:preferences.view,liveWallpaper:preferences.wallpaper,settings:{theme:preferences.theme,economy:preferences.economy}})}).catch(()=>{}),350);};
+const save = () => {preferenceStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));clearTimeout(preferenceTimer);if(window.PlumpAuth?.isGuest())return;preferenceTimer=setTimeout(()=>window.PlumpAuth?.api('/api/profile/preferences',{method:'PUT',headers:window.PlumpAuth.csrfHeaders(),body:JSON.stringify({libraryView:preferences.view,liveWallpaper:preferences.wallpaper,settings:{theme:preferences.theme,economy:preferences.economy}})}).catch(()=>{}),350);};
 const currentWallpaper = () => wallpapers.find(item => item.id === preferences.wallpaper) || wallpapers.at(-1);
 
 function applyColors(colors) {
