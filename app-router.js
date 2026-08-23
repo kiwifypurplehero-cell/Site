@@ -1,12 +1,14 @@
 const VIEW_ORDER = ['workspace', 'emulators', 'profile'];
+const DEFAULT_VIEW = 'workspace';
 const views = new Map([...document.querySelectorAll('[data-app-view]')].map(view => [view.dataset.appView, view]));
 const scrollPositions = new Map();
-let activeView = 'workspace';
+let activeView = DEFAULT_VIEW;
 let transitionToken = 0;
+let routerStarted = false;
 
 function requestedView() {
-  const value = new URL(location.href).searchParams.get('view') || 'workspace';
-  return views.has(value) ? value : 'workspace';
+  const value = new URLSearchParams(location.search).get('view');
+  return value && views.has(value) ? value : DEFAULT_VIEW;
 }
 
 function initializeView(view) {
@@ -64,7 +66,7 @@ function updateNavigation(name) {
 }
 
 function showView(name, { direction, restoreScroll = true } = {}) {
-  if (!views.has(name)) name = 'workspace';
+  if (!views.has(name)) name = DEFAULT_VIEW;
   const previousName = activeView;
   const previous = views.get(previousName);
   const next = views.get(name);
@@ -128,16 +130,27 @@ document.addEventListener('click', event => {
 });
 
 addEventListener('popstate', event => {
+  if (!routerStarted) return;
   const name = event.state?.view || requestedView();
   showView(name, { direction: VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(activeView) });
 });
 
-activeView = requestedView();
-views.forEach((view, name) => { view.hidden = name !== activeView; });
-initializeView(views.get(activeView));
-updateNavigation(activeView);
-document.documentElement.dataset.activeView = activeView;
-history.replaceState({ view: activeView }, '', `${location.pathname}?view=${activeView}`);
+function startRouter() {
+  if (routerStarted) return;
+  routerStarted = true;
+  activeView = requestedView();
+  views.forEach((view, name) => { view.hidden = name !== activeView; });
+  initializeView(views.get(activeView));
+  updateNavigation(activeView);
+  document.documentElement.dataset.activeView = activeView;
+  // Store the resolved fallback without rewriting a clean `/` to `?view=workspace`.
+  history.replaceState({ view: activeView }, '', location.href);
+}
+
+// Authentication owns visibility of the app shell. Start view-specific work only
+// after it has accepted a session, preventing protected UI from flashing first.
+if (window.plumpUser) startRouter();
+else window.addEventListener('plumpgames:authenticated', startRouter, { once: true });
 
 // Avoid pinning the navigation above a virtual keyboard; the visual viewport is
 // used only when the keyboard measurably reduces the visible page.
