@@ -142,7 +142,14 @@ history.replaceState({ view: activeView }, '', `${location.pathname}?view=${acti
 // Avoid pinning the navigation above a virtual keyboard; the visual viewport is
 // used only when the keyboard measurably reduces the visible page.
 if (window.visualViewport) {
-  const syncKeyboard = () => document.documentElement.classList.toggle('keyboard-open', innerHeight-window.visualViewport.height>180);
+  const syncKeyboard = () => {
+    const layoutHeight = Math.max(innerHeight, document.documentElement.clientHeight);
+    const obscuredHeight = layoutHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+    document.documentElement.classList.toggle('keyboard-open', obscuredHeight > Math.min(180, layoutHeight * .2));
+  };
   window.visualViewport.addEventListener('resize', syncKeyboard, {passive:true});
+  window.visualViewport.addEventListener('scroll', syncKeyboard, {passive:true});
+  addEventListener('orientationchange', syncKeyboard, {passive:true});
+  syncKeyboard();
 }
 document.addEventListener('fullscreenchange',()=>document.documentElement.classList.toggle('app-fullscreen',Boolean(document.fullscreenElement)));
