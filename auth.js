@@ -6,7 +6,7 @@ let loaded=false;
 
 function csrfHeaders(){return {'Content-Type':'application/json','X-PlumpGames-Request':'same-origin'};}
 async function api(path,options={}){
-  const response=await fetch(path,{credentials:'same-origin',...options});
+  const response=await fetch(path,{credentials:'include',cache:'no-store',...options});
   const body=await response.json().catch(()=>({}));
   if(!response.ok){
     const messages={
@@ -61,21 +61,30 @@ gate.addEventListener('submit',async event=>{
     loadApp(result.user);
   }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
 });
-const authController=new AbortController();
-const authTimer=setTimeout(()=>authController.abort(),7000);
-api('/api/auth/me',{signal:authController.signal}).then(result=>{
-  clearTimeout(authTimer);
-  if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper,theme:result.preferences.theme}));
-  window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:true,preferences:true};
-  document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
-  loadApp(result.user);
-}).catch(error=>{
-  clearTimeout(authTimer);gate.hidden=false;
-  const connectionFailure=error.name==='AbortError'||error.status>=500;
-  if(connectionFailure){status.innerHTML='Não foi possível verificar sua sessão. <button type="button">Tentar novamente</button>';status.querySelector('button').onclick=()=>location.reload();}
-  window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:false,degraded:connectionFailure};
-  document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
-});
+let authBootstrapPromise;
+async function restoreSession(){
+  if(authBootstrapPromise)return authBootstrapPromise;
+  status.textContent='Verificando sua sessão…';
+  authBootstrapPromise=api('/api/auth/me').then(result=>{
+    if(result.preferences)localStorage.setItem(cacheKey,JSON.stringify({...JSON.parse(localStorage.getItem(cacheKey)||'{}'),view:result.preferences.libraryView,wallpaper:result.preferences.liveWallpaper,theme:result.preferences.theme}));
+    window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:true,preferences:true};
+    document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
+    loadApp(result.user);
+  }).catch(error=>{
+    gate.hidden=false;
+    const connectionFailure=error.status>=500||!error.status;
+    if(connectionFailure){
+      status.replaceChildren('Não foi possível verificar sua sessão. ');
+      const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar novamente';
+      retry.onclick=()=>{authBootstrapPromise=null;restoreSession();};status.append(retry);
+    }else if(error.status===401){status.textContent='';}
+    else{status.textContent=error.message;}
+    window.__PLUMPGAMES_AUTH_BOOTSTRAP__={authenticated:false,degraded:connectionFailure};
+    document.dispatchEvent(new CustomEvent('plumpgames:auth-checked',{detail:window.__PLUMPGAMES_AUTH_BOOTSTRAP__}));
+  });
+  return authBootstrapPromise;
+}
+restoreSession();
 
 if(new URL(location.href).searchParams.has('register'))showForm('register');
 
