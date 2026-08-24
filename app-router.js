@@ -1,4 +1,4 @@
-const VIEW_ORDER = ['workspace', 'emulators', 'profile'];
+const VIEW_ORDER = ['workspace', 'emulators', 'utilities', 'profile'];
 const DEFAULT_VIEW = 'workspace';
 const views = new Map([...document.querySelectorAll('[data-app-view]')].map(view => [view.dataset.appView, view]));
 const scrollPositions = new Map();
