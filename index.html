@@ -52,7 +52,7 @@
 
     <header class="site-header" id="inicio">
       <nav class="navbar container" aria-label="Navegação principal">
-        <div class="primary-nav" data-app-navigation><a href="?view=workspace" data-view-link="workspace" aria-current="page"><b>Home</b></a><a href="?view=emulators" data-view-link="emulators"><b>Emuladores</b></a><a href="?view=profile" data-view-link="profile"><b>Perfil</b></a></div>
+        <div class="primary-nav" data-app-navigation><a href="?view=workspace" data-view-link="workspace" aria-current="page"><b>Home</b></a><a href="?view=emulators" data-view-link="emulators"><b>Emuladores</b></a><a href="?view=utilities" data-view-link="utilities"><b>Utilidades</b></a><a href="?view=profile" data-view-link="profile"><b>Perfil</b></a></div>
         <button id="gx-menu-button" class="gx-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="gx-side-panel" aria-haspopup="dialog"><span></span><span></span><span></span></button>
       </nav>
     </header>
@@ -95,6 +95,19 @@
       <section class="section container about" id="sobre" aria-labelledby="about-title"><div class="about__panel reveal"><div class="about__symbol" aria-hidden="true"><span>PG</span></div><div class="about__content"><p class="eyebrow">Criatividade independente</p><h2 id="about-title">Sobre a <span>PlumpGames</span></h2><p>A PlumpGames é o espaço oficial dos jogos gratuitos criados por Matheus Plump. O projeto transforma ideias em experiências acessíveis, com atenção à diversão e à facilidade de jogar.</p><p>Aqui você encontra jogos para navegador, informações transparentes e acesso ao download de jogos pelo repositório oficial. O primeiro título em destaque é CS 1.6 PLH, uma experiência HTML inspirada em um clássico dos jogos de ação.</p><p class="creator">Criado por Matheus (Plump) com ajuda do Codex.</p></div></div></section>
       </div>
       <div id="emulators-view" class="app-view app-view--external" data-app-view="emulators" hidden data-view-src="/Emuladores/" aria-live="polite"></div>
+      <div id="utilities-view" class="app-view utilities-view" data-app-view="utilities" hidden aria-live="polite">
+        <section class="utilities-page container" aria-labelledby="utilities-title">
+          <div class="utilities-list" data-utilities-list>
+            <header class="utilities-heading"><p class="eyebrow">Ferramentas</p><h1 id="utilities-title">Utilidades</h1><p>Ferramentas extras para facilitar algumas tarefas.</p></header>
+            <article class="utility-card" tabindex="0" role="button" aria-labelledby="read-pr-card-title" data-open-utility>
+              <span class="utility-type">Bookmarklet</span><h2 id="read-pr-card-title">Leia PR automático</h2>
+              <p>Uma ferramenta rápida executada através dos favoritos do navegador. Depois de instalada como bookmarklet, ela pode ser acionada diretamente na página compatível para abrir e executar a automação.</p>
+              <button class="utility-button" type="button" data-open-utility>Ver detalhes</button>
+            </article>
+          </div>
+          <article class="utility-details" data-utility-details hidden aria-labelledby="utility-details-title"></article>
+        </section>
+      </div>
       <div id="profile-view" class="app-view app-view--external" data-app-view="profile" hidden data-view-src="/profile.html" aria-live="polite"></div>
     </main>
 
@@ -150,6 +163,7 @@
     <script type="module" src="site-loader.js"></script>
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
+    <script type="module" src="utilities.js"></script>
     <script type="module" src="app-router.js"></script>
     <script type="module" src="workspace.js"></script>
   </body>
