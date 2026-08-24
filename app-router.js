@@ -39,7 +39,7 @@ function connectFrameHeight(frame) {
   document.documentElement.classList.add('embedded-app-view');
   const embeddedStyles = document.createElement('style');
   embeddedStyles.textContent = `
-    html.embedded-app-view,html.embedded-app-view body{height:auto!important;min-height:0!important;overflow:hidden!important}
+    html.embedded-app-view,html.embedded-app-view body{height:auto!important;min-height:0!important;overflow:hidden!important;background:transparent!important}
     html.embedded-app-view .site-header,html.embedded-app-view .profile-header{display:none!important}
     html.embedded-app-view .emulators-page{padding-top:32px!important}
     html.embedded-app-view .profile-main{padding-top:32px!important}
@@ -110,8 +110,8 @@ function showView(name, { direction, restoreScroll = true } = {}) {
     finish();
   } else {
     gsap.killTweensOf([previous, next].filter(Boolean));
-    gsap.set(next, { xPercent: movingForward ? 15 : -15, opacity: 0 });
-    if (previous) gsap.to(previous, { xPercent: movingForward ? -15 : 15, opacity: 0, duration: .24, ease: 'power2.out' });
+    gsap.set(next, { xPercent: movingForward ? 18 : -18, opacity: 0 });
+    if (previous) gsap.to(previous, { xPercent: movingForward ? -18 : 18, opacity: 0, duration: .24, ease: 'power2.out' });
     gsap.to(next, { xPercent: 0, opacity: 1, duration: .24, ease: 'power2.out', onComplete: finish });
   }
 }

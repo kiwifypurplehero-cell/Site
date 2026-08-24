@@ -157,33 +157,6 @@ async function authApi(request,env,path){
   }catch(error){console.error(`[AUTH] failure stage=${stage} type=${error?.name||'Error'} code=${error?.code||'unknown'}`);return isInfrastructureError(error)?json({error:'Serviço temporariamente indisponível. Tente novamente.',code:'AUTH_SERVICE_UNAVAILABLE'},503):json({error:'Falha interna inesperada.',code:'AUTH_INTERNAL_ERROR'},500);}
 }
 
-const AVATAR_MAX_BYTES=150*1024;
-const AVATAR_TYPES=new Set(['image/webp','image/jpeg','image/png']);
-const avatarBuckets=new Map();
-async function avatarKey(userId){const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`plumpgames-avatar:${userId}`)));return `assets/user-content/avatars/u_${[...bytes].slice(0,12).map(value=>value.toString(16).padStart(2,'0')).join('')}.webp`;}
-function imageDimensions(bytes,type){
-  if(type==='image/png'&&bytes.length>24&&bytes[0]===137)return [new DataView(bytes.buffer,bytes.byteOffset).getUint32(16),new DataView(bytes.buffer,bytes.byteOffset).getUint32(20)];
-  if(type==='image/webp'&&bytes.length>30&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'){
-    const tag=String.fromCharCode(...bytes.slice(12,16));if(tag==='VP8X')return [1+bytes[24]+(bytes[25]<<8)+(bytes[26]<<16),1+bytes[27]+(bytes[28]<<8)+(bytes[29]<<16)];
-  }
-  if(type==='image/jpeg'){for(let i=2;i+9<bytes.length;){if(bytes[i]!==255){i++;continue;}const marker=bytes[i+1],size=(bytes[i+2]<<8)+bytes[i+3];if(marker>=192&&marker<=195)return [(bytes[i+7]<<8)+bytes[i+8],(bytes[i+5]<<8)+bytes[i+6]];i+=2+size;}}
-  return null;
-}
-class AvatarStorage{async save(){throw new Error('Not implemented');}async delete(){throw new Error('Not implemented');}getUrl(path){return `/${path}`;}}
-class GitHubAvatarStorage extends AvatarStorage{
-  constructor(env){super();this.token=env.GITHUB_AVATAR_TOKEN;this.owner=env.GITHUB_AVATAR_OWNER||'kiwifypurplehero-cell';this.repo=env.GITHUB_AVATAR_REPO||'Site';this.branch=env.GITHUB_AVATAR_BRANCH||'main';}
-  async request(path,options={}){if(!this.token)throw new Error('GITHUB_AVATAR_TOKEN ausente');return fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}`,{...options,headers:{Accept:'application/vnd.github+json',Authorization:`Bearer ${this.token}`,'X-GitHub-Api-Version':'2022-11-28','User-Agent':'PlumpGames-Avatar-Worker',...options.headers}});}
-  async save(path,bytes){let sha;const current=await this.request(`${path}?ref=${encodeURIComponent(this.branch)}`);if(current.ok)sha=(await current.json()).sha;else if(current.status!==404)throw new Error('Falha ao consultar avatar');const response=await this.request(path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Update user avatar',content:bytesToBase64(bytes),branch:this.branch,...(sha?{sha}:{})})});if(!response.ok)throw new Error('Falha ao armazenar avatar');return path;}
-  async delete(path){const current=await this.request(`${path}?ref=${encodeURIComponent(this.branch)}`);if(current.status===404)return;if(!current.ok)throw new Error('Falha ao consultar avatar');const {sha}=await current.json();await this.request(path,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Delete user avatar',sha,branch:this.branch})});}
-}
-async function avatarApi(request,env,user){
-  if(request.method!=='POST')return json({error:'Método não permitido.'},405);if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
-  const type=(request.headers.get('Content-Type')||'').split(';')[0].toLowerCase(),length=Number(request.headers.get('Content-Length')||0);if(!AVATAR_TYPES.has(type)||length>AVATAR_MAX_BYTES)return json({error:'Envie JPEG, PNG ou WebP otimizado com até 150 KB.'},415);
-  const bytes=new Uint8Array(await request.arrayBuffer());if(!bytes.length||bytes.length>AVATAR_MAX_BYTES)return json({error:'Avatar excede 150 KB.'},413);const dimensions=imageDimensions(bytes,type);if(!dimensions||dimensions[0]>256||dimensions[1]>256||dimensions[0]!==dimensions[1])return json({error:'Avatar deve ser quadrado e ter no máximo 256×256.'},400);
-  const now=Date.now(),memory=(avatarBuckets.get(user.id)||[]).filter(time=>now-time<86400000);if(memory.some(time=>now-time<60000)||memory.length>=12)return json({error:'Limite de alterações de avatar atingido. Tente mais tarde.'},429,{'Retry-After':'60'});
-  const recent=await env.DB.prepare("SELECT COUNT(*) count,MAX(created_at) latest FROM avatar_uploads WHERE user_id=? AND created_at>datetime('now','-1 day')").bind(user.id).first();if((recent?.count||0)>=12||recent?.latest&&now-Date.parse(recent.latest)<60000)return json({error:'Limite de alterações de avatar atingido. Tente mais tarde.'},429,{'Retry-After':'60'});
-  const path=await avatarKey(user.id),storage=new GitHubAvatarStorage(env);await storage.save(path,bytes);const updatedAt=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE users SET avatar=?,avatar_updated_at=?,updated_at=? WHERE id=?").bind(path,updatedAt,updatedAt,user.id),env.DB.prepare('INSERT INTO avatar_uploads(user_id,created_at) VALUES(?,?)').bind(user.id,updatedAt)]);memory.push(now);avatarBuckets.set(user.id,memory);return json({avatar:storage.getUrl(path),avatarUpdatedAt:updatedAt});
-}
 function presenceView(row){const visible=row.show_online_status!==0,seen=row.presence_seen_at,online=visible&&seen&&Date.now()-Date.parse(seen)<180000;return {online:Boolean(online),lastSeenAt:visible?seen:null,currentGameId:online&&row.show_current_game!==0?row.current_game_id:null,currentGameTitle:online&&row.show_current_game!==0?row.current_game_title:null};}
 async function presenceApi(request,env){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(request.method!=='POST'||!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);const p=await bodyJson(request);if(!p)return json({error:'Dados inválidos.'},400);const title=p.currentGameTitle==null?null:String(p.currentGameTitle).trim().slice(0,120),id=p.currentGameId==null?null:String(p.currentGameId).slice(0,160);const seen=id===null&&title===null?null:new Date().toISOString();await env.DB.prepare('UPDATE users SET presence_seen_at=?,current_game_id=?,current_game_title=? WHERE id=?').bind(seen,id,title,user.id).run();return json({ok:true});}
 async function friendsApi(request,env,path){
@@ -202,17 +175,29 @@ async function friendsApi(request,env,path){
 
 async function profileApi(request,env,path){
   if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
-  if(path==='/api/profile/avatar')return avatarApi(request,env,user);
+  if(request.method==='GET'&&path.startsWith('/api/profile/public/')){
+    const username=decodeURIComponent(path.slice('/api/profile/public/'.length));
+    const target=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at FROM users WHERE username=? COLLATE NOCASE').bind(username).first();
+    if(!target)return json({error:'Perfil não encontrado.'},404);
+    const friendship=Number(target.id)===Number(user.id)?{status:'owner'}:await env.DB.prepare("SELECT status FROM friendships WHERE status='accepted' AND ((requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?))").bind(user.id,target.id,target.id,user.id).first();
+    const allowed=target.is_public!==0||friendship?.status==='accepted'||friendship?.status==='owner';
+    if(!allowed)return json({user:{username:target.username,isPublic:false},private:true,message:'Este perfil é privado.'});
+    const games=(await env.DB.prepare('SELECT g.id AS gameId,g.title,g.system,g.cover_url AS cover,s.total_seconds AS totalSeconds,s.sessions,s.last_played_at AS lastPlayedAt FROM play_stats s JOIN games g ON g.id=s.game_id WHERE s.user_id=? ORDER BY s.total_seconds DESC LIMIT 50').bind(target.id).all()).results||[];
+    const trophies=await trophyRows(env,target.id);
+    const friends=(await env.DB.prepare("SELECT u.id,u.username,u.display_name,u.avatar,u.avatar_updated_at FROM friendships f JOIN users u ON u.id=CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END WHERE f.status='accepted' AND (f.requester_id=? OR f.addressee_id=?) ORDER BY u.display_name LIMIT 50").bind(target.id,target.id,target.id).all()).results||[];
+    const summary={totalSeconds:games.reduce((total,game)=>total+Number(game.totalSeconds||0),0),gamesPlayed:games.length,mostPlayed:games[0]||null};
+    return json({user:publicUser(target),summary,games,trophies,friends:friends.map(publicUser),private:false});
+  }
   if(request.method==='PUT'&&path==='/api/profile'){
     if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
     const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
-    const allowed=new Set(['displayName','avatar','bio','isPublic','showOnlineStatus','showCurrentGame']);
+    const allowed=new Set(['displayName','avatar','bio','isPublic']);
     if(Object.keys(payload).some(key=>!allowed.has(key)))return json({error:'Campo de perfil não permitido.'},400);
     const displayName=typeof payload.displayName==='string'?payload.displayName.trim():'';
     const bio=typeof payload.bio==='string'?payload.bio.trim():'';
     const avatars=['controller','rocket','ghost','pixel','wizard','star'];
     if(displayName.length<1||displayName.length>40||bio.length>200||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
-    await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,show_online_status=?,show_current_game=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,payload.showOnlineStatus!==false?1:0,payload.showCurrentGame!==false?1:0,user.id).run();
+    await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,user.id).run();
     const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();
     return json({user:publicUser(updated)});
   }
