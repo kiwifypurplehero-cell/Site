@@ -1,0 +1,19 @@
+/* Large-screen-only overrides. The shell uses width, never zoom or transforms. */
+@media (min-width: 1024px) {
+  .navbar.container, .section--catalog, .workspace-view, .emulators-page.container, .profile-header, .profile-main {
+    width: min(80vw, var(--shell-max)); max-width: var(--shell-max);
+  }
+  /* Notebooks need a little more usable width than large desktop monitors. */
+  @media (max-width: 1279px) {
+    .navbar.container, .section--catalog, .workspace-view, .emulators-page.container, .profile-header, .profile-main { width: 90vw; }
+  }
+  .site-header .primary-nav { margin-left: clamp(20px, 4vw, 56px); gap: clamp(2px, 1vw, 10px); }
+  .site-header .primary-nav a { width: auto; padding-inline: clamp(10px, 1.4vw, 18px); }
+  .section--catalog { padding-top: clamp(32px, 5vw, 64px); }
+  .game-card { grid-template-columns: minmax(220px, 34%) minmax(0, 1fr); }
+  .game-card__image { width: 100%; min-height: 260px; }
+  .games-list[data-view="list"] .game-card { grid-template-columns: minmax(120px, 16%) minmax(0, 1fr); }
+  .emulator-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .emulator-card { width: 100%; max-width: none; }
+  .profile-main { display: grid; grid-template-columns: minmax(280px, .72fr) minmax(0, 1.28fr); gap: 20px 24px; }
+}
