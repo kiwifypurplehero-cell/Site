@@ -95,7 +95,7 @@ async function requireAuth(request,env){
   if(!user.last_active_at||Date.parse(user.last_active_at)<oneDayAgo){try{await env.DB.prepare('UPDATE users SET last_active_at=? WHERE id=? AND (last_active_at IS NULL OR last_active_at<?)').bind(now,user.id,new Date(oneDayAgo).toISOString()).run();}catch{/* A failed activity touch must not invalidate an otherwise valid session. */}}
   return {...user,tokenHash};
 }
-const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:user.avatar||'controller',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user',avatarUpdatedAt:user.avatar_updated_at||null,showOnlineStatus:user.show_online_status!==0,showCurrentGame:user.show_current_game!==0});
+const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:['mago','hacker','jogador','gamer'].includes(user.avatar)?user.avatar:'gamer',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user',avatarUpdatedAt:user.avatar_updated_at||null,showOnlineStatus:user.show_online_status!==0,showCurrentGame:user.show_current_game!==0});
 async function preferences(env,userId){const row=await env.DB.prepare('SELECT theme,wallpaper,animations,view_mode,reduce_motion FROM user_preferences WHERE user_id=?').bind(userId).first();return {theme:row?.theme||'default',libraryView:row?.view_mode||'detailed',liveWallpaper:row?.wallpaper||'none',animations:row?.animations!==0,reduceMotion:row?.reduce_motion===1};}
 function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
 const createSessionToken=()=>bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
@@ -195,7 +195,7 @@ async function profileApi(request,env,path){
     if(Object.keys(payload).some(key=>!allowed.has(key)))return json({error:'Campo de perfil não permitido.'},400);
     const displayName=typeof payload.displayName==='string'?payload.displayName.trim():'';
     const bio=typeof payload.bio==='string'?payload.bio.trim():'';
-    const avatars=['controller','rocket','ghost','pixel','wizard','star'];
+    const avatars=['mago','hacker','jogador','gamer'];
     if(displayName.length<1||displayName.length>40||bio.length>200||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
     await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,user.id).run();
     const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();
