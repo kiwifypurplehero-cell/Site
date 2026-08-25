@@ -4,3 +4,47 @@
 
 /* Painéis foscos preservam o Live Wallpaper global quando a página está embutida. */
 .profile-page{background:transparent}.profile-main{position:relative}.profile-title,.profile-section,.stats-grid article{border:1px solid rgba(255,255,255,.08);background:rgba(10,8,20,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 14px 35px rgba(0,0,0,.18)}.profile-title{position:relative;padding:22px;border-radius:18px}.profile-title__actions{margin-left:auto;display:flex;align-self:flex-start;gap:8px}.ranking-cover{width:42px;height:52px;border-radius:8px;object-fit:cover;background:rgba(255,255,255,.06)}.rank-row{grid-template-columns:32px 42px minmax(0,1fr) auto}@media(max-width:600px){.profile-title{align-items:flex-start;flex-wrap:wrap}.profile-title__actions{width:100%;margin-left:0}.profile-title__actions .button{flex:1}.rank-row{grid-template-columns:26px 38px minmax(0,1fr) auto}.ranking-cover{width:38px;height:48px}}
+
+/* Profile layout uses the same three explicit responsive ranges as the SPA shell. */
+.profile-header,.profile-main{width:min(100% - 40px,1280px);max-width:1280px}
+.profile-main{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1.28fr);align-items:start;gap:20px 24px;padding:40px 0 80px}
+.profile-title{grid-column:1;grid-row:1;display:grid;grid-template-columns:96px minmax(0,1fr);align-items:start;margin:0}
+.profile-avatar{width:96px;height:96px}
+.profile-title h1{font-size:clamp(1.8rem,3vw,3rem);overflow-wrap:anywhere}
+.profile-title__actions{grid-column:1/-1;width:100%;margin:10px 0 0;align-self:auto}
+.profile-title__actions .button{flex:1;padding-inline:12px}
+.profile-load-state{grid-column:1;grid-row:2;display:flex;align-items:center;gap:10px;min-height:42px}
+.profile-load-state p{margin:0;overflow-wrap:anywhere}
+#profile-editor{grid-column:1;grid-row:3;margin-top:0}
+#friends-section{grid-column:2;grid-row:1;margin-top:0}
+.stats-grid{grid-column:2;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr))}
+#summary+section{grid-column:2;grid-row:3}
+#summary+section+section{grid-column:2;grid-row:4}
+#summary+section+section+section{grid-column:2;grid-row:5}
+.privacy-actions{grid-column:1;grid-row:4;display:grid;align-self:start}
+.privacy-actions>div:last-child{display:flex;align-items:stretch;flex-direction:column;margin-top:14px}
+.profile-section{min-width:0;margin-top:0}
+.game-row,.rank-row{min-width:0}
+
+@media (min-width:768px) and (max-width:1023px){
+  .profile-header,.profile-main{width:calc(100% - 32px)}
+  .profile-main{grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:16px}
+  .profile-title{grid-template-columns:74px minmax(0,1fr);padding:18px}
+  .profile-avatar{width:74px;height:74px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media (max-width:767px){
+  .profile-header,.profile-main{width:calc(100% - 24px)}
+  .profile-main{display:block;padding:24px 0 72px}
+  .profile-title{display:flex;margin-bottom:14px;padding:18px;gap:14px}
+  .profile-avatar{width:72px;height:72px;flex:0 0 72px}
+  .profile-title h1{font-size:clamp(1.65rem,8vw,2.35rem)}
+  .profile-title__actions{width:100%;margin:0}
+  .profile-load-state{margin-bottom:14px}
+  .profile-section,.stats-grid{margin-top:16px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .game-row{grid-template-columns:44px minmax(0,1fr)}
+  .game-row>span{grid-column:2}
+  .privacy-actions{display:block}
+}

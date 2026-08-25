@@ -102,6 +102,7 @@ function showView(name, { direction, restoreScroll = true } = {}) {
       previous.hidden = true;
       previous.removeAttribute('style');
     }
+    window.gsap?.set([previous, next].filter(Boolean), { clearProps: 'transform,opacity,position,insetInline,pointerEvents' });
     next.removeAttribute('style');
     if (restoreScroll) scrollTo({ top: scrollPositions.get(name) || 0, behavior: 'instant' });
   };
@@ -115,6 +116,12 @@ function showView(name, { direction, restoreScroll = true } = {}) {
     gsap.to(next, { xPercent: 0, opacity: 1, duration: .24, ease: 'power2.out', onComplete: finish });
   }
 }
+
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || event.data?.type !== 'plumpgames:profile-saved' || !event.data.user) return;
+  window.plumpUser = { ...(window.plumpUser || {}), ...event.data.user };
+  try { sessionStorage.setItem('plumpgames:profile', JSON.stringify(event.data.user)); } catch { /* D1 remains the source of truth. */ }
+});
 
 function navigate(name) {
   if (name === activeView) return;

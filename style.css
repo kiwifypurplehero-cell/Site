@@ -324,3 +324,48 @@ body{background:#09070f;color:var(--color-text)}.ambient-glow,.institutional-str
 /* Glass discreto sobre o único Live Wallpaper global. */
 .games-toolbar,.game-card,.game-card__body,.game-details,.segmented-control,.card-actions .button--ghost,.card-actions .button:not(.button--primary),.emulator-card,.rom-card{background:rgba(10,8,20,.55);border-color:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .game-card__body{background:rgba(10,8,20,.38)}.games-toolbar{padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:12px}.card-actions .button--primary{background:linear-gradient(120deg,rgba(112,85,237,.9),rgba(71,121,251,.78))}.app-view-frame{background:transparent}.emulators-page{background:transparent}
+
+/* Responsive shell consolidation: mobile < 768, tablet 768–1023, desktop >= 1024. */
+#app-shell{padding-left:0;min-width:0}
+.site-header{inset:0 0 auto;width:100%;height:var(--header)}
+.navbar.container{width:min(100% - 32px,1280px);max-width:1280px;margin-inline:auto;flex-direction:row;align-items:center;overflow:visible}
+.site-header .brand{flex:0 0 auto}
+.site-header .primary-nav{width:auto;margin:0 0 0 clamp(20px,4vw,56px);display:flex;grid-template-columns:none;gap:clamp(2px,1vw,10px)}
+.site-header .primary-nav a{width:auto;min-height:40px;padding-inline:clamp(10px,1.4vw,18px)}
+.header-actions{width:auto;margin:0 0 0 auto;padding:0;display:flex;grid-template-columns:none;align-items:center}
+#main-content{width:100%;min-width:0;padding-top:var(--header)}
+.app-view--external{margin-top:0}
+.section--catalog,.workspace-view{width:min(100% - 40px,1280px);max-width:1280px;margin-inline:auto}
+.section--catalog{padding-top:clamp(32px,5vw,64px)}
+.game-card{grid-template-columns:minmax(220px,34%) minmax(0,1fr)}
+.game-card__image{width:100%;min-height:260px}
+.emulators-page.container{width:min(100% - 40px,1280px);max-width:1280px}
+.emulator-grid{grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:18px}
+.emulator-card{max-width:420px;width:100%}
+.utilities-page{width:min(100% - 40px,900px);margin-inline:auto}
+.view-enter-right,.view-enter-left,.view-exit-left,.view-exit-right{will-change:transform,opacity}
+.app-view:not(.view-enter-right):not(.view-enter-left):not(.view-exit-left):not(.view-exit-right){transform:none}
+
+@media (min-width:768px) and (max-width:1023px){
+  .navbar.container{width:min(100% - 24px,960px)}
+  .site-header .primary-nav{margin-left:18px;gap:1px}
+  .site-header .primary-nav a{padding-inline:10px;font-size:.82rem}
+  .section--catalog,.workspace-view,.emulators-page.container{width:calc(100% - 32px)}
+  .game-card{grid-template-columns:minmax(190px,31%) minmax(0,1fr)}
+  .game-card__image{min-height:230px}
+}
+
+@media (max-width:767px){
+  .navbar.container{width:100%;padding-inline:8px}
+  .site-header .primary-nav{min-width:0;flex:1;margin-left:4px;justify-content:space-evenly;gap:0}
+  .site-header .primary-nav a{width:auto;min-height:38px;padding-inline:4px}
+  .header-actions{flex:0 0 auto}
+  #main-content{padding-top:var(--header)}
+  .section--catalog,.workspace-view{width:calc(100% - 20px)}
+  .game-card{grid-template-columns:1fr}
+  .game-card__image{width:100%;min-height:0;height:170px}
+  .emulators-page.container{width:calc(100% - 24px)}
+  .emulator-grid{grid-template-columns:minmax(0,1fr)}
+  .emulator-card{max-width:none}
+  .utilities-page{width:calc(100% - 20px)}
+}
