@@ -1,0 +1,41 @@
+/* Shared responsive contract. Breakpoints: mobile < 768px, tablet 768–1023px, desktop >= 1024px. */
+:root {
+  --layout-mobile-max: 767px;
+  --layout-desktop-min: 1024px;
+  --shell-max: 1400px;
+  --content-max: 1400px;
+  --reading-max: 900px;
+}
+
+html, body { max-width: 100%; overflow-x: clip; }
+#app-shell, #main-content, .app-view { min-width: 0; }
+#main-content { width: 100%; padding-top: var(--header); }
+.site-header { inset: 0 0 auto; width: 100%; }
+.navbar.container { margin-inline: auto; flex-direction: row; align-items: center; overflow: visible; }
+.site-header .primary-nav { width: auto; display: flex; grid-template-columns: none; }
+.header-actions { width: auto; margin-left: auto; display: flex; grid-template-columns: none; align-items: center; }
+.section--catalog, .workspace-view, .emulators-page.container, .profile-header, .profile-main { margin-inline: auto; }
+.utilities-page { width: min(100% - 32px, var(--reading-max)); margin-inline: auto; }
+.utility-video { width: 100%; max-width: 760px; aspect-ratio: 16 / 9; }
+.wallpaper-stage, .wallpaper-overlay, #live-wallpaper-video, .live-wallpaper-video {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; max-width: none;
+}
+#live-wallpaper-video, .live-wallpaper-video { object-fit: cover; }
+.games-toolbar, .game-card, .emulator-card, .utility-card, .utility-details, .profile-title, .profile-section, .stats-grid article {
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+@supports not (height: 100dvh) {
+  .wallpaper-stage, .wallpaper-overlay, #live-wallpaper-video, .live-wallpaper-video { height: 100vh; }
+}
+
+/* Tablet is shared because it is the transition between the two layout families. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .navbar.container { width: calc(100% - 32px); }
+  .site-header .primary-nav { margin-left: 18px; gap: 2px; }
+  .site-header .primary-nav a { padding-inline: 10px; font-size: .82rem; }
+  .section--catalog, .workspace-view, .emulators-page.container, .profile-header, .profile-main { width: calc(100% - 32px); }
+  .game-card { grid-template-columns: minmax(190px, 31%) minmax(0, 1fr); }
+  .game-card__image { width: 100%; min-height: 230px; }
+  .emulator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .profile-main { grid-template-columns: minmax(250px, .8fr) minmax(0, 1.2fr); gap: 16px; }
+}

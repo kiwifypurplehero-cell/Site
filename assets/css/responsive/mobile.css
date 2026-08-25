@@ -1,0 +1,22 @@
+/* Phone-only overrides. Keep this file aligned to the single 768px breakpoint. */
+@media (max-width: 767px) {
+  :root { --header: 56px; }
+  .navbar.container { width: calc(100% - 16px); padding-inline: 0; gap: 1px; }
+  .site-header .primary-nav { min-width: 0; flex: 1; margin-left: 0; justify-content: space-evenly; gap: 0; }
+  .site-header .primary-nav a { width: auto; min-height: 38px; padding-inline: 4px; font-size: clamp(.62rem, 2.8vw, .74rem); white-space: nowrap; }
+  .gx-menu-button { flex: 0 0 34px; width: 34px !important; }
+  #main-content { padding-top: var(--header); padding-bottom: 0; }
+  .app-view { min-height: calc(100dvh - var(--header)); }
+  .section--catalog, .workspace-view { width: calc(100% - 24px); }
+  .section--catalog { padding: 28px 0; }
+  .game-card { grid-template-columns: minmax(0, 1fr); }
+  .game-card__image { width: 100%; height: 170px; min-height: 0; }
+  .games-list[data-view="list"] .game-card { grid-template-columns: 68px minmax(0, 1fr); }
+  .emulators-page.container, .profile-header, .profile-main { width: calc(100% - 24px); }
+  .emulator-grid { grid-template-columns: minmax(0, 1fr); }
+  .emulator-card { width: 100%; max-width: none; }
+  .utilities-page { width: calc(100% - 24px); }
+  .profile-main { display: block; padding: 24px 0 72px; }
+  .profile-section, .stats-grid { margin-top: 16px; }
+  .utility-card, .utility-details { padding: 18px; }
+}
