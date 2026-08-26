@@ -372,10 +372,19 @@ function createGameCover(game) {
   const cover = element('div', 'game-card__image game-cover');
   cover.setAttribute('role','img');
   cover.setAttribute('aria-label', `Capa automática de ${game.name}`);
-  const status = element('span','status',game.community?'COMUNIDADE':'OFICIAL');
   const initials = game.name.split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0]).join('').toLocaleUpperCase('pt-BR') || 'PG';
   if (game.community && isSafeHttpsUrl(game.coverUrl)) { const image=element('img','game-cover__image'); image.src=game.coverUrl; image.alt=''; image.loading='lazy'; image.decoding='async'; image.referrerPolicy='no-referrer'; cover.append(image); }
-  cover.append(status, element('span','game-cover__icon','🎮'), element('b','',initials), element('small','',game.name));
+  const declaredPlatforms = Array.isArray(game.compatibility) ? game.compatibility.map(value=>String(value).toLowerCase()) : [];
+  const platforms = element('div','game-cover__platforms');
+  platforms.setAttribute('aria-label', declaredPlatforms.length ? 'Compatibilidade de plataforma' : 'Compatibilidade de plataforma ainda não informada');
+  [['desktop','▣','PC'],['mobile','▯','Celular']].forEach(([id,icon,label])=>{
+    const supported = declaredPlatforms.includes(id);
+    const indicator = element('span','platform-indicator',`${icon} ${label}`);
+    indicator.dataset.platform=id;
+    indicator.dataset.supported=declaredPlatforms.length ? String(supported) : 'unknown';
+    platforms.append(indicator);
+  });
+  cover.append(platforms, element('b','',initials), element('small','',game.name));
   return cover;
 }
 
