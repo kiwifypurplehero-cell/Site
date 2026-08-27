@@ -89,13 +89,13 @@ function authLimited(request,kind){const key=`auth:${kind}:${request.headers.get
 function usernameData(value){if(typeof value!=='string')return null;const username=value.trim().normalize('NFC');if(username.length<3||username.length>24||!/^[\p{L}\p{N}_-]+$/u.test(username))return null;return username;}
 async function requireAuth(request,env){
   const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;const tokenHash=await sha256(token),now=new Date().toISOString();
-  const user=await env.DB.prepare('SELECT u.id,u.username,u.display_name,u.avatar,u.bio,u.is_public,u.role,u.last_active_at,u.avatar_updated_at,u.show_online_status,u.show_current_game,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
+  const user=await env.DB.prepare('SELECT u.id,u.username,u.display_name,u.avatar,u.bio,u.about,u.is_public,u.role,u.last_active_at,u.avatar_updated_at,u.show_online_status,u.show_current_game,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash,now).first();
   if(!user)return null;
   const oneDayAgo=Date.now()-86_400_000;
   if(!user.last_active_at||Date.parse(user.last_active_at)<oneDayAgo){try{await env.DB.prepare('UPDATE users SET last_active_at=? WHERE id=? AND (last_active_at IS NULL OR last_active_at<?)').bind(now,user.id,new Date(oneDayAgo).toISOString()).run();}catch{/* A failed activity touch must not invalidate an otherwise valid session. */}}
   return {...user,tokenHash};
 }
-const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:['mago','hacker','jogador','gamer'].includes(user.avatar)?user.avatar:'gamer',bio:user.bio||'',isPublic:user.is_public!==0,role:user.role||'user',avatarUpdatedAt:user.avatar_updated_at||null,showOnlineStatus:user.show_online_status!==0,showCurrentGame:user.show_current_game!==0});
+const publicUser=user=>({id:user.id,username:user.username,displayName:user.display_name||user.username,avatar:['mago','hacker','jogador','gamer'].includes(user.avatar)?user.avatar:'gamer',bio:user.bio||'',about:user.about||'',isPublic:user.is_public!==0,role:user.role||'user',avatarUpdatedAt:user.avatar_updated_at||null,showOnlineStatus:user.show_online_status!==0,showCurrentGame:user.show_current_game!==0});
 async function preferences(env,userId){const row=await env.DB.prepare('SELECT theme,wallpaper,animations,view_mode,reduce_motion FROM user_preferences WHERE user_id=?').bind(userId).first();return {theme:row?.theme||'default',libraryView:row?.view_mode||'detailed',liveWallpaper:row?.wallpaper||'none',animations:row?.animations!==0,reduceMotion:row?.reduce_motion===1};}
 function sessionCookie(token,maxAge=SESSION_SECONDS){return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
 const createSessionToken=()=>bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
@@ -142,14 +142,14 @@ async function authApi(request,env,path){
       if(typeof payload.password!=='string'||payload.password.length<8||payload.password.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);
       stage='username check';const existing=await env.DB.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(existing)return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);authLog('username checked');
       stage='password hash';const hash=await hashPassword(payload.password);authLog('password hash stored');
-      stage='user insert';let inserted;try{inserted=await env.DB.prepare("INSERT INTO users(username,email,password_hash,display_name,last_active_at) VALUES(?,NULL,?,?,datetime('now')) RETURNING id,username,display_name,avatar,bio,is_public,role").bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
+      stage='user insert';let inserted;try{inserted=await env.DB.prepare("INSERT INTO users(username,email,password_hash,display_name,last_active_at) VALUES(?,NULL,?,?,datetime('now')) RETURNING id,username,display_name,avatar,bio,about,is_public,role").bind(username,hash,username).first();}catch(error){if(/UNIQUE/i.test(String(error)))return json({error:'Esse nome de usuário já está em uso.',code:'USERNAME_TAKEN'},409);throw error;}authLog('user inserted');
       stage='preferences insert';await env.DB.prepare("INSERT OR IGNORE INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,'default','none',1,'detailed',0,?)").bind(inserted.id,new Date().toISOString()).run();
       stage='session create';const token=await createSession(env,inserted.id);authLog('session created');authLog('success');return json({user:publicUser(inserted),preferences:await preferences(env,inserted.id)},201,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/login'){
       if(authLimited(request,'login'))return json({error:'Muitas tentativas. Aguarde alguns minutos.'},429,{'Retry-After':'900'});
       const username=usernameData(payload.username);const invalid=()=>json({error:'Usuário ou senha inválidos.',code:'INVALID_CREDENTIALS'},401);if(!username||typeof payload.password!=='string')return invalid();
-      const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await verifyPassword(payload.password,user.password_hash))return invalid();
+      const user=await env.DB.prepare('SELECT id,username,password_hash,display_name,avatar,bio,about,is_public,role FROM users WHERE username=? COLLATE NOCASE').bind(username).first();if(!user||!await verifyPassword(payload.password,user.password_hash))return invalid();
       const token=await createSession(env,user.id);try{await env.DB.prepare("UPDATE users SET last_active_at=datetime('now') WHERE id=?").bind(user.id).run();}catch{/* Migration rollout compatibility; successful auth remains available. */}return json({user:publicUser(user),preferences:await preferences(env,user.id)},200,{'Set-Cookie':sessionCookie(token)});
     }
     if(path==='/api/auth/change-password'){const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);if(typeof payload.newPassword!=='string'||payload.newPassword.length<8||payload.newPassword.length>128)return json({error:'A senha precisa ter pelo menos 8 caracteres.',code:'PASSWORD_TOO_SHORT'},400);const stored=await env.DB.prepare('SELECT password_hash FROM users WHERE id=?').bind(user.id).first();if(!stored||!await verifyPassword(payload.currentPassword||'',stored.password_hash))return json({error:'Senha atual incorreta.',code:'INVALID_CURRENT_PASSWORD'},401);const hash=await hashPassword(payload.newPassword);authLog('password hash stored');await env.DB.batch([env.DB.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").bind(hash,user.id),env.DB.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').bind(user.id,user.tokenHash)]);return json({ok:true});}
@@ -177,7 +177,7 @@ async function profileApi(request,env,path){
   if(!env.DB)return json({error:'Perfil temporariamente indisponível.'},503);const user=await requireAuth(request,env);if(!user)return json({error:'Autenticação necessária.'},401);
   if(request.method==='GET'&&path.startsWith('/api/profile/public/')){
     const username=decodeURIComponent(path.slice('/api/profile/public/'.length));
-    const target=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at FROM users WHERE username=? COLLATE NOCASE').bind(username).first();
+    const target=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,about,is_public,role,avatar_updated_at FROM users WHERE username=? COLLATE NOCASE').bind(username).first();
     if(!target)return json({error:'Perfil não encontrado.'},404);
     const friendship=Number(target.id)===Number(user.id)?{status:'owner'}:await env.DB.prepare("SELECT status FROM friendships WHERE status='accepted' AND ((requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?))").bind(user.id,target.id,target.id,user.id).first();
     const allowed=target.is_public!==0||friendship?.status==='accepted'||friendship?.status==='owner';
@@ -191,15 +191,16 @@ async function profileApi(request,env,path){
   if(request.method==='PUT'&&path==='/api/profile'){
     if(!sameOrigin(request))return json({error:'Requisição não autorizada.'},403);
     const payload=await bodyJson(request);if(!payload)return json({error:'Dados inválidos.'},400);
-    const allowed=new Set(['displayName','avatar','bio','isPublic']);
+    const allowed=new Set(['displayName','avatar','bio','about']);
     if(Object.keys(payload).some(key=>!allowed.has(key)))return json({error:'Campo de perfil não permitido.'},400);
     const displayName=typeof payload.displayName==='string'?payload.displayName.trim():'';
     const bio=typeof payload.bio==='string'?payload.bio.trim():'';
+    const about=typeof payload.about==='string'?payload.about.trim():'';
     const avatars=['mago','hacker','jogador','gamer'];
-    if(displayName.length<1||displayName.length>40||bio.length>200||!avatars.includes(payload.avatar)||typeof payload.isPublic!=='boolean')return json({error:'Perfil inválido.'},400);
-    const update=await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,is_public=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,payload.isPublic?1:0,user.id).run();
+    if(displayName.length<1||displayName.length>40||bio.length>200||about.length>500||!avatars.includes(payload.avatar))return json({error:'Perfil inválido.'},400);
+    const update=await env.DB.prepare("UPDATE users SET display_name=?,avatar=?,bio=?,about=?,updated_at=datetime('now') WHERE id=?").bind(displayName,payload.avatar,bio,about,user.id).run();
     if(Number(update?.meta?.changes||0)!==1)return json({error:'Não foi possível salvar o perfil.'},500);
-    const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();
+    const updated=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,about,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();
     return json({user:publicUser(updated)});
   }
   if(request.method==='PUT'&&path==='/api/profile/preferences'){
@@ -208,7 +209,7 @@ async function profileApi(request,env,path){
     if(!['detailed','list','icons'].includes(view)||typeof wallpaper!=='string'||wallpaper.length>60)return json({error:'Preferência inválida.'},400);
     await env.DB.prepare('INSERT INTO user_preferences(user_id,theme,wallpaper,animations,view_mode,reduce_motion,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme=excluded.theme,wallpaper=excluded.wallpaper,animations=excluded.animations,view_mode=excluded.view_mode,reduce_motion=excluded.reduce_motion,updated_at=excluded.updated_at').bind(user.id,payload.theme??current.theme,wallpaper,(payload.animations??current.animations)?1:0,view,(payload.reduceMotion??current.reduceMotion)?1:0,new Date().toISOString()).run();return json({preferences:{...current,theme:payload.theme??current.theme,libraryView:view,liveWallpaper:wallpaper,animations:payload.animations??current.animations,reduceMotion:payload.reduceMotion??current.reduceMotion}});
   }
-  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats')){const current=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();if(!current)return json({error:'Perfil não encontrado.'},404);const response=await playerApi(request,env,'/api/player/stats');if(!response.ok)return response;const data=await response.json();await evaluateTrophies(env,user.id);return json({...data,user:publicUser(current),preferences:await preferences(env,user.id),trophies:await trophyRows(env,user.id),trophyRegistry:TROPHIES});}
+  if(request.method==='GET'&&(path==='/api/profile'||path==='/api/profile/stats')){const current=await env.DB.prepare('SELECT id,username,display_name,avatar,bio,about,is_public,role,avatar_updated_at,show_online_status,show_current_game FROM users WHERE id=?').bind(user.id).first();if(!current)return json({error:'Perfil não encontrado.'},404);const response=await playerApi(request,env,'/api/player/stats');if(!response.ok)return response;const data=await response.json();await evaluateTrophies(env,user.id);return json({...data,user:publicUser(current),preferences:await preferences(env,user.id),trophies:await trophyRows(env,user.id),trophyRegistry:TROPHIES});}
   return json({error:'Endpoint não encontrado.'},404);
 }
 function validGame(game){return game&&GAME_ID_RE.test(game.gameId)&&typeof game.title==='string'&&game.title.trim().length<=120&&typeof game.system==='string'&&game.system.trim().length<=40&&['git','web','emulator'].includes(game.source)&&typeof game.sourceKey==='string'&&game.sourceKey.length<=160&&(!game.cover||typeof game.cover==='string'&&game.cover.length<=500);}
