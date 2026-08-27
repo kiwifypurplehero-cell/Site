@@ -379,12 +379,15 @@ function createGameCover(game) {
   platforms.setAttribute('aria-label', declaredPlatforms.length ? 'Compatibilidade de plataforma' : 'Compatibilidade de plataforma ainda não informada');
   [['desktop','▣','PC'],['mobile','▯','Celular']].forEach(([id,icon,label])=>{
     const supported = declaredPlatforms.includes(id);
+    if (declaredPlatforms.length && !supported) return;
     const indicator = element('span','platform-indicator',`${icon} ${label}`);
     indicator.dataset.platform=id;
     indicator.dataset.supported=declaredPlatforms.length ? String(supported) : 'unknown';
     platforms.append(indicator);
   });
-  cover.append(platforms, element('b','',initials), element('small','',game.name));
+  const identity = element('div','game-cover__identity');
+  identity.append(element('b','game-cover__monogram',initials), element('small','game-cover__title',game.name));
+  cover.append(platforms, identity);
   return cover;
 }
 
@@ -410,7 +413,7 @@ function createGameCard(game) {
   card.dataset.repositoryId=game.id;
   card.dataset.gameId=`git:web:${String(game.rawName||game.id).toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-|-$/g,'')}`;
   const body=element('div','game-card__body');
-  body.append(element('p','card-kicker',`${game.community?'COMUNIDADE':'OFICIAL'} • ${game.language} • ${game.status}`), element('h3','',game.name));
+  body.append(element('p','card-kicker',`${game.community?'COMUNIDADE • ':''}${game.language} • ${game.status}`), element('h3','',game.name));
   if(game.community)body.append(element('p','community-creator',`Por: ${game.creator}`));
   body.append(element('p','',game.description));
   const details=element('dl','game-details');
