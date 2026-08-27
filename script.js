@@ -108,6 +108,13 @@ const wallpaperManager = {
   reduced(){ return preferences.reduceMotion || preferences.economy || matchMedia('(prefers-reduced-motion: reduce)').matches; }
 };
 
+function syncWallpaperState(hasLiveWallpaper = Boolean(wallpaperManager.active)) {
+  document.documentElement.classList.toggle('has-live-wallpaper', hasLiveWallpaper);
+  document.documentElement.classList.toggle('no-live-wallpaper', !hasLiveWallpaper);
+}
+
+syncWallpaperState(false);
+
 function createWallpaperVideo(item) {
   const video=document.createElement('video');
   video.className='live-wallpaper-video'; video.autoplay=true; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata';
@@ -145,7 +152,7 @@ async function applyWallpaper(item, restoring=false) {
   const token=++wallpaperManager.request;
   destroyVideo(wallpaperManager.pending); wallpaperManager.pending=null;
   if(!item.url||wallpaperManager.reduced()) {
-    destroyWallpaper(); preferences.wallpaper=item.id; save(); applyColors(activeColors()); renderWallpapers();
+    destroyWallpaper(); syncWallpaperState(false); preferences.wallpaper=item.id; save(); applyColors(activeColors()); renderWallpapers();
     setStatus(item.url?'Movimento reduzido ou modo desempenho ativo: usando fundo estático.':'Wallpaper sem animação ativo.'); return;
   }
   setStatus('Carregando wallpaper…');
@@ -153,7 +160,7 @@ async function applyWallpaper(item, restoring=false) {
     const next=await loadWallpaper(item); if(token!==wallpaperManager.request){destroyVideo(next);return;}
     wallpaperManager.pending=next; $('#wallpaper-stage').append(next); await next.play();
     const applied=await transitionWallpaper(next,wallpaperManager.active,token); if(!applied)return;
-    preferences.wallpaper=item.id; save(); applyColors(activeColors()); renderWallpapers(); setStatus(`${item.name} ativo.`);
+    syncWallpaperState(true); preferences.wallpaper=item.id; save(); applyColors(activeColors()); renderWallpapers(); setStatus(`${item.name} ativo.`);
   } catch {
     destroyVideo(wallpaperManager.pending); wallpaperManager.pending=null;
     setStatus('Não foi possível carregar o wallpaper. O anterior foi mantido.',true);
@@ -384,7 +391,7 @@ function createGameCover(game) {
     indicator.dataset.supported=declaredPlatforms.length ? String(supported) : 'unknown';
     platforms.append(indicator);
   });
-  cover.append(platforms, element('b','',initials), element('small','',game.name));
+  cover.append(platforms, element('b','game-monogram',initials), element('small','',game.name));
   return cover;
 }
 
@@ -427,7 +434,19 @@ function createGameCard(game) {
   if (download) actions.append(download); if (github) actions.append(github);
   const detailsButton=element('button','button button--small button--ghost','Mais detalhes');
   detailsButton.type='button'; detailsButton.addEventListener('click',()=>openGameDetails(game)); actions.append(detailsButton);
-  body.append(actions); card.append(createGameCover(game),body); return card;
+  body.append(actions); card.append(createGameCover(game),body);
+  card.addEventListener('pointermove', event => {
+    if (motionPreference.matches) return;
+    const bounds=card.getBoundingClientRect();
+    const x=((event.clientX-bounds.left)/bounds.width-.5).toFixed(3);
+    const y=((event.clientY-bounds.top)/bounds.height-.5).toFixed(3);
+    card.style.setProperty('--star-x',x); card.style.setProperty('--star-y',y);
+  }, { passive:true });
+  const resetStars=()=>{card.style.setProperty('--star-x',0);card.style.setProperty('--star-y',0);};
+  card.addEventListener('pointerleave',resetStars,{passive:true});
+  card.addEventListener('pointercancel',resetStars,{passive:true});
+  card.addEventListener('pointerup',resetStars,{passive:true});
+  return card;
 }
 
 function setGamesMessage(message, error = false) {
