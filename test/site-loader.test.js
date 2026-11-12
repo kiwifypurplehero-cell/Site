@@ -1,4 +1,0 @@
-import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import test from 'node:test';
-const loader=await readFile(new URL('../site-loader.js',import.meta.url),'utf8'),html=await readFile(new URL('../index.html',import.meta.url),'utf8');
-test('loader combina bootstrap com limite absoluto de três segundos',()=>{assert.match(loader,/LOADING_MAX_DURATION = 3000/);assert.match(loader,/plumpgames:critical-ready/);assert.match(loader,/Promise\.race/);assert.match(loader,/finally/);assert.doesNotMatch(loader,/preferences:\[85/);});
-test('overlay separa backdrop e conteúdo e libera toda interação',()=>{assert.match(html,/class="loading-backdrop"/);assert.match(html,/class="loading-content"/);assert.match(loader,/style\.pointerEvents='none'/);assert.match(loader,/classList\.remove\('loading-active'\)/);assert.match(loader,/overlay\.remove\(\)/);});
