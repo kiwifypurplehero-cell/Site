@@ -26,9 +26,6 @@
     <script type="application/ld+json">
       {"@context":"https://schema.org","@type":"WebSite","name":"PlumpGames","url":"https://site.kiwifypurplehero.workers.dev/","description":"Jogos gratuitos e projetos independentes de Matheus Plump.","inLanguage":"pt-BR","author":{"@type":"Person","name":"Matheus Plump"}}
     </script>
-    <style>
-      html.loading-active,body.loading-active{overflow:hidden;touch-action:none}#site-loader{position:fixed;inset:0;width:100%;height:100dvh;z-index:2147483647;display:grid;place-items:center;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));color:#f5f6ff;font-family:Inter,ui-sans-serif,system-ui,sans-serif;isolation:isolate;box-sizing:border-box;transition:opacity .2s ease}#site-loader.is-complete{opacity:0;pointer-events:none}.loading-backdrop{position:absolute;inset:0;z-index:0;background:rgba(5,5,15,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}.loading-content{position:relative;z-index:1;width:min(390px,88vw);max-height:calc(100dvh - 40px);text-align:center;opacity:1;visibility:visible;transform:none;pointer-events:none}.site-loader__name{margin:0 0 22px;font-size:clamp(1.65rem,7vw,2.35rem);text-shadow:0 2px 18px #05050f}.site-loader__track{height:9px;overflow:hidden;border:1px solid #ffffff2b;border-radius:999px;background:#080919;box-shadow:0 5px 20px #0005}.site-loader__bar{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8b5cf6,#38d9f5);transition:width .12s linear}.site-loader__percent{display:block;margin-top:12px;font-size:1.15rem;font-variant-numeric:tabular-nums}.site-loader__message{margin:8px 0 0;color:#e2e4f4;font-size:.92rem}@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){.loading-backdrop{background:#080817}}@media(prefers-reduced-motion:reduce){#site-loader,.site-loader__bar{transition:none}}
-    </style>
     <link rel="stylesheet" href="style.css" data-critical-style>
     <link rel="stylesheet" href="/assets/css/responsive/shared.css">
     <link rel="stylesheet" href="/assets/css/responsive/mobile.css">
@@ -134,7 +131,6 @@
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="accent-content">Cor personalizada do site <span>+</span></button><div id="accent-content" class="gx-accordion__content" hidden><div class="accent-options"><button type="button" data-simple-accent="#8b5cf6">Roxo padrão</button><button type="button" data-simple-accent="#3b82f6">Azul</button><button type="button" data-simple-accent="#ef4444">Vermelho</button><button type="button" data-simple-accent="#22c55e">Verde</button></div><label>Outra cor <input id="simple-accent" type="color" value="#8b5cf6"></label></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="account-content">Conta <span>+</span></button><div id="account-content" class="gx-accordion__content" hidden><div id="simple-account"></div></div></section>
         <section class="gx-accordion"><button class="gx-accordion__button" aria-expanded="false" aria-controls="about-content">Sobre / Créditos <span>+</span></button><div id="about-content" class="gx-accordion__content" hidden><p>PlumpGames é um projeto de Matheus (Plump), desenvolvido com ajuda do Codex.</p></div></section>
-        <div class="legacy-controls" hidden aria-hidden="true"><button id="refresh-games"></button><button id="open-add-game"></button><button id="show-community-games"></button><button id="plump-assistant-button"></button><select id="theme-select"><option value="original">Original</option><option value="custom">Personalizado</option></select><input id="wallpaper-colors" type="checkbox"><input id="menu-opacity" value=".88"><input id="economy-mode" type="checkbox"><input id="glow-strength" value="0"><input id="card-opacity" value="1"><input id="animation-strength" value="0"><input id="color-primary" type="color"><input id="color-secondary" type="color"><input id="color-accent" type="color"><input id="color-menu" type="color"><input id="color-button" type="color"><input id="color-glow" type="color"><button id="apply-theme"></button><button id="reset-theme"></button><div id="performance-suggestion"></div><div id="future-content"></div></div>
       </div>
     </aside>
     <div class="community-dialog" id="community-dialog" role="dialog" aria-modal="true" aria-labelledby="community-dialog-title" hidden>
@@ -167,8 +163,10 @@
     <script type="module" src="site-loader.js"></script>
     <script type="module" src="performance-debug.js"></script>
     <script type="module" src="auth.js"></script>
+    <script type="module" src="play-utils.js"></script>
     <script type="module" src="utilities.js"></script>
     <script type="module" src="app-router.js"></script>
     <script type="module" src="workspace.js"></script>
+    <script type="module" src="modules/index.js"></script>
   </body>
 </html>

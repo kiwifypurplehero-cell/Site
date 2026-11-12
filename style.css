@@ -15,6 +15,20 @@ body::before { content:""; position:fixed; inset:0; z-index:-3; background:radia
 .ambient-glow--one { background:var(--purple); top:15%; left:-180px; }
 .ambient-glow--two { background:var(--cyan); right:-190px; bottom:10%; animation-delay:-5s; }
 
+/* Site Loader (critical, inline-worthy) */
+html.loading-active,body.loading-active{overflow:hidden;touch-action:none}
+#site-loader{position:fixed;inset:0;width:100%;height:100dvh;z-index:2147483647;display:grid;place-items:center;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));color:#f5f6ff;font-family:Inter,ui-sans-serif,system-ui,sans-serif;isolation:isolate;box-sizing:border-box;transition:opacity .2s ease}
+#site-loader.is-complete{opacity:0;pointer-events:none}
+.loading-backdrop{position:absolute;inset:0;z-index:0;background:rgba(5,5,15,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.loading-content{position:relative;z-index:1;width:min(390px,88vw);max-height:calc(100dvh - 40px);text-align:center;opacity:1;visibility:visible;transform:none;pointer-events:none}
+.site-loader__name{margin:0 0 22px;font-size:clamp(1.65rem,7vw,2.35rem);text-shadow:0 2px 18px #05050f}
+.site-loader__track{height:9px;overflow:hidden;border:1px solid #ffffff2b;border-radius:999px;background:#080919;box-shadow:0 5px 20px #0005}
+.site-loader__bar{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8b5cf6,#38d9f5);transition:width .12s linear}
+.site-loader__percent{display:block;margin-top:12px;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.site-loader__message{margin:8px 0 0;color:#e2e4f4;font-size:.92rem}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){.loading-backdrop{background:#080817}}
+@media(prefers-reduced-motion:reduce){#site-loader,.site-loader__bar{transition:none}}
+
 /* Navegação */
 .site-header { height:var(--header); position:fixed; inset:0 0 auto; z-index:20; background:rgba(5,6,17,.67); border-bottom:1px solid transparent; backdrop-filter:blur(18px); transition:.3s; }
 .site-header.scrolled { border-color:var(--border); box-shadow:0 12px 35px rgba(0,0,0,.22); }

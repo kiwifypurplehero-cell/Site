@@ -27,7 +27,7 @@ function loadApp(user){
   window.plumpUser=user;
   const temporary=new Map();
   window.PlumpStorage=user.isGuest?{getItem:key=>temporary.has(key)?temporary.get(key):null,setItem:(key,value)=>temporary.set(key,String(value)),removeItem:key=>temporary.delete(key)}:localStorage;
-  for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js',''],['script.js','']]){
+  for(const [src,type] of [['play-utils.js',''],['components/library/game-library-view.js','']]){
     const script=document.createElement('script');script.src=src;if(type)script.type=type;document.head.append(script);
   }
   const loadSecondary=()=>{

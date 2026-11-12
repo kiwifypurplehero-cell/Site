@@ -1,22 +1,18 @@
-'use strict';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const test = require('node:test');
-const {
-  FIXED_RESOLUTIONS,
-  buildPlayPageUrl,
-  fitResolution,
-  getGamePlayUrl,
-  parseResolution,
-  validCustomResolution
-} = require('../play-utils.js');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const playUtils = await import('../play-utils.js');
+const mod = playUtils.default || playUtils;
+const { FIXED_RESOLUTIONS, buildPlayPageUrl, fitResolution, getGamePlayUrl, parseResolution, validCustomResolution } = mod;
 
 test('resolve os jogos conhecidos somente no GitHub Pages autorizado', () => {
-  assert.equal(getGamePlayUrl({ repo:'FNF' }), 'https://kiwifypurplehero-cell.github.io/FNF/');
-  assert.equal(getGamePlayUrl({ repo:'CS1-6HTML' }), 'https://kiwifypurplehero-cell.github.io/CS1-6HTML/');
-  assert.equal(getGamePlayUrl({ repo:'Novo-Jogo' }), 'https://kiwifypurplehero-cell.github.io/Novo-Jogo/');
+  assert.equal(getGamePlayUrl({ repo: 'FNF' }), 'https://kiwifypurplehero-cell.github.io/FNF/');
+  assert.equal(getGamePlayUrl({ repo: 'CS1-6HTML' }), 'https://kiwifypurplehero-cell.github.io/CS1-6HTML/');
+  assert.equal(getGamePlayUrl({ repo: 'Novo-Jogo' }), 'https://kiwifypurplehero-cell.github.io/Novo-Jogo/');
 });
 
 test('rejeita tentativas de injetar URL, host, caminho ou protocolo', () => {
@@ -28,7 +24,7 @@ test('rejeita tentativas de injetar URL, host, caminho ou protocolo', () => {
 
 test('cria URL absoluta da página dedicada com parâmetros codificados', () => {
   const result = new URL(buildPlayPageUrl(
-    { rawName:'FNF', name:'Friday Night Funkin & amigos' },
+    { rawName: 'FNF', name: 'Friday Night Funkin & amigos' },
     'https://site.kiwifypurplehero.workers.dev/catalogo/'
   ));
   assert.equal(result.origin, 'https://site.kiwifypurplehero.workers.dev');
@@ -72,16 +68,16 @@ test('valida resolução personalizada e bloqueia valores absurdos', () => {
   assert.equal(validCustomResolution(Infinity, 720), false);
 });
 
-test('a implementação ativa não contém launcher ou controle virtual legado', () => {
+test('a implementação ativa não contém launcher ou controle virtual legado', async () => {
   const root = path.join(__dirname, '..');
-  const activeFiles = ['index.html', 'script.js', 'style.css', 'play.html', 'play.js', 'play.css'];
-  const source = activeFiles.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
+  const activeFiles = ['index.html', 'style.css', 'play.html', 'play.js', 'play.css', 'modules/index.js', 'modules/ui/ui.js', 'modules/games/games.js', 'modules/preferences/preferences.js', 'modules/preferences/wallpaper-manager.js', 'modules/assistant/assistant.js', 'modules/community/community.js'];
+  const source = (await Promise.all(activeFiles.map(file => readFile(path.join(root, file), 'utf8')))).join('\n');
   assert.doesNotMatch(source, /game-launcher|virtual-gamepad|gamepad-button|launcher-popover|iframe-interaction-overlay/i);
   assert.doesNotMatch(source, /dispatchVirtualKey|VIRTUAL_GAMEPAD_MAPPING|openGameLauncher|closeGameLauncher/i);
 });
 
-test('a barra dedicada contém somente a engrenagem e o menu completo', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'play.html'), 'utf8');
+test('a barra dedicada contém somente a engrenagem e o menu completo', async () => {
+  const html = await readFile(path.join(__dirname, '..', 'play.html'), 'utf8');
   const toolbar = html.match(/<header class="play-toolbar">([\s\S]*?)<\/header>/)?.[1] || '';
   const ids = [...toolbar.matchAll(/<button id="([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(ids, ['game-settings-button']);
@@ -96,10 +92,12 @@ test('a barra dedicada contém somente a engrenagem e o menu completo', () => {
   assert.match(html, /Abrir jogo diretamente/);
 });
 
-test('LDT mobile persiste controles relativos, editáveis e multitouch', () => {
-  const script = fs.readFileSync(path.join(__dirname, '..', 'play.js'), 'utf8');
-  const html = fs.readFileSync(path.join(__dirname, '..', 'play.html'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'play.css'), 'utf8');
+test('LDT mobile persiste controles relativos, editáveis e multitouch', async () => {
+  const [script, html, css] = await Promise.all([
+    readFile(path.join(__dirname, '..', 'play.js'), 'utf8'),
+    readFile(path.join(__dirname, '..', 'play.html'), 'utf8'),
+    readFile(path.join(__dirname, '..', 'play.css'), 'utf8')
+  ]);
   assert.match(script, /plumpgamesLoadouts/);
   assert.match(script, /xPercent/);
   assert.match(script, /yPercent/);
@@ -130,8 +128,8 @@ test('LDT mobile persiste controles relativos, editáveis e multitouch', () => {
   for (const button of ['△', '○', '×', '□', 'L1', 'R1', 'L2', 'R2', 'L3', 'R3', 'Options', 'Create']) assert.match(script, new RegExp(button));
 });
 
-test('bridge valida a origem oficial e gerencia teclas presas', () => {
-  const bridge = fs.readFileSync(path.join(__dirname, '..', 'plumpgames-input-bridge.js'), 'utf8');
+test('bridge valida a origem oficial e gerencia teclas presas', async () => {
+  const bridge = await readFile(path.join(__dirname, '..', 'plumpgames-input-bridge.js'), 'utf8');
   assert.match(bridge, /https:\/\/site\.kiwifypurplehero\.workers\.dev/);
   assert.match(bridge, /plumpgames-input-ready/);
   assert.match(bridge, /new KeyboardEvent/);

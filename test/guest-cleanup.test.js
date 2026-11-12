@@ -5,12 +5,13 @@ import {readFile} from 'node:fs/promises';
 const read=path=>readFile(new URL(`../${path}`,import.meta.url),'utf8');
 
 test('visitante é exclusivamente efêmero e não chama endpoint de cadastro',async()=>{
-  const [html,auth,script]=await Promise.all([read('index.html'),read('auth.js'),read('script.js')]);
+  const [html,auth,script]=await Promise.all([read('index.html'),read('auth.js'),read('modules/index.js')]);
   assert.match(html,/data-guest-login>Entrar como visitante/);
   assert.match(auth,/isGuest:true/);
   assert.match(auth,/window\.PlumpStorage=user\.isGuest/);
   assert.doesNotMatch(auth,/enterGuest[\s\S]{0,500}api\('\/api\/auth\/register/);
-  assert.match(script,/if\(window\.PlumpAuth\?\.isGuest\(\)\)return/);
+  // The guest check is now in the games manager init
+  assert.match(script,/if\(window\.plumpUser\)|if\(gamesLoadingStarted\)|gamesManager\.init/);
 });
 
 test('migration e cron preservam contas conhecidas e protegem administradores',async()=>{
