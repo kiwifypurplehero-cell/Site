@@ -8,7 +8,8 @@
   --accent-glow: rgba(168, 85, 247, 0.4);
   --radius: 16px;
   --transition: 200ms ease;
-  --font-sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-sans: 'Orbitron', 'Press Start 2P', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-pixel: 'Press Start 2P', cursive;
 }
 [data-theme="light"] {
   --bg: #f5f3fa;
@@ -18,6 +19,8 @@
   --accent-glow: rgba(168, 85, 247, 0.3);
 }
 
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap');
+
 /* Reset & base */
 *, *::before, *::after { box-sizing: border-box; }
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
@@ -25,7 +28,32 @@ body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: v
 
 /* Header */
 .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem clamp(1rem, 5vw, 3rem); border-bottom: 1px solid var(--card-border); }
-.logo { font-size: clamp(1.25rem, 4vw, 2rem); font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -0.02em; }
+.logo {
+  font-family: var(--font-pixel);
+  font-size: clamp(1rem, 3.5vw, 1.8rem);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong), #fff, var(--accent-strong), var(--accent));
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: logo-shine 3s ease-in-out infinite;
+  text-shadow:
+    0 0 0 transparent,
+    1px 1px 0 rgba(168,85,247,0.3),
+    2px 2px 0 rgba(168,85,247,0.2),
+    3px 3px 6px rgba(168,85,247,0.4),
+    4px 4px 12px rgba(168,85,247,0.3);
+  filter: drop-shadow(0 4px 8px rgba(168,85,247,0.3));
+}
+@keyframes logo-shine {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo { animation: none; }
+}
 #theme-toggle { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; transition: transform var(--transition), box-shadow var(--transition); color: var(--fg); }
 #theme-toggle:hover { transform: scale(1.08); box-shadow: 0 0 16px var(--accent-glow); }
 #theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
