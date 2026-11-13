@@ -26,6 +26,9 @@
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; transition: background var(--transition), color var(--transition); }
 
+/* Hidden attribute support */
+[hidden] { display: none !important; }
+
 /* Header */
 .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem clamp(1rem, 5vw, 3rem); border-bottom: 1px solid var(--card-border); }
 .logo {
