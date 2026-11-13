@@ -1,0 +1,5 @@
+[
+  { "id": "game-1", "title": "Cyberpunk 2077", "thumb": "https://via.placeholder.com/320x180/1a1a2e/a855f7?text=Cyberpunk", "url": "https://example.com/play/cyberpunk", "comingSoon": true },
+  { "id": "game-2", "title": "Elden Ring", "thumb": "https://via.placeholder.com/320x180/1a1a2e/a855f7?text=Elden+Ring", "url": "https://example.com/play/elden-ring", "comingSoon": true },
+  { "id": "game-3", "title": "Baldur's Gate 3", "thumb": "https://via.placeholder.com/320x180/1a1a2e/a855f7?text=BG3", "url": "https://example.com/play/bg3", "comingSoon": true }
+]
