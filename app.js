@@ -8,6 +8,7 @@ let GAMES = [];
 // ============ Auth & Session Management ============
 let guestTimerInterval = null;
 let lastFocused = null;
+let currentTrapElement = null;
 
 async function initAuth() {
   const session = Auth.getSession();
@@ -17,7 +18,10 @@ async function initAuth() {
     startGuestTimer();
   } else if (session.isGuest) {
     if (Auth.isGuestExpired(session)) {
-      showGuestExpiredModal();
+      // Guest expired → clear old session and start fresh
+      Auth.logout();
+      Auth.createGuestSession();
+      startGuestTimer();
     } else {
       startGuestTimer(session.guestExpiresAt);
     }
@@ -236,6 +240,16 @@ function closeSettingsPanel() {
   document.getElementById('settings-panel').hidden = true;
   document.body.style.overflow = '';
   releaseFocus();
+  // Reset delete account UI
+  const warningEl = document.getElementById('delete-warning');
+  const confirmInput = document.getElementById('delete-confirm-input');
+  const deleteBtn = document.getElementById('settings-delete-account');
+  if (warningEl) warningEl.hidden = true;
+  if (confirmInput) confirmInput.hidden = true;
+  if (deleteBtn) {
+    deleteBtn.textContent = 'Deletar Conta';
+    deleteBtn.onclick = handleDeleteAccount;
+  }
 }
 
 function populateProfileSettings(session) {
@@ -278,6 +292,13 @@ function applyAccessibilitySettings() {
     document.documentElement.style.setProperty('--transition', '200ms ease');
   }
 }
+
+// Close settings panel on backdrop click or close button
+document.getElementById('settings-panel').addEventListener('click', (e) => {
+  if (e.target.classList.contains('panel-backdrop') || e.target.classList.contains('panel-close')) {
+    closeSettingsPanel();
+  }
+});
 
 function initSettingsControls() {
   // Theme select
@@ -499,36 +520,43 @@ document.getElementById('guest-expired-modal').addEventListener('click', (e) => 
 });
 
 // ============ Delete Account Flow ============
+let deleteAccountStep = 0; // 0 = initial, 1 = waiting for username confirm, 2 = waiting for password
+
 async function handleDeleteAccount() {
   const warningEl = document.getElementById('delete-warning');
   const confirmInput = document.getElementById('delete-confirm-input');
-  const username = confirmInput.value.trim();
+  const deleteBtn = document.getElementById('settings-delete-account');
   const session = Auth.getSession();
   const profile = Auth.getProfile();
 
   if (!session || session.isGuest || !profile) return;
 
-  // Show warning and confirmation input
-  warningEl.hidden = false;
-  confirmInput.hidden = false;
-  confirmInput.focus();
+  if (deleteAccountStep === 0) {
+    // Step 1: Show warning and username confirmation
+    warningEl.hidden = false;
+    confirmInput.hidden = false;
+    confirmInput.value = '';
+    confirmInput.placeholder = 'Digite seu usuário para confirmar';
+    confirmInput.focus();
+    deleteBtn.textContent = 'Confirmar Usuário';
+    deleteAccountStep = 1;
+    return;
+  }
 
-  // Replace button with confirmation flow
-  const deleteBtn = document.getElementById('settings-delete-account');
-  deleteBtn.textContent = 'Confirmar Exclusão';
-  deleteBtn.onclick = async () => {
+  if (deleteAccountStep === 1) {
+    // Step 2: Verify username, then ask for password
+    const username = confirmInput.value.trim();
     if (username !== profile.username) {
       showToast('Nome de usuário incorreto', 'error');
       confirmInput.value = '';
       return;
     }
 
-    // Ask for password confirmation
-    const password = prompt('Digite sua senha para confirmar a exclusão permanente:');
+    // Step 3: Ask for password
+    const password = prompt('Digite sua senha para confirmar a exclusão PERMANENTE:');
     if (!password) return;
 
     try {
-      // Use emailHash from session for secure deletion
       await Auth.deleteAccountByHash(session.userEmailHash, password);
       showToast('Conta excluída permanentemente');
       closeSettingsPanel();
@@ -536,10 +564,11 @@ async function handleDeleteAccount() {
     } catch (err) {
       showToast(err.message, 'error');
     }
-  };
+  }
 }
 
 // ============ Focus Trap ============
+
 function trapFocus(element) {
   lastFocused = document.activeElement;
   const focusable = element.querySelectorAll(
@@ -565,22 +594,16 @@ function trapFocus(element) {
 
   element.addEventListener('keydown', handleTabTrap);
   element._focusTrapHandler = handleTabTrap;
+  currentTrapElement = element;
   first?.focus();
 }
 
 function releaseFocus() {
-  const panel = document.getElementById('settings-panel');
-  const searchModal = document.getElementById('search-modal');
-  const authModal = document.getElementById('auth-modal');
-  const guestModal = document.getElementById('guest-expired-modal');
-
-  [panel, searchModal, authModal, guestModal].forEach(el => {
-    if (el._focusTrapHandler) {
-      el.removeEventListener('keydown', el._focusTrapHandler);
-      el._focusTrapHandler = null;
-    }
-  });
-
+  if (currentTrapElement && currentTrapElement._focusTrapHandler) {
+    currentTrapElement.removeEventListener('keydown', currentTrapElement._focusTrapHandler);
+    currentTrapElement._focusTrapHandler = null;
+  }
+  currentTrapElement = null;
   lastFocused?.focus();
   lastFocused = null;
 }
