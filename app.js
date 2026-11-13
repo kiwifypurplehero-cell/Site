@@ -17,17 +17,30 @@ async function initAuth() {
     Auth.createGuestSession();
     startGuestTimer();
   } else if (session.isGuest) {
-    if (Auth.isGuestExpired(session)) {
-      // Guest expired → clear old session and start fresh
+    if (Auth.isGuestExpired(session) || !session.guestExpiresAt) {
+      // Guest expired or corrupted → clear old session and start fresh
       Auth.logout();
       Auth.createGuestSession();
       startGuestTimer();
     } else {
       startGuestTimer(session.guestExpiresAt);
     }
+  } else if (session.userEmailHash) {
+    // Logged in user - verify user still exists
+    const users = JSON.parse(localStorage.getItem('darkplp_users') || '{}');
+    if (!users[session.userEmailHash]) {
+      // User was deleted externally, clear session
+      Auth.logout();
+      Auth.createGuestSession();
+      startGuestTimer();
+    } else {
+      updateUIForUser(session);
+    }
   } else {
-    // Logged in user
-    updateUIForUser(session);
+    // Corrupted session
+    Auth.logout();
+    Auth.createGuestSession();
+    startGuestTimer();
   }
 }
 
@@ -314,14 +327,16 @@ function initSettingsControls() {
     updateToggleIcon(document.documentElement.dataset.theme);
   });
 
-  // Accent color
-  document.getElementById('setting-accent').addEventListener('input', (e) => {
-    const color = e.target.value;
+  // Accent color - use both input and change for cross-browser compatibility
+  const accentInput = document.getElementById('setting-accent');
+  function applyAccentColor(color) {
     localStorage.setItem('darkplp-accent', color);
     document.documentElement.style.setProperty('--accent', color);
     document.documentElement.style.setProperty('--accent-glow', hexToRgba(color, 0.4));
     document.documentElement.style.setProperty('--accent-strong', lightenColor(color, 20));
-  });
+  }
+  accentInput.addEventListener('input', (e) => applyAccentColor(e.target.value));
+  accentInput.addEventListener('change', (e) => applyAccentColor(e.target.value));
 
   // Reduced motion
   document.getElementById('setting-reduced-motion').addEventListener('change', (e) => {
@@ -373,6 +388,15 @@ function initSettingsControls() {
     Auth.logout();
     closeSettingsPanel();
     location.reload();
+  });
+
+  // Clear all site data (debug)
+  document.getElementById('settings-clear-data').addEventListener('click', () => {
+    if (confirm('Tem certeza? Isso apaga TUDO: conta, sessão, tema, cor, acessibilidade.')) {
+      localStorage.clear();
+      showToast('Todos os dados limpos. Recarregando...');
+      setTimeout(() => location.reload(), 500);
+    }
   });
 }
 
