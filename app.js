@@ -1,8 +1,24 @@
 // app.js
-import GAMES from './data/games.json' assert { type: 'json' };
-
 const grid = document.getElementById('games-grid');
 const toggle = document.getElementById('theme-toggle');
+let GAMES = [];
+
+async function loadGames() {
+  try {
+    const res = await fetch('./data/games.json');
+    if (!res.ok) throw new Error('Failed to load games');
+    GAMES = await res.json();
+    renderGames();
+  } catch (err) {
+    console.error('Error loading games:', err);
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--fg);">
+        <p>Erro ao carregar jogos. Tente recarregar a página.</p>
+        <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer;">Recarregar</button>
+      </div>
+    `;
+  }
+}
 
 function renderGames() {
   grid.innerHTML = GAMES.map(game => `
@@ -57,5 +73,5 @@ window.addEventListener('storage', e => {
 
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
-  renderGames();
+  loadGames();
 });
