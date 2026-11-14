@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="heroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#2d2d4a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b0764;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="heroAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#c084fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e9d5ff;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:0.15" />
+      <stop offset="70%" style="stop-color:#7e22ce;stop-opacity:0.05" />
+      <stop offset="100%" style="stop-color:#3b0764;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#heroGrad)"/>
+  <!-- Glow center -->
+  <ellipse cx="960" cy="540" rx="600" ry="300" fill="url(#glowGrad)"/>
+  <!-- Grid pattern -->
+  <g opacity="0.03" stroke="url(#heroAccent)" stroke-width="1">
+    <defs>
+      <pattern id="grid" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="80" y2="0"/>
+        <line x1="0" y1="0" x2="0" y2="80"/>
+      </pattern>
+    </defs>
+    <rect width="1920" height="1080" fill="url(#grid)"/>
+  </g>
+  <!-- Decorative X shapes -->
+  <g transform="translate(960, 540)" opacity="0.15">
+    <g filter="url(#glow)">
+      <path d="M-120 -120 L120 120 M120 -120 L-120 120" stroke="url(#heroAccent)" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="16" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+  </g>
+  <!-- Corner accents -->
+  <g stroke="url(#heroAccent)" stroke-width="2" fill="none" opacity="0.2">
+    <path d="M60 60 L60 140 M60 60 L140 60"/>
+    <path d="M1860 60 L1860 140 M1860 60 L1780 60"/>
+    <path d="M60 1020 L60 940 M60 1020 L140 1020"/>
+    <path d="M1860 1020 L1860 940 M1860 1020 L1780 1020"/>
+  </g>
+  <!-- Center title area -->
+  <g transform="translate(960, 540)" text-anchor="middle">
+    <text x="0" y="-20" font-family="system-ui, sans-serif" font-size="48" font-weight="700" fill="url(#heroAccent)" opacity="0.4">GAME TITLE</text>
+    <text x="0" y="40" font-family="system-ui, sans-serif" font-size="24" fill="#7a7a9a" opacity="0.4">Hero Placeholder Image</text>
+  </g>
+</svg>

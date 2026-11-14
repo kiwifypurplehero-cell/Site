@@ -1,0 +1,198 @@
+/* ==========================================================================
+   RESET & BASE STYLES — Modern Normalize
+   ========================================================================== */
+
+/* Box sizing inheritance */
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+html {
+  box-sizing: border-box;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
+}
+
+/* Remove default margin */
+body, h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd, ul, ol, pre, form, fieldset, legend, textarea, input, select, button, table, th, td {
+  margin: 0;
+  padding: 0;
+}
+
+/* Body base */
+body {
+  min-height: 100vh;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Images */
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+
+/* Form elements */
+input, button, select, textarea, optgroup {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button, [role="button"] {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+input, select, textarea {
+  background: none;
+  border: none;
+  outline: none;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+/* Remove list styles on ul, ol elements with a list role */
+ul[role="list"], ol[role="list"] {
+  list-style: none;
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+th, td {
+  text-align: left;
+  vertical-align: top;
+}
+
+/* Details/Summary */
+details {
+  cursor: pointer;
+}
+
+summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Dialog */
+dialog {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: var(--color-overlay);
+  backdrop-filter: blur(4px);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-purple-500);
+  color: var(--color-text-inverse);
+}
+
+/* Focus visible baseline */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Hidden attribute */
+[hidden] {
+  display: none !important;
+}
+
+/* Inert attribute */
+[inert] {
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.5;
+}
+
+/* Disable text selection on interactive elements during drag */
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+/* Print adjustments */
+@media print {
+  *, *::before, *::after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a, a:visited {
+    text-decoration: underline;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+
+  abbr[title]::after {
+    content: " (" attr(title) ")";
+  }
+
+  pre, blockquote {
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr, img {
+    page-break-inside: avoid;
+  }
+
+  img {
+    max-width: 100% !important;
+  }
+
+  @page {
+    margin: 2cm;
+  }
+
+  p, h2, h3 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+}

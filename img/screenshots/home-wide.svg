@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <text x="640" y="360" text-anchor="middle" font-family="system-ui, sans-serif" font-size="48" font-weight="700" fill="#a855f7">Xbox Purple Gaming Dashboard</text>
+  <text x="640" y="420" text-anchor="middle" font-family="system-ui, sans-serif" font-size="24" fill="#7a7a9a">Home Dashboard Preview</text>
+</svg>

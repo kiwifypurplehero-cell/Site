@@ -1,0 +1,610 @@
+/* ==========================================================================
+   THEMES & ACCESSIBILITY OVERRIDES
+   Light theme, high contrast, reduced motion, forced colors
+   ========================================================================== */
+
+/* ==========================================================================
+   LIGHT THEME
+   Activated via [data-theme="light"] on <html> or .theme-light on <body>
+   ========================================================================== */
+[data-theme="light"],
+.theme-light {
+  /* Surface Scale (Light) */
+  --color-surface-0:   #fafafa;
+  --color-surface-50:  #f5f5f5;
+  --color-surface-100: #eeeeee;
+  --color-surface-200: #e0e0e0;
+  --color-surface-300: #d0d0d0;
+  --color-surface-400: #bdbdbd;
+
+  /* Text */
+  --color-text-primary:   #1a1a2e;
+  --color-text-secondary: #4a4a6a;
+  --color-text-muted:     #7a7a9a;
+  --color-text-inverse:   #ffffff;
+
+  /* Borders */
+  --color-border:         #d0d0e0;
+  --color-border-strong:  #b0b0c8;
+  --color-border-focus:   var(--color-purple-600);
+
+  /* Glass/Overlay */
+  --color-glass:          rgba(255, 255, 255, 0.85);
+  --color-glass-border:   rgba(0, 0, 0, 0.08);
+  --color-overlay:        rgba(255, 255, 255, 0.9);
+  --color-overlay-strong: rgba(255, 255, 255, 0.98);
+
+  /* Shadows (lighter for light theme) */
+  --shadow-sm:   0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md:   0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  --shadow-lg:   0 12px 32px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl:   0 20px 48px -8px rgba(0, 0, 0, 0.12);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+
+  /* Scrollbar */
+  --scrollbar-thumb: var(--color-surface-300);
+  --scrollbar-thumb-hover: var(--color-surface-400);
+
+  /* Focus ring */
+  --focus-ring-color: var(--color-purple-600);
+}
+
+/* Light theme specific component adjustments */
+[data-theme="light"] .btn--primary,
+.theme-light .btn--primary {
+  --btn-bg: var(--color-purple-600);
+  --btn-bg-hover: var(--color-purple-700);
+  --btn-bg-active: var(--color-purple-800);
+  --btn-text: var(--color-text-inverse);
+}
+
+[data-theme="light"] .game-tile,
+.theme-light .game-tile {
+  background: var(--color-surface-50);
+  border-color: var(--color-border);
+}
+
+[data-theme="light"] .game-tile:hover,
+.theme-light .game-tile:hover {
+  background: var(--color-surface-100);
+  border-color: var(--color-purple-300);
+  box-shadow: var(--shadow-lg);
+}
+
+[data-theme="light"] .sidebar,
+.theme-light .sidebar {
+  background: var(--color-surface-50);
+  border-right: 1px solid var(--color-border);
+}
+
+[data-theme="light"] .header,
+.theme-light .header {
+  background: rgba(250, 250, 250, 0.9);
+  border-bottom: 1px solid var(--color-border);
+}
+
+[data-theme="light"] .modal__panel,
+.theme-light .modal__panel {
+  background: var(--color-surface-0);
+  border-color: var(--color-border);
+}
+
+[data-theme="light"] .dropdown__menu,
+.theme-light .dropdown__menu {
+  background: var(--color-surface-0);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xl);
+}
+
+[data-theme="light"] .tooltip,
+.theme-light .tooltip {
+  background: var(--color-surface-400);
+  color: var(--color-text-primary);
+}
+
+/* ==========================================================================
+   HIGH CONTRAST MODE (prefers-contrast: more)
+   ========================================================================== */
+@media (prefers-contrast: more) {
+  :root:not([data-theme="light"]):not(.theme-light) {
+    /* Borders become primary text color for maximum contrast */
+    --color-border: var(--color-text-primary);
+    --color-border-strong: var(--color-text-primary);
+    --color-border-focus: var(--color-accent-gold);
+
+    /* Focus ring gold for visibility */
+    --focus-ring-color: var(--color-accent-gold);
+    --focus-ring-width: 3px;
+
+    /* Remove decorative shadows */
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-glow: none;
+    --shadow-glow-strong: none;
+    --shadow-inner: none;
+
+    /* Glass becomes solid */
+    --color-glass: var(--color-surface-0);
+    --color-glass-border: var(--color-text-primary);
+
+    /* Overlay becomes opaque */
+    --color-overlay: var(--color-surface-0);
+    --color-overlay-strong: var(--color-surface-0);
+  }
+
+  /* Ensure all interactive elements have clear borders */
+  .btn,
+  .game-tile,
+  .sidebar__item,
+  .dropdown__trigger,
+  .tabs__trigger,
+  .slider__thumb,
+  .toggle__track,
+  .avatar {
+    border: 2px solid var(--color-border) !important;
+  }
+
+  .btn:focus-visible,
+  .game-tile:focus-visible,
+  .sidebar__item:focus-visible,
+  .dropdown__trigger:focus-visible,
+  .tabs__trigger:focus-visible,
+  .slider__thumb:focus-visible,
+  .toggle__track:focus-visible,
+  .avatar:focus-visible {
+    border-color: var(--color-accent-gold) !important;
+    box-shadow: 0 0 0 3px var(--color-accent-gold) !important;
+  }
+
+  /* Form elements */
+  input, select, textarea {
+    border: 2px solid var(--color-border) !important;
+    background: var(--color-surface-0) !important;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--color-accent-gold) !important;
+  }
+}
+
+/* ==========================================================================
+   FORCED COLORS MODE (Windows High Contrast)
+   ========================================================================== */
+@media (forced-colors: active) {
+  :root {
+    /* Map semantic colors to system colors */
+    --color-purple-500: CanvasText;
+    --color-purple-400: CanvasText;
+    --color-purple-600: CanvasText;
+    --color-purple-700: CanvasText;
+
+    --color-text-primary: CanvasText;
+    --color-text-secondary: CanvasText;
+    --color-text-muted: GrayText;
+    --color-text-inverse: Canvas;
+
+    --color-surface-0: Canvas;
+    --color-surface-50: Canvas;
+    --color-surface-100: Canvas;
+    --color-surface-200: Canvas;
+    --color-surface-300: Canvas;
+    --color-surface-400: Canvas;
+
+    --color-border: CanvasText;
+    --color-border-strong: CanvasText;
+    --color-border-focus: Highlight;
+
+    --color-glass: Canvas;
+    --color-glass-border: CanvasText;
+    --color-overlay: Canvas;
+    --color-overlay-strong: Canvas.
+
+    --focus-ring-color: Highlight;
+    --color-accent-gold: Highlight;
+    --color-accent-cyan: Highlight;
+    --color-accent-pink: Highlight.
+    --color-error: Highlight.
+    --color-success: Highlight.
+    --color-warning: Highlight.
+    --color-info: Highlight.
+  }
+
+  /* Ensure all backgrounds are transparent to let system colors show */
+  * {
+    background-color: transparent !important;
+    border-color: currentColor !important;
+  }
+
+  /* Preserve images and media */
+  img, video, canvas, picture {
+    opacity: 1 !important;
+    filter: none !important;
+  }
+
+  /* Focus visible in forced colors */
+  :focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Buttons */
+  .btn {
+    border: 2px solid currentColor !important;
+    background: ButtonFace !important;
+    color: ButtonText !important;
+  }
+
+  .btn:focus-visible,
+  .btn:hover {
+    background: Highlight !important;
+    color: HighlightText !important;
+    border-color: Highlight !important;
+  }
+
+  .btn--primary {
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+
+  /* Game tiles */
+  .game-tile {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  .game-tile:focus-visible,
+  .game-tile:hover {
+    border-color: Highlight !important;
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 2px solid currentColor !important;
+  }
+
+  .sidebar__item {
+    border: 2px solid transparent !important;
+  }
+
+  .sidebar__item:focus-visible,
+  .sidebar__item[aria-current="page"] {
+    border-color: Highlight !important;
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+
+  /* Modal */
+  .modal__panel {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  /* Dropdown */
+  .dropdown__menu {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  .dropdown__item:focus-visible,
+  .dropdown__item:hover {
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+
+  /* Tabs */
+  .tabs__trigger {
+    border: 2px solid transparent !important;
+    border-bottom-color: currentColor !important;
+  }
+
+  .tabs__trigger[aria-selected="true"] {
+    border-color: currentColor !important;
+    border-bottom-color: transparent !important;
+  }
+
+  .tabs__trigger:focus-visible {
+    border-color: Highlight !important;
+  }
+
+  /* Slider */
+  .slider__track {
+    background: currentColor !important;
+  }
+
+  .slider__fill {
+    background: Highlight !important;
+  }
+
+  .slider__thumb {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  .slider__thumb:focus-visible {
+    border-color: Highlight !important;
+    box-shadow: 0 0 0 3px Highlight !important;
+  }
+
+  /* Toggle */
+  .toggle__track {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  .toggle[aria-checked="true"] .toggle__track {
+    background: Highlight !important;
+    border-color: Highlight !important;
+  }
+
+  .toggle__thumb {
+    background: currentColor !important;
+    border: 2px solid currentColor !important;
+  }
+
+  /* Avatar */
+  .avatar {
+    border: 2px solid currentColor !important;
+  }
+
+  /* Badge */
+  .badge {
+    border: 1px solid currentColor !important;
+    background: Canvas !important;
+  }
+
+  /* Progress ring */
+  .progress-ring__bg {
+    stroke: currentColor !important;
+  }
+
+  .progress-ring__progress {
+    stroke: Highlight !important;
+  }
+
+  /* Skeleton */
+  .skeleton {
+    background: GrayText !important;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    background: CanvasText !important;
+    color: Canvas !important;
+    border: 2px solid currentColor !important;
+  }
+
+  /* Toast */
+  .toast {
+    border: 2px solid currentColor !important;
+    background: Canvas !important;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION (prefers-reduced-motion: reduce)
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    /* Disable all transitions */
+    --transition-instant: 0ms;
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+    --transition-slower: 0ms;
+    --transition-bounce: 0ms;
+    --transition-spring: 0ms;
+
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+  }
+
+  /* Disable all animations and transitions globally */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Specific component overrides for reduced motion */
+  .hero-carousel {
+    /* Carousel handled by JS - auto-rotate disabled */
+  }
+
+  .hero-carousel__slide {
+    transition: none !important;
+  }
+
+  .game-tile {
+    transition: none !important;
+  }
+
+  .game-tile:hover,
+  .game-tile:focus-visible {
+    transform: none !important;
+  }
+
+  .btn {
+    transition: none !important;
+  }
+
+  .btn:active {
+    transform: none !important;
+  }
+
+  .modal__backdrop,
+  .modal__panel {
+    transition: none !important;
+  }
+
+  .dropdown__menu {
+    transition: none !important;
+  }
+
+  .tabs__indicator {
+    transition: none !important;
+  }
+
+  .slider__thumb {
+    transition: none !important;
+  }
+
+  .slider__fill {
+    transition: none !important;
+  }
+
+  .toggle__thumb {
+    transition: none !important;
+  }
+
+  .avatar {
+    transition: none !important;
+  }
+
+  .badge {
+    transition: none !important;
+  }
+
+  .progress-ring__progress {
+    transition: none !important;
+  }
+
+  .shimmer::after {
+    animation: none !important;
+  }
+
+  .skeleton {
+    animation: none !important;
+  }
+
+  .tooltip {
+    transition: none !important;
+  }
+
+  .toast {
+    transition: none !important;
+  }
+
+  .search-modal__results {
+    transition: none !important;
+  }
+
+  /* Scroll behavior */
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   PRINT SPECIFIC OVERRIDES
+   ========================================================================== */
+@media print {
+  /* Hide UI chrome */
+  .header,
+  .sidebar,
+  .footer,
+  .modal,
+  .modal__backdrop,
+  .dropdown__menu,
+  .tooltip,
+  .toast,
+  .search-modal,
+  .btn--icon,
+  .avatar--editable::after {
+    display: none !important;
+  }
+
+  /* Show all content */
+  .main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .app-shell {
+    display: block !important;
+  }
+
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Game tiles - stack vertically */
+  .game-grid {
+    display: block !important;
+  }
+
+  .game-tile {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    margin-bottom: 1rem !important;
+    transform: none !important;
+  }
+
+  .hero-carousel {
+    display: none !important;
+  }
+
+  /* Links show URLs */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* Buttons as text */
+  .btn {
+    border: 1px solid #666 !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.9em !important;
+  }
+
+  /* Colors to grayscale */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ==========================================================================
+   THEME TRANSITION (smooth theme switching)
+   ========================================================================== */
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color var(--transition-base),
+              border-color var(--transition-base),
+              color var(--transition-base),
+              box-shadow var(--transition-base) !important;
+}
+
+/* ==========================================================================
+   COLOR SCHEME META (for browser UI)
+   ========================================================================== */
+:root {
+  color-scheme: dark light;
+}
+
+[data-theme="light"],
+.theme-light {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not(.theme-dark) {
+    /* Auto light theme - optional, commented out to default to dark */
+    /* --color-surface-0: #fafafa; */
+    /* --color-text-primary: #1a1a2e; */
+  }
+}

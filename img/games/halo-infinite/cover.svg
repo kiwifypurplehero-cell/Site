@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200">
+  <defs>
+    <linearGradient id="coverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2d2d4a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b0764;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c084fc;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#coverGrad)"/>
+  <rect x="0" y="0" width="320" height="200" fill="url(#pattern)" opacity="0.05"/>
+  <defs>
+    <pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="10" cy="10" r="1" fill="white"/>
+    </pattern>
+  </defs>
+  <g transform="translate(160, 100)">
+    <!-- Gamepad icon -->
+    <path d="M-35 -10 C-45 -10 -50 -5 -50 5 C-50 15 -45 20 -35 20 C-25 20 -20 15 -20 5 C-20 -5 -25 -10 -35 -10 Z" fill="url(#accentGrad)" opacity="0.8"/>
+    <path d="M35 -10 C45 -10 50 -5 50 5 C50 15 45 20 35 20 C25 20 20 15 20 5 C20 -5 25 -10 35 -10 Z" fill="url(#accentGrad)" opacity="0.8"/>
+    <path d="M-10 -30 C-10 -40 -5 -45 5 -45 C15 -45 20 -40 20 -30 C20 -20 15 -15 5 -15 C-5 -15 -10 -20 -10 -30 Z" fill="url(#accentGrad)" opacity="0.8"/>
+    <path d="M-10 10 C-10 20 -5 25 5 25 C15 25 20 20 20 10 C20 0 15 -5 5 -5 C-5 -5 -10 0 -10 10 Z" fill="url(#accentGrad)" opacity="0.8"/>
+    <!-- Center -->
+    <circle cx="0" cy="0" r="12" fill="none" stroke="url(#accentGrad)" stroke-width="3" opacity="0.6"/>
+    <circle cx="0" cy="0" r="6" fill="url(#accentGrad)" opacity="0.8"/>
+  </g>
+  <!-- Bottom gradient fade -->
+  <rect x="0" y="140" width="320" height="60" fill="url(#fadeGrad)" opacity="0.5"/>
+  <defs>
+    <linearGradient id="fadeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:transparent;stop-opacity:0" />
+      <stop offset="100%" style="stop-color:#0a0a0f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>
