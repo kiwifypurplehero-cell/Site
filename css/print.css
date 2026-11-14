@@ -1,0 +1,299 @@
+/* ==========================================================================
+   PRINT STYLESHEET
+   ========================================================================== */
+
+@media print {
+  /* Reset */
+  *, *::before, *::after {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 2cm;
+    size: auto;
+  }
+
+  body {
+    font-size: 12pt;
+    line-height: 1.5;
+    min-height: auto;
+  }
+
+  /* Hide UI chrome */
+  .header,
+  .sidebar,
+  .footer,
+  .modal,
+  .modal__backdrop,
+  .dropdown__menu,
+  .tooltip,
+  .toast,
+  .toast-container,
+  .search-modal,
+  .hero-carousel__btn,
+  .hero-carousel__indicators,
+  .btn--icon,
+  .avatar--editable::after,
+  .avatar--editable::before,
+  .sidebar__collapse-btn,
+  .header__btn--menu,
+  .header__search,
+  .header__actions,
+  .quick-resume,
+  .scroll-row,
+  .section__action {
+    display: none !important;
+  }
+
+  /* Layout adjustments */
+  .app-shell {
+    display: block !important;
+  }
+
+  .main {
+    padding: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  .container {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .page {
+    display: block !important;
+    page-break-inside: avoid;
+  }
+
+  /* Show all content sections */
+  .section {
+    page-break-inside: avoid;
+    margin-bottom: 2rem;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  p, li, blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Links - show URLs */
+  a, a:visited {
+    text-decoration: underline;
+    color: #333 !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+    font-weight: normal;
+  }
+
+  /* Buttons as text */
+  .btn {
+    display: inline-block;
+    border: 1px solid #999 !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.9em !important;
+    font-weight: normal !important;
+    background: transparent !important;
+    color: #333 !important;
+    border-radius: 4px !important;
+  }
+
+  /* Game tiles - stack vertically */
+  .grid {
+    display: block !important;
+  }
+
+  .game-tile {
+    display: flex !important;
+    flex-direction: row !important;
+    aspect-ratio: auto !important;
+    min-height: 120px !important;
+    max-height: 120px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    margin-bottom: 1rem !important;
+    transform: none !important;
+    background: #fff !important;
+  }
+
+  .game-tile__cover {
+    width: 30% !important;
+    height: 100% !important;
+    min-width: 100px !important;
+  }
+
+  .game-tile__content {
+    flex: 1;
+    padding: 0.75rem !important;
+  }
+
+  .game-tile__title {
+    font-size: 1em !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .game-tile__meta {
+    font-size: 0.75em !important;
+  }
+
+  /* Hero carousel - hide, show first slide as static image */
+  .hero-carousel {
+    display: none !important;
+  }
+
+  .hero-carousel__slide--active {
+    display: block !important;
+    position: relative !important;
+    min-height: 300px !important;
+    margin-bottom: 1.5rem !important;
+    border: 1px solid #ccc !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    page-break-inside: avoid;
+  }
+
+  .hero-carousel__image {
+    opacity: 0.3 !important;
+  }
+
+  .hero-carousel__overlay {
+    display: none !important;
+  }
+
+  .hero-carousel__content {
+    position: absolute !important;
+    bottom: 1rem !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    padding: 0 !important;
+    color: #000 !important;
+    text-shadow: none !important;
+  }
+
+  .hero-carousel__title {
+    color: #000 !important;
+    font-size: 1.5em !important;
+    text-shadow: none !important;
+  }
+
+  .hero-carousel__description {
+    color: #333 !important;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 1px solid #999;
+    padding: 0.5rem;
+    text-align: left;
+  }
+
+  th {
+    background: #f0f0f0 !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  /* Badges */
+  .badge {
+    border: 1px solid #999 !important;
+    background: transparent !important;
+    color: #333 !important;
+    padding: 0.125rem 0.5rem !important;
+    font-size: 0.75em !important;
+  }
+
+  /* Progress rings - show as text */
+  .progress-ring {
+    display: inline-block !important;
+  }
+
+  .progress-ring__svg {
+    display: none !important;
+  }
+
+  .progress-ring__label::after {
+    content: attr(data-progress) "%";
+    font-weight: bold;
+  }
+
+  /* Modals - show content inline */
+  .modal[open] {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+    border: 1px solid #999 !important;
+    padding: 1rem !important;
+    margin: 1rem 0 !important;
+    page-break-inside: avoid;
+  }
+
+  .modal__backdrop { display: none !important; }
+  .modal__panel { box-shadow: none !important; border: none !important; }
+  .modal__header { border-bottom: 1px solid #999 !important; margin-bottom: 1rem !important; }
+  .modal__close { display: none !important; }
+
+  /* Accordion/Details */
+  details { page-break-inside: avoid; }
+  details > summary { cursor: default; }
+
+  /* Avoid breaks */
+  .no-break { page-break-inside: avoid; }
+  .break-before { page-break-before: always; }
+  .break-after { page-break-after: always; }
+
+  /* QR codes or special elements */
+  .qr-code { page-break-inside: avoid; }
+
+  /* Color adjustments for printing */
+  .print-color-adjust {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Print-specific classes for use in HTML */
+.print-only { display: none; }
+@media print { .print-only { display: block; } }
+
+.no-print { display: block; }
+@media print { .no-print { display: none !important; } }
+
+/* Landscape optimization */
+@media print and (orientation: landscape) {
+  @page { margin: 1.5cm; }
+}

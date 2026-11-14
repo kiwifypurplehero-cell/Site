@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Página não encontrada - XPGD</title>
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <style>
+    .error-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: var(--space-8); text-align: center; }
+    .error-page__code { font-family: var(--font-display); font-size: clamp(8rem, 15vw, 16rem); font-weight: 900; line-height: 1; background: linear-gradient(90deg, var(--color-purple-500), var(--color-purple-300)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: var(--space-4); }
+    .error-page__title { font-size: var(--text-2xl); font-weight: 700; margin-bottom: var(--space-3); }
+    .error-page__desc { color: var(--color-text-secondary); max-width: 400px; margin-bottom: var(--space-8); }
+    .error-page__btn { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-6); background: var(--color-purple-600); color: var(--color-text-inverse); border-radius: var(--radius-full); font-weight: 600; transition: all var(--transition-fast); }
+    .error-page__btn:hover { background: var(--color-purple-500); transform: translateY(-2px); box-shadow: var(--shadow-glow); }
+  </style>
+</head>
+<body>
+  <main class="error-page" role="main">
+    <div class="error-page__code" aria-hidden="true">404</div>
+    <h1 class="error-page__title">Página não encontrada</h1>
+    <p class="error-page__desc">Ops! Parece que esta página não existe ou foi movida. Não se preocupe, vamos te levar de volta ao jogo.</p>
+    <a href="#home" class="error-page__btn">Voltar ao Início</a>
+  </main>
+  <script>
+    // Redirect to SPA after brief delay
+    setTimeout(() => {
+      window.location.href = '/index.html#home';
+    }, 3000);
+  </script>
+</body>
+</html>
