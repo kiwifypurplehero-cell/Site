@@ -1,8 +1,0 @@
-{
-  "id": "betterfps",
-  "name": "BetterFps Optimized",
-  "version": "1.4.8-optimized",
-  "authors": ["Guichaguri", "Optimized by Claude"],
-  "description": "Ultra-optimized performance improvements for extremely weak devices. Includes UltraFastMath (2KB RAM, 5x speedup), configurable hopper/beacon intervals, memory pre-allocation, fog disable, and creative search caching.",
-  "url": "http://guichaguri.github.io/BetterFps/"
-}

@@ -1,9 +1,0 @@
-Manifest-Version: 1.0
-TweakOrder: 600
-TweakVersion: 1.4.8
-TweakMetaFile: betterfps.json
-TweakName: BetterFps
-TweakAuthor: Guichaguri
-TweakClass: guichaguri.betterfps.tweaker.BetterFpsTweaker
-Main-Class: guichaguri.betterfps.installer.BetterFpsInstaller
-
