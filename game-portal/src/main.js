@@ -159,7 +159,7 @@ function render() {
   app.innerHTML = `
     <!-- TEST BANNER - remove depois -->
     <div style="position:fixed;top:0;left:0;right:0;background:#b84dff;color:#05000a;text-align:center;padding:8px;font-weight:700;z-index:9999;font-family:system-ui;font-size:14px;">
-      ✅ GAMEPORTAL CARREGOU — Se vê isto, HTML/JS/CSS funcionam
+      ✅ DARL-PLP CARREGOU — Se vê isto, HTML/JS/CSS funcionam
     </div>
 
     <!-- Top Footer -->
@@ -183,12 +183,12 @@ function render() {
 
     <header class="header">
       <div class="header-content">
-        <div class="logo" aria-label="GamePortal Home">
+        <div class="logo" aria-label="Darl-PLP Home">
           <svg class="logo-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect width="32" height="32" rx="8" fill="currentColor"/>
             <path d="M8 12h16M8 16h12M8 20h8" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
-          <span class="logo-text">GamePortal</span>
+          <span class="logo-text">Darl-PLP</span>
         </div>
 
         <div class="search-box">
