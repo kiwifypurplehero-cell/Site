@@ -1,0 +1,38 @@
+CL: nz net/minecraft/server/dedicated/DedicatedServer DedicatedServer
+CL: oo net/minecraft/world/WorldServer WorldServer
+CL: rk net/minecraft/util/math/MathHelper MathHelper
+CL: tv net/minecraft/inventory/IInventory IInventory
+CL: acm net/minecraft/entity/item/EntityTNTPrimed EntityTNTPrimed
+CL: aed net/minecraft/entity/player/EntityPlayer EntityPlayer
+CL: amu net/minecraft/world/World World
+CL: aow net/minecraft/block/Block Block
+CL: arl net/minecraft/block/BlockHopper BlockHopper
+CL: avh net/minecraft/tileentity/TileEntityBeacon TileEntityBeacon
+CL: avh$a net/minecraft/tileentity/TileEntityBeacon$BeamSegment BeamSegment
+CL: avw net/minecraft/tileentity/TileEntityHopper TileEntityHopper
+CL: axw net/minecraft/world/chunk/Chunk Chunk
+CL: bib net/minecraft/client/Minecraft Minecraft
+CL: ble net/minecraft/client/gui/GuiOptions GuiOptions
+CL: bmp net/minecraft/client/gui/inventory/GuiContainerCreative GuiContainerCreative
+CL: brq net/minecraft/client/model/ModelBox ModelBox
+CL: bsb net/minecraft/client/multiplayer/WorldClient WorldClient
+CL: bud net/minecraft/client/entity/EntityPlayerSP EntityPlayerSP
+CL: buq net/minecraft/client/renderer/EntityRenderer EntityRenderer
+CL: bwv net/minecraft/client/renderer/tileentity/TileEntityBeaconRenderer TileEntityBeaconRenderer
+CL: cct net/minecraft/client/renderer/entity/RenderPlayer RenderPlayer
+CL: chd net/minecraft/server/integrated/IntegratedServer IntegratedServer
+CL: net/minecraft/client/ClientBrandRetriever net/minecraft/client/ClientBrandRetriever ClientBrandRetriever
+FD: rk/b net/minecraft/util/math/MathHelper/SIN_TABLE SIN_TABLE
+FD: bib/b net/minecraft/client/Minecraft/memoryReserve memoryReserve
+MD: rk/a (F)F net/minecraft/util/math/MathHelper/sin (F)F sin
+MD: rk/b (F)F net/minecraft/util/math/MathHelper/cos (F)F cos
+MD: vg/B_ ()V net/minecraft/entity/Entity/onUpdate ()V onUpdate
+MD: amu/d ()V net/minecraft/world/World/tick ()V tick
+MD: amu/j ()V net/minecraft/world/World/updateBlocks ()V updateBlocks
+MD: avw/a (Lavv;)Z net/minecraft/tileentity/TileEntityHopper/captureDroppedItems (Lnet/minecraft/tileentity/IHopper;)Z captureDroppedItems
+MD: bib/m ()V net/minecraft/client/Minecraft/freeMemory ()V freeMemory
+MD: bib/aq ()V net/minecraft/client/Minecraft/init ()V startGame
+MD: blk/b ()V net/minecraft/client/gui/GuiScreen/initGui ()V initGui
+MD: bwv/a (DDDDDDII[FDD)V net/minecraft/client/renderer/tileentity/TileEntityBeaconRenderer/renderBeamSegment (DDDDDDII[FDD)V renderBeamSegment
+MD: net/minecraft/client/ClientBrandRetriever/getClientModName ()Ljava/lang/String; net/minecraft/client/ClientBrandRetriever/getClientModName ()Ljava/lang/String; getClientModName
+MD: net/minecraft/server/MinecraftServer/j ()Z net/minecraft/server/MinecraftServer/init ()Z startServer

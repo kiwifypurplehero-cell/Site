@@ -1,0 +1,81 @@
+name: Build BetterFps Optimized
+
+on:
+  push:
+    branches: [main, fresh-main]
+  workflow_dispatch:  # Manual trigger
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build for Minecraft 1.12.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'gradle'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '4.10.3'
+
+      - name: Cache Forge/Minecraft dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-forge-1.12.2-${{ hashFiles('betterfps-optimized/build.gradle', 'betterfps-optimized/gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-forge-1.12.2-
+
+      - name: Download Forge artifacts (fallback)
+        run: |
+          # Create directories
+          mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860
+          mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT
+
+          # Try to download from alternative mirrors
+          echo "Attempting to download Forge artifacts..."
+
+          # Download Forge installer which contains the artifacts
+          wget -q "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar" \
+            -O /tmp/forge-installer.jar || echo "Installer download failed"
+
+          # Try files.minecraftforge.net
+          wget -q "https://files.minecraftforge.net/maven/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-userdev.jar" \
+            -O ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-userdev.jar || echo "Userdev download failed"
+
+      - name: Build BetterFps Optimized
+        working-directory: ./betterfps-optimized
+        run: |
+          chmod +x gradlew
+          ./gradlew setupDecompWorkspace build --stacktrace --info
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BetterFps-Optimized
+          path: betterfps-optimized/build/libs/*.jar
+          retention-days: 30
+
+      - name: Create Release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: betterfps-optimized/build/libs/*.jar
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
