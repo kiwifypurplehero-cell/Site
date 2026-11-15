@@ -31,37 +31,56 @@ jobs:
         with:
           gradle-version: '4.10.3'
 
-      - name: Cache Forge/Minecraft dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-forge-1.12.2-${{ hashFiles('betterfps-optimized/build.gradle', 'betterfps-optimized/gradle.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-forge-1.12.2-
-
-      - name: Download Forge artifacts (fallback)
+      - name: Fix gradlew Java path
         run: |
-          # Create directories
+          sed -i 's|/usr/lib/jvm/java-8-openjdk-amd64/bin/java|${JAVA_HOME}/bin/java|' betterfps-optimized/gradlew
+          chmod +x betterfps-optimized/gradlew
+
+      - name: Download and install Forge artifacts
+        run: |
+          set -e
+          cd betterfps-optimized
+
+          # Create ForgeGradle cache structure
           mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860
           mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT
 
-          # Try to download from alternative mirrors
-          echo "Attempting to download Forge artifacts..."
-
-          # Download Forge installer which contains the artifacts
+          # Download Forge installer (contains all artifacts)
+          echo "Downloading Forge installer..."
           wget -q "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar" \
-            -O /tmp/forge-installer.jar || echo "Installer download failed"
+            -O /tmp/forge-installer.jar || {
+            echo "Trying files.minecraftforge.net..."
+            wget -q "https://files.minecraftforge.net/maven/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar" \
+              -O /tmp/forge-installer.jar || {
+              echo "ERROR: Could not download Forge installer"
+              exit 1
+            }
+          }
 
-          # Try files.minecraftforge.net
-          wget -q "https://files.minecraftforge.net/maven/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-userdev.jar" \
-            -O ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-userdev.jar || echo "Userdev download failed"
+          # Run installer to extract artifacts to gradle cache
+          echo "Installing Forge artifacts..."
+          cd /tmp
+          java -jar forge-installer.jar --installClient 2>&1 | tail -20
+
+          # Copy installed artifacts to gradle cache
+          if [ -d ~/.minecraft/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2860 ]; then
+            cp -r ~/.minecraft/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2860/* \
+              ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/ 2>/dev/null || true
+          fi
+
+          # Also try to find and copy userdev jar
+          find ~/.minecraft -name "*userdev*.jar" -exec cp {} ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/ \; 2>/dev/null || true
+
+          # Download ForgeGradle plugin
+          echo "Downloading ForgeGradle..."
+          wget -q "https://repo.maven.apache.org/maven2/net/minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-20180610.215539-1.jar" \
+            -O ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-20180610.215539-1.jar 2>/dev/null || echo "ForgeGradle download failed, will try maven"
 
       - name: Build BetterFps Optimized
         working-directory: ./betterfps-optimized
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_8_X64 }}
         run: |
-          chmod +x gradlew
           ./gradlew setupDecompWorkspace build --stacktrace --info
 
       - name: Upload JAR artifact
