@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="divider_color">#FF4A0072</color>
+    <color name="purple_accent">#FFBB86FC</color>
+    <color name="purple_dark">#FF4A0072</color>
+    <color name="purple_light">#FF9B30FF</color>
+    <color name="purple_medium">#FF7B1FA2</color>
+    <color name="purple_very_dark">#FF2D0042</color>
+    <color name="surface_card">#FF2D0042</color>
+    <color name="surface_dark">#FF1A0026</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB388CC</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="app_name">Dark-PLP</string>
+    <string name="back">Voltar</string>
+    <string name="default_url">https://www.google.com</string>
+    <string name="go">Ir</string>
+    <string name="url_hint">Pesquisar ou digitar URL</string>
+    <style name="Theme.MinimalBrowser" parent="Theme.AppCompat.Light.NoActionBar">
+        
+        <item name="colorPrimary">@color/purple_dark</item>
+        <item name="colorPrimaryDark">@color/black</item>
+        <item name="colorAccent">@color/purple_accent</item>
+        
+        <item name="android:statusBarColor">@color/black</item>
+        
+        <item name="android:navigationBarColor">@color/black</item>
+        
+        <item name="android:windowBackground">@drawable/bg_gradient_main</item>
+    </style>
+    <style name="Theme.MinimalBrowser.NoActionBar" parent="Theme.MinimalBrowser">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>

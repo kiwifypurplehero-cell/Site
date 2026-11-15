@@ -1,0 +1,33 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color divider_color
+color purple_accent
+color purple_dark
+color purple_light
+color purple_medium
+color purple_very_dark
+color surface_card
+color surface_dark
+color text_primary
+color text_secondary
+color white
+drawable bg_fab_back
+drawable bg_gradient_main
+drawable ic_launcher
+id bottomBar
+id btnBack
+id btnGo
+id etUrl
+id tvBrand
+id webView
+layout activity_main
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string back
+string default_url
+string go
+string url_hint
+style Theme.MinimalBrowser
+style Theme.MinimalBrowser.NoActionBar

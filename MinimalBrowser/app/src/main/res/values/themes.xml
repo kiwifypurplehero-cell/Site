@@ -1,0 +1,21 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.MinimalBrowser" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/purple_dark</item>
+        <item name="colorPrimaryDark">@color/black</item>
+        <item name="colorAccent">@color/purple_accent</item>
+        <!-- Status bar color - black at top -->
+        <item name="android:statusBarColor">@color/black</item>
+        <!-- Navigation bar color -->
+        <item name="android:navigationBarColor">@color/black</item>
+        <!-- Window background with gradient -->
+        <item name="android:windowBackground">@drawable/bg_gradient_main</item>
+    </style>
+
+    <style name="Theme.MinimalBrowser.NoActionBar" parent="Theme.MinimalBrowser">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+</resources>

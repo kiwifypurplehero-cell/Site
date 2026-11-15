@@ -1,0 +1,58 @@
+[
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/drawable_bg_gradient_main.xml.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/drawable/bg_gradient_main.xml"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/drawable_ic_launcher.xml.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/drawable/ic_launcher.xml"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/drawable_bg_fab_back.xml.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/drawable/bg_fab_back.xml"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-mdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/layout_activity_main.xml.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-hdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-mdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.example.minimalbrowser.app-debug-25:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "com.example.minimalbrowser.app-main-27:/mipmap-xxxhdpi/ic_launcher_round.png"
+    }
+]
