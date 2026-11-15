@@ -3,7 +3,7 @@ name: Build BetterFps Optimized
 on:
   push:
     branches: [main, fresh-main]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -11,77 +11,96 @@ jobs:
   build:
     name: Build for Minecraft 1.12.2
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+
+    # Use a container that has Java 8 and can run Gradle 4.10.3
+    container:
+      image: ubuntu:20.04
+      options: --user root
 
     steps:
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y \
+            openjdk-8-jdk-headless \
+            wget \
+            unzip \
+            git \
+            2>&1 | tail -5
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 8
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '8'
-          cache: 'gradle'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '4.10.3'
-
-      - name: Fix gradlew Java path
+      - name: Setup Gradle 4.10.3
         run: |
-          sed -i 's|/usr/lib/jvm/java-8-openjdk-amd64/bin/java|${JAVA_HOME}/bin/java|' betterfps-optimized/gradlew
-          chmod +x betterfps-optimized/gradlew
+          cd /tmp
+          wget -q https://services.gradle.org/distributions/gradle-4.10.3-bin.zip
+          unzip -q gradle-4.10.3-bin.zip -d /opt/gradle
+          ln -s /opt/gradle/gradle-4.10.3/bin/gradle /usr/local/bin/gradle
+          gradle -v
 
-      - name: Download and install Forge artifacts
+      - name: Download and install Forge 1.12.2
         run: |
           set -e
-          cd betterfps-optimized
+          cd /tmp
 
-          # Create ForgeGradle cache structure
-          mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860
-          mkdir -p ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT
-
-          # Download Forge installer (contains all artifacts)
           echo "Downloading Forge installer..."
           wget -q "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar" \
-            -O /tmp/forge-installer.jar || {
+            -O forge-installer.jar || {
             echo "Trying files.minecraftforge.net..."
             wget -q "https://files.minecraftforge.net/maven/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar" \
-              -O /tmp/forge-installer.jar || {
-              echo "ERROR: Could not download Forge installer"
-              exit 1
-            }
+              -O forge-installer.jar || exit 1
           }
 
-          # Run installer to extract artifacts to gradle cache
-          echo "Installing Forge artifacts..."
-          cd /tmp
-          java -jar forge-installer.jar --installClient 2>&1 | tail -20
+          echo "Running Forge installer (client)..."
+          java -jar forge-installer.jar --installClient 2>&1 | tail -30
 
-          # Copy installed artifacts to gradle cache
-          if [ -d ~/.minecraft/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2860 ]; then
-            cp -r ~/.minecraft/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2860/* \
-              ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/ 2>/dev/null || true
+          echo "Running Forge installer (server - for userdev)..."
+          java -jar forge-installer.jar --installServer 2>&1 | tail -30
+
+          # The installer creates ~/.minecraft/libraries with all artifacts
+          # Copy entire libraries to gradle cache
+          if [ -d ~/.minecraft/libraries ]; then
+            mkdir -p ~/.gradle/caches/modules-2/files-2.1
+            cp -r ~/.minecraft/libraries/* ~/.gradle/caches/modules-2/files-2.1/ 2>/dev/null || true
           fi
 
-          # Also try to find and copy userdev jar
-          find ~/.minecraft -name "*userdev*.jar" -exec cp {} ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forge/1.12.2-14.23.5.2860/ \; 2>/dev/null || true
+      - name: Download ForgeGradle from legacy mirror
+        run: |
+          # Try to get ForgeGradle from various mirrors
+          FG_DIR=~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT
+          mkdir -p "$FG_DIR"
 
-          # Download ForgeGradle plugin
-          echo "Downloading ForgeGradle..."
-          wget -q "https://repo.maven.apache.org/maven2/net/minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-20180610.215539-1.jar" \
-            -O ~/.gradle/caches/modules-2/files-2.1/net.minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-20180610.215539-1.jar 2>/dev/null || echo "ForgeGradle download failed, will try maven"
+          # Try jitpack.io which sometimes has old snapshots
+          wget -q "https://jitpack.io/com/github/MinecraftForge/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-SNAPSHOT.jar" \
+            -O "$FG_DIR/ForgeGradle-2.3-SNAPSHOT.jar" 2>/dev/null || true
+
+          # Try maven.minecraftforge.net
+          wget -q "https://maven.minecraftforge.net/net/minecraftforge/gradle/ForgeGradle/2.3-SNAPSHOT/ForgeGradle-2.3-SNAPSHOT.jar" \
+            -O "$FG_DIR/ForgeGradle-2.3-SNAPSHOT.jar" 2>/dev/null || true
+
+          # If still not found, create a minimal one from the installer
+          if [ ! -f "$FG_DIR/ForgeGradle-2.3-SNAPSHOT.jar" ]; then
+            echo "ForgeGradle not found, extracting from installer..."
+            cd /tmp
+            unzip -q forge-installer.jar -d forge-installer-extracted
+            find forge-installer-extracted -name "ForgeGradle*.jar" -exec cp {} "$FG_DIR/ForgeGradle-2.3-SNAPSHOT.jar" \; 2>/dev/null || true
+          fi
 
       - name: Build BetterFps Optimized
         working-directory: ./betterfps-optimized
         env:
-          JAVA_HOME: ${{ env.JAVA_HOME_8_X64 }}
+          JAVA_HOME: /usr/lib/jvm/java-8-openjdk-amd64
+          GRADLE_OPTS: "-Xmx3G -Dfile.encoding=UTF-8"
         run: |
-          ./gradlew setupDecompWorkspace build --stacktrace --info
+          # Fix gradlew
+          sed -i 's|/usr/lib/jvm/java-8-openjdk-amd64/bin/java|${JAVA_HOME}/bin/java|' gradlew
+          chmod +x gradlew
+
+          echo "Starting build..."
+          ./gradlew setupDecompWorkspace build --stacktrace --info 2>&1 | tail -100
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
