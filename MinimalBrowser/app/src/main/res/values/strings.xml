@@ -1,7 +1,0 @@
-<resources>
-    <string name="app_name">Dark-PLP</string>
-    <string name="back">Voltar</string>
-    <string name="go">Ir</string>
-    <string name="url_hint">Pesquisar ou digitar URL</string>
-    <string name="default_url">https://www.google.com</string>
-</resources>
